@@ -146,7 +146,7 @@ int connection_handler(void *data)
 
   int ret;
   unsigned char in_buf[len+1];
-  unsigned char out_buf[len+1];
+  // unsigned char out_buf[len+1];
 
   while (1){
 
@@ -164,10 +164,10 @@ int connection_handler(void *data)
     memset(&address, 0, sizeof(struct sockaddr_in));
     ret = udp_server_receive(accept_socket, &address, in_buf, len, MSG_WAITALL);
     if(ret > 0){
-      printk(KERN_INFO MODULE_NAME": Got %s [connection_handler]", in_buf);
-      memset(&out_buf, 0, len+1);
-      strcat(out_buf, "GOT IT");
-      udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+      // printk(KERN_INFO MODULE_NAME": Got %s [connection_handler]", in_buf);
+      // memset(&out_buf, 0, len+1);
+      // strcat(out_buf, "GOT IT");
+      // udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
     }
   }
 

@@ -31,6 +31,8 @@ static struct udp_server_service * udp_server;
 static atomic_t released_socket = ATOMIC_INIT(0); // 0 no, 1 yes
 static atomic_t thread_running = ATOMIC_INIT(0);   // 0 no, 1 yes
 static atomic_t struct_allocated = ATOMIC_INIT(0); // 0 no, 1 yes
+static struct in_addr proposeraddr;
+static unsigned char learnerip[5] = {127,0,0,4,'\0'};
 
 u32 create_address(u8 *ip)
 {
@@ -147,6 +149,10 @@ int connection_handler(void *data)
   int ret;
   unsigned char in_buf[len+1];
   unsigned char out_buf[len+1];
+  size_t size_msg, size_msg1, size_buf;
+
+  size_msg = strlen("PREPARE 1A");
+  size_msg1 = strlen("ACCEPT REQ 2A");
 
   while (1){
 
@@ -162,12 +168,44 @@ int connection_handler(void *data)
 
     memset(in_buf, 0, len+1);
     memset(&address, 0, sizeof(struct sockaddr_in));
+
     ret = udp_server_receive(accept_socket, &address, in_buf, len, MSG_WAITALL);
     if(ret > 0){
-      printk(KERN_INFO MODULE_NAME": Got %s [connection_handler]", in_buf);
-      memset(&out_buf, 0, len+1);
-      strcat(out_buf, "GOT IT");
-      udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+      size_buf = strlen(in_buf);
+      if(memcmp(in_buf, "PREPARE 1A", size_buf > size_msg ? size_msg : size_buf) == 0){
+        // printk(KERN_INFO MODULE_NAME": Got %s from CLIENT [connection_handler]", in_buf);
+        memcpy(&proposeraddr, &address.sin_addr, sizeof(struct in_addr));
+        // address is same as receiver
+        // address.sin_addr.s_addr = htonl(create_address(acceptorip));
+        address.sin_family = AF_INET;
+        address.sin_port = htons(port);
+
+        memset(&out_buf, 0, len+1);
+        strcat(out_buf, "PROMISE 1B");
+        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+      }else if (memcmp(in_buf, "ACCEPT REQ 2A", size_buf > size_msg1 ? size_msg1 : size_buf) == 0){
+        // address is same as receiver
+        // address.sin_addr.s_addr = htonl(create_address(acceptorip));
+        address.sin_family = AF_INET;
+        address.sin_port = htons(port);
+
+        memset(&out_buf, 0, len+1);
+        strcat(out_buf, "ACCEPTED 2B");
+        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+
+        address.sin_addr.s_addr = htonl(create_address(learnerip));
+        address.sin_family = AF_INET;
+        address.sin_port = htons(port);
+
+        memset(&out_buf, 0, len+1);
+        strcat(out_buf, "ACCEPTED 2B");
+        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+
+      }
+      // printk(KERN_INFO MODULE_NAME": Got %s [connection_handler]", in_buf);
+      // memset(&out_buf, 0, len+1);
+      // strcat(out_buf, "GOT IT");
+      // udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
     }
   }
 
