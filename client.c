@@ -13,6 +13,8 @@ MODULE_AUTHOR("Emanuele Giuseppe Esposito");
 #define MODULE_NAME "Client"
 #define MAX_RCV_WAIT 100000 // in microseconds
 
+static unsigned char proposerip[5] = {127,0,0,2, '\0'};
+
 static int port = 3000;
 module_param(port, int, S_IRUGO);
 MODULE_PARM_DESC(port,"The receiving port, default 3000");
@@ -147,6 +149,15 @@ int connection_handler(void *data)
   int ret;
   unsigned char in_buf[len+1];
   unsigned char out_buf[len+1];
+  size_t size_msg, size_buf;
+
+  address.sin_addr.s_addr = htonl(create_address(proposerip));
+  address.sin_family = AF_INET;
+  address.sin_port = htons(port);
+
+  memset(&out_buf, 0, len+1);
+  strcat(out_buf, "VALUE FROM CLIENT");
+  udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
 
   while (1){
 
@@ -160,14 +171,21 @@ int connection_handler(void *data)
       return 0;
     }
 
+
     memset(in_buf, 0, len+1);
     memset(&address, 0, sizeof(struct sockaddr_in));
     ret = udp_server_receive(accept_socket, &address, in_buf, len, MSG_WAITALL);
     if(ret > 0){
-      printk(KERN_INFO MODULE_NAME": Got %s [connection_handler]", in_buf);
-      memset(&out_buf, 0, len+1);
-      strcat(out_buf, "GOT IT");
-      udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+      size_msg = strlen("ALL DONE");
+      size_buf = strlen(in_buf);
+      if(memcmp(in_buf, "ALL DONE", size_buf > size_msg ? size_msg : size_buf) == 0){
+        printk(KERN_INFO MODULE_NAME": All done, terminating client [connection_handler]");
+      }
+
+      // printk(KERN_INFO MODULE_NAME": Got %s [connection_handler]", in_buf);
+      // memset(&out_buf, 0, len+1);
+      // strcat(out_buf, "GOT IT");
+      // udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
     }
   }
 

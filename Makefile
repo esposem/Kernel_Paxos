@@ -1,5 +1,6 @@
 obj-m += proposer.o
-obj-m += client_learner.o
+obj-m += client.o
+obj-m += learner.o
 obj-m += acceptor.o
 
 all:

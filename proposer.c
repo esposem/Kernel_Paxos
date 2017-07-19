@@ -31,6 +31,9 @@ static struct udp_server_service * udp_server;
 static atomic_t released_socket = ATOMIC_INIT(0); // 0 no, 1 yes
 static atomic_t thread_running = ATOMIC_INIT(0);   // 0 no, 1 yes
 static atomic_t struct_allocated = ATOMIC_INIT(0); // 0 no, 1 yes
+static struct in_addr clientaddr;
+static unsigned char acceptorip[5] = {127,0,0,3, '\0'};
+
 
 u32 create_address(u8 *ip)
 {
@@ -146,6 +149,12 @@ int connection_handler(void *data)
   int ret;
   unsigned char in_buf[len+1];
   unsigned char out_buf[len+1];
+  size_t size_buf, size_msg1, size_msg2, size_msg3;
+
+
+  size_msg1 = strlen("VALUE FROM CLIENT");
+  size_msg2 = strlen("PROMISE 1B");
+  size_msg3 = strlen("ACCEPTED 2B");
 
   while (1){
 
@@ -163,10 +172,38 @@ int connection_handler(void *data)
     memset(&address, 0, sizeof(struct sockaddr_in));
     ret = udp_server_receive(accept_socket, &address, in_buf, len, MSG_WAITALL);
     if(ret > 0){
-      printk(KERN_INFO MODULE_NAME": Got %s [connection_handler]", in_buf);
-      memset(&out_buf, 0, len+1);
-      strcat(out_buf, "GOT IT");
-      udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+      size_buf = strlen(in_buf);
+      if(memcmp(in_buf, "VALUE FROM CLIENT", size_buf > size_msg1 ? size_msg1 : size_buf) == 0){
+        // printk(KERN_INFO MODULE_NAME": Got %s from CLIENT [connection_handler]", in_buf);
+        memcpy(&clientaddr, &address.sin_addr, sizeof(struct in_addr));
+
+        address.sin_addr.s_addr = htonl(create_address(acceptorip));
+        address.sin_family = AF_INET;
+        address.sin_port = htons(port);
+
+        memset(&out_buf, 0, len+1);
+        strcat(out_buf, "PREPARE 1A");
+        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+      }else if (memcmp(in_buf, "PROMISE 1B", size_buf > size_msg2 ? size_msg2 : size_buf) == 0){
+
+        address.sin_addr.s_addr = htonl(create_address(acceptorip));
+        address.sin_family = AF_INET;
+        address.sin_port = htons(port);
+
+        memset(&out_buf, 0, len+1);
+        strcat(out_buf, "ACCEPT REQ 2A");
+        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+
+      } else if (memcmp(in_buf, "ACCEPTED 2B", size_buf > size_msg3 ? size_msg3 : size_buf) == 0){
+        address.sin_addr = clientaddr;
+        address.sin_family = AF_INET;
+        address.sin_port = htons(port);
+
+        memset(&out_buf, 0, len+1);
+        strcat(out_buf, "ALL DONE");
+        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+      }
+
     }
   }
 
