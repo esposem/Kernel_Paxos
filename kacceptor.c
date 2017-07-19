@@ -17,9 +17,9 @@ static int port = 3000;
 module_param(port, int, S_IRUGO);
 MODULE_PARM_DESC(port,"The receiving port, default 3000");
 
-static int len = 49;
+static int len = 51;
 module_param(len, int, S_IRUGO);
-MODULE_PARM_DESC(len,"Packet length, default 49 (automatically added space for \0)");
+MODULE_PARM_DESC(len,"Packet length, default 51 (automatically added space for \0)");
 
 struct udp_acceptor_service
 {
@@ -32,7 +32,7 @@ struct paxos_msg{
   // char * str;
 };
 
-static struct udp_acceptor_service * udp_server;
+static struct udp_acceptor_service * kacceptor;
 static atomic_t released_socket = ATOMIC_INIT(0); // 0 no, 1 yes
 static atomic_t thread_running = ATOMIC_INIT(0);   // 0 no, 1 yes
 static atomic_t struct_allocated = ATOMIC_INIT(0); // 0 no, 1 yes
@@ -82,7 +82,7 @@ int udp_server_send(struct socket *sock, struct sockaddr_in *address, const char
     //   if(atomic_read(&released_socket) == 0){
     //     printk(KERN_INFO MODULE_NAME": Released socket [udp_server_send]");
     //     atomic_set(&released_socket, 1);
-    //     sock_release(udp_server->acceptor_socket);
+    //     sock_release(kacceptor->acceptor_socket);
     //   }
     //   return 0;
     // }
@@ -130,7 +130,7 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
       if(atomic_read(&released_socket) == 0){
         printk(KERN_INFO MODULE_NAME": Released socket [udp_server_receive]");
         atomic_set(&released_socket, 1);
-        sock_release(udp_server->acceptor_socket);
+        sock_release(kacceptor->acceptor_socket);
       }
       return 0;
     }else{
@@ -158,7 +158,7 @@ void _send_message(struct socket * s, struct sockaddr_in * a, unsigned char * bu
 int connection_handler(void *data)
 {
   struct sockaddr_in address;
-  struct socket *accept_socket = udp_server->acceptor_socket;
+  struct socket *accept_socket = kacceptor->acceptor_socket;
   int ret;
 
   unsigned char * in_buf = kmalloc(len, GFP_KERNEL);
@@ -175,7 +175,7 @@ int connection_handler(void *data)
       if(atomic_read(&released_socket) == 0){
         printk(KERN_INFO MODULE_NAME": Released socket [connection_handler]");
         atomic_set(&released_socket, 1);
-        sock_release(udp_server->acceptor_socket);
+        sock_release(kacceptor->acceptor_socket);
       }
       kfree(in_buf);
       kfree(out_buf);
@@ -231,7 +231,7 @@ int udp_server_listen(void)
   struct timeval tv;
   unsigned char listeningip[5] = {127,0,0,3,'\0'};
 
-  server_err = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &udp_server->acceptor_socket);
+  server_err = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &kacceptor->acceptor_socket);
   if(server_err < 0){
     printk(KERN_INFO MODULE_NAME": Error: %d while creating socket [udp_server_listen]", server_err);
     return 0;
@@ -240,7 +240,7 @@ int udp_server_listen(void)
     printk(KERN_INFO MODULE_NAME": Created socket [udp_server_listen]");
   }
 
-  conn_socket = udp_server->acceptor_socket;
+  conn_socket = kacceptor->acceptor_socket;
   server.sin_addr.s_addr = htonl(create_address(listeningip));
   server.sin_family = AF_INET;
   server.sin_port = htons(port);
@@ -249,7 +249,7 @@ int udp_server_listen(void)
   if(server_err < 0) {
     printk(KERN_INFO MODULE_NAME": Error: %d while binding socket [udp_server_listen]", server_err);
     atomic_set(&released_socket, 1);
-    sock_release(udp_server->acceptor_socket);
+    sock_release(kacceptor->acceptor_socket);
     return 0;
   }else{
     printk(KERN_INFO MODULE_NAME": Socket is bind to 127.0.0.3 [udp_server_listen]");
@@ -264,8 +264,8 @@ int udp_server_listen(void)
 }
 
 void udp_server_start(void){
-  udp_server->acceptor_thread = kthread_run((void *)udp_server_listen, NULL, MODULE_NAME);
-  if(udp_server->acceptor_thread >= 0){
+  kacceptor->acceptor_thread = kthread_run((void *)udp_server_listen, NULL, MODULE_NAME);
+  if(kacceptor->acceptor_thread >= 0){
     atomic_set(&thread_running,1);
     printk(KERN_INFO MODULE_NAME ": Thread running [udp_server_start]");
   }else{
@@ -276,12 +276,12 @@ void udp_server_start(void){
 static int __init network_server_init(void)
 {
   atomic_set(&released_socket, 1);
-  udp_server = kmalloc(sizeof(struct udp_acceptor_service), GFP_KERNEL);
-  if(!udp_server){
+  kacceptor = kmalloc(sizeof(struct udp_acceptor_service), GFP_KERNEL);
+  if(!kacceptor){
     printk(KERN_INFO MODULE_NAME": Failed to initialize server [network_server_init]");
   }else{
     atomic_set(&struct_allocated,1);
-    memset(udp_server, 0, sizeof(struct udp_acceptor_service));
+    memset(kacceptor, 0, sizeof(struct udp_acceptor_service));
     printk(KERN_INFO MODULE_NAME ": Server initialized [network_server_init]");
     udp_server_start();
   }
@@ -294,7 +294,7 @@ static void __exit network_server_exit(void)
   if(atomic_read(&struct_allocated) == 1){
 
     if(atomic_read(&thread_running) == 1){
-      if((ret = kthread_stop(udp_server->acceptor_thread)) == 0){
+      if((ret = kthread_stop(kacceptor->acceptor_thread)) == 0){
         printk(KERN_INFO MODULE_NAME": Terminated thread [network_server_exit]");
       }else{
         printk(KERN_INFO MODULE_NAME": Error %d in terminating thread [network_server_exit]", ret);
@@ -305,11 +305,11 @@ static void __exit network_server_exit(void)
 
     if(atomic_read(&released_socket) == 0){
       atomic_set(&released_socket, 1);
-      sock_release(udp_server->acceptor_socket);
+      sock_release(kacceptor->acceptor_socket);
       printk(KERN_INFO MODULE_NAME": Released socket [network_server_exit]");
     }
 
-    kfree(udp_server);
+    kfree(kacceptor);
   }else{
     printk(KERN_INFO MODULE_NAME": Struct was not allocated [network_server_exit]");
   }
