@@ -21,10 +21,10 @@ static int len = 49;
 module_param(len, int, S_IRUGO);
 MODULE_PARM_DESC(len,"Packet length, default 49 (automatically added space for \0)");
 
-struct udp_server_service
+struct udp_acceptor_service
 {
-  struct socket * server_socket;
-  struct task_struct * server_thread;
+  struct socket * acceptor_socket;
+  struct task_struct * acceptor_thread;
 };
 
 struct paxos_msg{
@@ -32,7 +32,7 @@ struct paxos_msg{
   // char * str;
 };
 
-static struct udp_server_service * udp_server;
+static struct udp_acceptor_service * udp_server;
 static atomic_t released_socket = ATOMIC_INIT(0); // 0 no, 1 yes
 static atomic_t thread_running = ATOMIC_INIT(0);   // 0 no, 1 yes
 static atomic_t struct_allocated = ATOMIC_INIT(0); // 0 no, 1 yes
@@ -82,7 +82,7 @@ int udp_server_send(struct socket *sock, struct sockaddr_in *address, const char
     //   if(atomic_read(&released_socket) == 0){
     //     printk(KERN_INFO MODULE_NAME": Released socket [udp_server_send]");
     //     atomic_set(&released_socket, 1);
-    //     sock_release(udp_server->server_socket);
+    //     sock_release(udp_server->acceptor_socket);
     //   }
     //   return 0;
     // }
@@ -130,7 +130,7 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
       if(atomic_read(&released_socket) == 0){
         printk(KERN_INFO MODULE_NAME": Released socket [udp_server_receive]");
         atomic_set(&released_socket, 1);
-        sock_release(udp_server->server_socket);
+        sock_release(udp_server->acceptor_socket);
       }
       return 0;
     }else{
@@ -146,16 +146,25 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
   return len;
 }
 
+// TODO: add struct and serialize it, void * data. Check for how much data has been sent
+void _send_message(struct socket * s, struct sockaddr_in * a, unsigned char * buff, int p, char * data ){
+  a->sin_family = AF_INET;
+  a->sin_port = htons(p);
+  memset(buff, '\0', len);
+  strncat(buff, data, len-1);
+  udp_server_send(s, a, buff,strlen(buff), MSG_WAITALL);
+}
+
 int connection_handler(void *data)
 {
   struct sockaddr_in address;
-  struct socket *accept_socket = udp_server->server_socket;
+  struct socket *accept_socket = udp_server->acceptor_socket;
   int ret;
-  unsigned char in_buf[len+1];
-  unsigned char out_buf[len+1];
+
+  unsigned char * in_buf = kmalloc(len, GFP_KERNEL);
+  unsigned char * out_buf = kmalloc(len, GFP_KERNEL);
   size_t size_msg, size_msg1, size_buf;
-  struct paxos_msg message;
-  unsigned char * c;
+
   size_msg = strlen("PREPARE 1A");
   size_msg1 = strlen("ACCEPT REQ 2A");
 
@@ -166,33 +175,32 @@ int connection_handler(void *data)
       if(atomic_read(&released_socket) == 0){
         printk(KERN_INFO MODULE_NAME": Released socket [connection_handler]");
         atomic_set(&released_socket, 1);
-        sock_release(udp_server->server_socket);
+        sock_release(udp_server->acceptor_socket);
       }
+      kfree(in_buf);
+      kfree(out_buf);
       return 0;
     }
 
-    memset(in_buf, 0, len+1);
+    memset(in_buf, '\0', len);
     memset(&address, 0, sizeof(struct sockaddr_in));
 
     address.sin_addr.s_addr = htonl(create_address(learnerip));
     address.sin_family = AF_INET;
     address.sin_port = htons(port);
 
-    memset(&out_buf, 0, len+1);
-    strcat(out_buf, "ACCEPTED 2B");
-    if(12 + sizeof(struct paxos_msg) > len){
-      printk(KERN_INFO MODULE_NAME"Could not insert the struct, not enough space");
-    }else{
-      message.i = 90;
-      c = out_buf;
-      c+=12;
-      memcpy(c, &message, sizeof(struct paxos_msg));
-      message = *((struct paxos_msg *) c);
-      printk(KERN_INFO MODULE_NAME": i = %d", message.i);
-    }
-
-    // strcat(out_buf, (char *) &message);
-    udp_server_send(accept_socket, &address, out_buf,strlen(out_buf) + 1 + sizeof(struct paxos_msg), MSG_WAITALL);
+    // struct paxos_msg message;
+    // memset(out_buf, '\0', len);
+    // strcat(out_buf, "ACCEPTED 2B");
+    // if(12 + sizeof(struct paxos_msg) > len){
+    //   printk(KERN_INFO MODULE_NAME"Could not insert the struct, not enough space");
+    // }else{
+    //   message.i = 90;
+    //   memcpy((out_buf + 12), &message, sizeof(struct paxos_msg));
+    //   message = *((struct paxos_msg *) (out_buf + 12));
+    //   printk(KERN_INFO MODULE_NAME": i = %d", message.i);
+    // }
+    // udp_server_send(accept_socket, &address, out_buf,strlen(out_buf) + 1 + sizeof(struct paxos_msg), MSG_WAITALL);
 
     ret = udp_server_receive(accept_socket, &address, in_buf, len, MSG_WAITALL);
     if(ret > 0){
@@ -201,29 +209,13 @@ int connection_handler(void *data)
         memcpy(&proposeraddr, &address.sin_addr, sizeof(struct in_addr));
         // address is same as receiver
         // address.sin_addr.s_addr = htonl(create_address(acceptorip));
-        address.sin_family = AF_INET;
-        address.sin_port = htons(port);
-        memset(&out_buf, 0, len+1);
-        strcat(out_buf, "PROMISE 1B");
-        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
+        _send_message(accept_socket, &address, out_buf, port, "PROMISE 1B");
       }else if (memcmp(in_buf, "ACCEPT REQ 2A", size_buf > size_msg1 ? size_msg1 : size_buf) == 0){
         // address is same as receiver
         // address.sin_addr.s_addr = htonl(create_address(acceptorip));
-        address.sin_family = AF_INET;
-        address.sin_port = htons(port);
-
-        memset(&out_buf, 0, len+1);
-        strcat(out_buf, "ACCEPTED 2B");
-        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
-
+        _send_message(accept_socket, &address, out_buf, port, "ACCEPTED 2B");
         address.sin_addr.s_addr = htonl(create_address(learnerip));
-        address.sin_family = AF_INET;
-        address.sin_port = htons(port);
-
-        memset(&out_buf, 0, len+1);
-        strcat(out_buf, "ACCEPTED 2B");
-        udp_server_send(accept_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
-
+        _send_message(accept_socket, &address, out_buf, port, "ACCEPTED 2B");
       }
     }
   }
@@ -239,7 +231,7 @@ int udp_server_listen(void)
   struct timeval tv;
   unsigned char listeningip[5] = {127,0,0,3,'\0'};
 
-  server_err = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &udp_server->server_socket);
+  server_err = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &udp_server->acceptor_socket);
   if(server_err < 0){
     printk(KERN_INFO MODULE_NAME": Error: %d while creating socket [udp_server_listen]", server_err);
     return 0;
@@ -248,7 +240,7 @@ int udp_server_listen(void)
     printk(KERN_INFO MODULE_NAME": Created socket [udp_server_listen]");
   }
 
-  conn_socket = udp_server->server_socket;
+  conn_socket = udp_server->acceptor_socket;
   server.sin_addr.s_addr = htonl(create_address(listeningip));
   server.sin_family = AF_INET;
   server.sin_port = htons(port);
@@ -257,7 +249,7 @@ int udp_server_listen(void)
   if(server_err < 0) {
     printk(KERN_INFO MODULE_NAME": Error: %d while binding socket [udp_server_listen]", server_err);
     atomic_set(&released_socket, 1);
-    sock_release(udp_server->server_socket);
+    sock_release(udp_server->acceptor_socket);
     return 0;
   }else{
     printk(KERN_INFO MODULE_NAME": Socket is bind to 127.0.0.3 [udp_server_listen]");
@@ -272,8 +264,8 @@ int udp_server_listen(void)
 }
 
 void udp_server_start(void){
-  udp_server->server_thread = kthread_run((void *)udp_server_listen, NULL, MODULE_NAME);
-  if(udp_server->server_thread >= 0){
+  udp_server->acceptor_thread = kthread_run((void *)udp_server_listen, NULL, MODULE_NAME);
+  if(udp_server->acceptor_thread >= 0){
     atomic_set(&thread_running,1);
     printk(KERN_INFO MODULE_NAME ": Thread running [udp_server_start]");
   }else{
@@ -284,12 +276,12 @@ void udp_server_start(void){
 static int __init network_server_init(void)
 {
   atomic_set(&released_socket, 1);
-  udp_server = kmalloc(sizeof(struct udp_server_service), GFP_KERNEL);
+  udp_server = kmalloc(sizeof(struct udp_acceptor_service), GFP_KERNEL);
   if(!udp_server){
     printk(KERN_INFO MODULE_NAME": Failed to initialize server [network_server_init]");
   }else{
     atomic_set(&struct_allocated,1);
-    memset(udp_server, 0, sizeof(struct udp_server_service));
+    memset(udp_server, 0, sizeof(struct udp_acceptor_service));
     printk(KERN_INFO MODULE_NAME ": Server initialized [network_server_init]");
     udp_server_start();
   }
@@ -302,7 +294,7 @@ static void __exit network_server_exit(void)
   if(atomic_read(&struct_allocated) == 1){
 
     if(atomic_read(&thread_running) == 1){
-      if((ret = kthread_stop(udp_server->server_thread)) == 0){
+      if((ret = kthread_stop(udp_server->acceptor_thread)) == 0){
         printk(KERN_INFO MODULE_NAME": Terminated thread [network_server_exit]");
       }else{
         printk(KERN_INFO MODULE_NAME": Error %d in terminating thread [network_server_exit]", ret);
@@ -313,7 +305,7 @@ static void __exit network_server_exit(void)
 
     if(atomic_read(&released_socket) == 0){
       atomic_set(&released_socket, 1);
-      sock_release(udp_server->server_socket);
+      sock_release(udp_server->acceptor_socket);
       printk(KERN_INFO MODULE_NAME": Released socket [network_server_exit]");
     }
 
