@@ -10,16 +10,18 @@
 MODULE_LICENSE("MIT");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");
 
-#define MODULE_NAME "Learner"
+#define MODULE_NAME "Learner: "
 #define MAX_RCV_WAIT 100000 // in microseconds
+#define MAX_UDP_SIZE 65507
 
-static int port = 3000;
+static int port = 4000;
 module_param(port, int, S_IRUGO);
 MODULE_PARM_DESC(port,"The receiving port, default 3000");
 
-static int len = 51;
+static int len = 50;
 module_param(len, int, S_IRUGO);
-MODULE_PARM_DESC(len,"Packet length, default 51 (automatically added space for \0)");
+// the \0 is allocated, but not sent. It's just for printing purposes
+MODULE_PARM_DESC(len,"Data packet length, default 50, max 65507 (automatically added space for terminating \0)");
 
 struct udp_learner_service
 {
@@ -67,27 +69,16 @@ int udp_server_send(struct socket *sock, struct sockaddr_in *address, const char
     msg.msg_flags   = 0;
 
     oldmm = get_fs(); set_fs(KERNEL_DS);
-    printk(KERN_INFO MODULE_NAME": Sent message to %pI4 [udp_server_send]", &address->sin_addr);
+    printk(KERN_INFO MODULE_NAME"Sent message to %pI4 [udp_server_send]", &address->sin_addr);
 
     repeat_send:
 
     vec.iov_len = left;
     vec.iov_base = (char *)buf + written;
 
-    // if(kthread_should_stop() || signal_pending(current)){
-    //   printk(KERN_INFO MODULE_NAME": STOP [udp_server_send]");
-    //   if(atomic_read(&released_socket) == 0){
-    //     printk(KERN_INFO MODULE_NAME": Released socket [udp_server_send]");
-    //     atomic_set(&released_socket, 1);
-    //     sock_release(klearner->learner_socket);
-    //   }
-    //   return 0;
-    // }
-
     len = kernel_sendmsg(sock, &msg, &vec, left, left);
 
     if((len == -ERESTARTSYS) || (!(flags & MSG_WAITALL) && (len == -EAGAIN))){
-      // printk(KERN_INFO MODULE_NAME"Sent only a piece [udp_server_send]");
       goto repeat_send;
     }
 
@@ -109,7 +100,7 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
 {
   struct msghdr msg;
   struct kvec vec;
-  int len;
+  int lenm;
 
   msg.msg_name = address;
   msg.msg_namelen = sizeof(struct sockaddr_in);
@@ -120,27 +111,34 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
   vec.iov_len = size;
   vec.iov_base = buf;
 
-  len = -EAGAIN;
-  while(len == -ERESTARTSYS || len == -EAGAIN){
+  do{
     if(kthread_should_stop() || signal_pending(current)){
-      // printk(KERN_INFO MODULE_NAME": STOP [udp_server_receive]");
+      // printk(KERN_INFO MODULE_NAME"STOP [udp_server_receive]");
       if(atomic_read(&released_socket) == 0){
-        printk(KERN_INFO MODULE_NAME": Released socket [udp_server_receive]");
+        printk(KERN_INFO MODULE_NAME"Released socket [udp_server_receive]");
         atomic_set(&released_socket, 1);
         sock_release(klearner->learner_socket);
       }
       return 0;
     }else{
-      len = kernel_recvmsg(sock, &msg, &vec, size, size, flags);
-      if(len > 0){
+      lenm = kernel_recvmsg(sock, &msg, &vec, size, size, flags);
+      if(lenm > 0){
         address = (struct sockaddr_in *) msg.msg_name;
-        printk(KERN_INFO MODULE_NAME": Received message from %pI4 saying %s [udp_server_receive]",&address->sin_addr, buf);
-
+        printk(KERN_INFO MODULE_NAME"Received message from %pI4 saying %s %d == %d [udp_server_receive]",&address->sin_addr, buf, len, size);
+        break;
       }
     }
-  }
+  }while(lenm == -ERESTARTSYS || lenm == -EAGAIN);
 
-  return len;
+  return lenm;
+}
+
+void _send_message(struct socket * s, struct sockaddr_in * a, unsigned char * buff, int p, char * data ){
+  a->sin_family = AF_INET;
+  a->sin_port = htons(p);
+  memset(buff, '\0', len);
+  strncat(buff, data, len-1);
+  udp_server_send(s, a, buff,strlen(buff), MSG_WAITALL);
 }
 
 int connection_handler(void *data)
@@ -150,35 +148,38 @@ int connection_handler(void *data)
 
   int ret;
   unsigned char * in_buf = kmalloc(len, GFP_KERNEL);
-  // unsigned char out_buf[len+1];
+  unsigned char * out_buf= kmalloc(len, GFP_KERNEL);
 
   while (1){
 
     if(kthread_should_stop() || signal_pending(current)){
-      // printk(KERN_INFO MODULE_NAME": STOP [connection_handler]");
+      // printk(KERN_INFO MODULE_NAME"STOP [connection_handler]");
       if(atomic_read(&released_socket) == 0){
-        printk(KERN_INFO MODULE_NAME": Released socket [connection_handler]");
+        printk(KERN_INFO MODULE_NAME"Released socket [connection_handler]");
         atomic_set(&released_socket, 1);
         sock_release(klearner->learner_socket);
       }
-      printk(KERN_INFO MODULE_NAME": Released buffer [connection_handler]");
+      printk(KERN_INFO MODULE_NAME"Released buffer [connection_handler]");
       kfree(in_buf);
+      kfree(out_buf);
       return 0;
     }
 
     memset(in_buf, '\0', len);
     memset(&address, 0, sizeof(struct sockaddr_in));
     ret = udp_server_receive(learner_socket, &address, in_buf, len, MSG_WAITALL);
-    if(ret > 0){
-      // if(memcmp(in_buf, "ACCEPTED 2B", 11) == 0){
-      //   struct paxos_msg message;
-      //   message.i = 100;
-      //   message = *((struct paxos_msg *) (in_buf + 12));
-      //   printk(KERN_INFO MODULE_NAME": i = %d", message.i);
-      // }
 
-      // printk(KERN_INFO MODULE_NAME": Got %s [connection_handler]", in_buf);
-      // memset(out_buf, '\0', len+1);
+    if(ret > 0){
+      if(memcmp(in_buf, "ACCEPTED 2B", 11) == 0){
+        // struct paxos_msg message;
+        // message.i = 100;
+        // message = *((struct paxos_msg *) (in_buf + 12));
+        // printk(KERN_INFO MODULE_NAME"i = %d", message.i);
+        // _send_message(learner_socket, &address, out_buf, port, "GOT MESSAGE");
+        return 0;
+      }
+
+      // memset(out_buf, '\0', len);
       // strcat(out_buf, "GOT IT");
       // udp_server_send(learner_socket, &address, out_buf,strlen(out_buf), MSG_WAITALL);
     }
@@ -197,11 +198,12 @@ int udp_server_listen(void)
 
   server_err = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &klearner->learner_socket);
   if(server_err < 0){
-    printk(KERN_INFO MODULE_NAME": Error: %d while creating socket [udp_server_listen]", server_err);
+    printk(KERN_INFO MODULE_NAME"Error: %d while creating socket [udp_server_listen]", server_err);
+    atomic_set(&thread_running, 0);
     return 0;
   }else{
     atomic_set(&released_socket, 0);
-    printk(KERN_INFO MODULE_NAME": Created socket [udp_server_listen]");
+    printk(KERN_INFO MODULE_NAME"Created socket [udp_server_listen]");
   }
 
   conn_socket = klearner->learner_socket;
@@ -211,12 +213,13 @@ int udp_server_listen(void)
 
   server_err = conn_socket->ops->bind(conn_socket, (struct sockaddr*)&server, sizeof(server));
   if(server_err < 0) {
-    printk(KERN_INFO MODULE_NAME": Error: %d while binding socket [udp_server_listen]", server_err);
+    printk(KERN_INFO MODULE_NAME"Error: %d while binding socket [udp_server_listen]", server_err);
     atomic_set(&released_socket, 1);
     sock_release(klearner->learner_socket);
+    atomic_set(&thread_running, 0);
     return 0;
   }else{
-    printk(KERN_INFO MODULE_NAME": Socket is bind to 127.0.0.4 [udp_server_listen]");
+    printk(KERN_INFO MODULE_NAME"Socket is bind to 127.0.0.4 [udp_server_listen]");
   }
 
   tv.tv_sec = 0;
@@ -224,6 +227,7 @@ int udp_server_listen(void)
   kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&tv, sizeof(tv));
 
   connection_handler(NULL);
+  atomic_set(&thread_running, 0);
   return 0;
 }
 
@@ -231,22 +235,27 @@ void udp_server_start(void){
   klearner->learner_thread = kthread_run((void *)udp_server_listen, NULL, MODULE_NAME);
   if(klearner->learner_thread >= 0){
     atomic_set(&thread_running,1);
-    printk(KERN_INFO MODULE_NAME ": Thread running [udp_server_start]");
+    printk(KERN_INFO MODULE_NAME "Thread running [udp_server_start]");
   }else{
-    printk(KERN_INFO MODULE_NAME ": Error in starting thread. Terminated [udp_server_start]");
+    printk(KERN_INFO MODULE_NAME "Error in starting thread. Terminated [udp_server_start]");
   }
 }
 
 static int __init network_server_init(void)
 {
+  if(len < 0 || len > MAX_UDP_SIZE){
+    printk(KERN_INFO MODULE_NAME"Wrong len, using default one");
+    len = 50;
+  }
+  len++;
   atomic_set(&released_socket, 1);
   klearner = kmalloc(sizeof(struct udp_learner_service), GFP_KERNEL);
   if(!klearner){
-    printk(KERN_INFO MODULE_NAME": Failed to initialize server [network_server_init]");
+    printk(KERN_INFO MODULE_NAME"Failed to initialize server [network_server_init]");
   }else{
     atomic_set(&struct_allocated,1);
     memset(klearner, 0, sizeof(struct udp_learner_service));
-    printk(KERN_INFO MODULE_NAME ": Server initialized [network_server_init]");
+    printk(KERN_INFO MODULE_NAME "Server initialized [network_server_init]");
     udp_server_start();
   }
   return 0;
@@ -259,26 +268,26 @@ static void __exit network_server_exit(void)
 
     if(atomic_read(&thread_running) == 1){
       if((ret = kthread_stop(klearner->learner_thread)) == 0){
-        printk(KERN_INFO MODULE_NAME": Terminated thread [network_server_exit]");
+        printk(KERN_INFO MODULE_NAME"Terminated thread [network_server_exit]");
       }else{
-        printk(KERN_INFO MODULE_NAME": Error %d in terminating thread [network_server_exit]", ret);
+        printk(KERN_INFO MODULE_NAME"Error %d in terminating thread [network_server_exit]", ret);
       }
     }else{
-      printk(KERN_INFO MODULE_NAME": Thread was not running [network_server_exit]");
+      printk(KERN_INFO MODULE_NAME"Thread was not running [network_server_exit]");
     }
 
     if(atomic_read(&released_socket) == 0){
       atomic_set(&released_socket, 1);
       sock_release(klearner->learner_socket);
-      printk(KERN_INFO MODULE_NAME": Released socket [network_server_exit]");
+      printk(KERN_INFO MODULE_NAME"Released socket [network_server_exit]");
     }
 
     kfree(klearner);
   }else{
-    printk(KERN_INFO MODULE_NAME": Struct was not allocated [network_server_exit]");
+    printk(KERN_INFO MODULE_NAME"Struct was not allocated [network_server_exit]");
   }
 
-  printk(KERN_INFO MODULE_NAME": Module unloaded [network_server_exit]");
+  printk(KERN_INFO MODULE_NAME"Module unloaded [network_server_exit]");
 }
 
 module_init(network_server_init)
