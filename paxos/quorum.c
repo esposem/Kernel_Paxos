@@ -26,19 +26,21 @@
  */
 
 
-#include "paxos.h"
-#include "quorum.h"
+#include "include/paxos.h"
+#include "include/quorum.h"
 // #include <stdlib.h>
 // #include <string.h>
-#include <linux/kernel.h>
+#include <linux/kernel.h> // stdlib, string, limits
+#include <linux/slab.h>
 
 
 void
 quorum_init(struct quorum* q, int acceptors)
 {
+
 	q->acceptors = acceptors;
 	q->quorum = paxos_quorum(acceptors);
-	q->acceptor_ids = malloc(sizeof(int) * q->acceptors);
+	q->acceptor_ids = kmalloc(sizeof(int) * q->acceptors, GFP_KERNEL);
 	quorum_clear(q);
 }
 
@@ -52,7 +54,7 @@ quorum_clear(struct quorum* q)
 void
 quorum_destroy(struct quorum* q)
 {
-	free(q->acceptor_ids);
+	kfree(q->acceptor_ids);
 }
 
 int

@@ -26,15 +26,15 @@
  */
 
 
-#include "proposer.h"
-#include "carray.h"
-#include "quorum.h"
-#include "khash.h"
+#include "include/proposer.h"
+#include "include/carray.h"
+#include "include/quorum.h"
+#include "include/khash.h"
 // #include <assert.h>
 // #include <string.h>
 // #include <stdlib.h>
-// #include <sys/time.h>
-#include <linux/kernel.h>
+#include <linux/kernel.h> // stdlib, string, limits
+#include <linux/slab.h>
 #include <linux/time.h>
 
 struct instance
@@ -88,7 +88,7 @@ struct proposer*
 proposer_new(int id, int acceptors)
 {
 	struct proposer *p;
-	p = malloc(sizeof(struct proposer));
+	p = kmalloc(sizeof(struct proposer), GFP_KERNEL);
 	p->id = id;
 	p->acceptors = acceptors;
 	p->max_trim_iid = 0;
@@ -109,7 +109,7 @@ proposer_free(struct proposer* p)
 	kh_destroy(instance, p->accept_instances);
 	carray_foreach(p->values, carray_paxos_value_free);
 	carray_free(p->values);
-	free(p);
+	kfree(p);
 }
 
 void
@@ -146,7 +146,8 @@ proposer_prepare(struct proposer* p, paxos_prepare* out)
 	ballot_t bal = proposer_next_ballot(p, 0);
 	struct instance* inst = instance_new(iid, bal, p->acceptors);
 	khiter_t k = kh_put_instance(p->prepare_instances, iid, &rv);
-	assert(rv > 0);
+	// assert(rv > 0);
+	WARN_ON(rv <= 0);
 	kh_value(p->prepare_instances, k) = inst;
 	*out = (paxos_prepare) {inst->iid, inst->ballot};
 }
@@ -316,11 +317,11 @@ struct timeout_iterator*
 proposer_timeout_iterator(struct proposer* p)
 {
 	struct timeout_iterator* iter;
-	iter = malloc(sizeof(struct timeout_iterator));
+	iter = kmalloc(sizeof(struct timeout_iterator), GFP_KERNEL);
 	iter->pi = kh_begin(p->prepare_instances);
 	iter->ai = kh_begin(p->accept_instances);
 	iter->proposer = p;
-	gettimeofday(&iter->timeout, NULL);
+	do_gettimeofday(&iter->timeout);
 	return iter;
 }
 
@@ -368,7 +369,7 @@ timeout_iterator_accept(struct timeout_iterator* iter, paxos_accept* out)
 void
 timeout_iterator_free(struct timeout_iterator* iter)
 {
-	free(iter);
+	kfree(iter);
 }
 
 static ballot_t
@@ -388,7 +389,7 @@ proposer_preempt(struct proposer* p, struct instance* inst, paxos_prepare* out)
 	inst->promised_value = NULL;
 	quorum_clear(&inst->quorum);
 	*out = (paxos_prepare) {inst->iid, inst->ballot};
-	gettimeofday(&inst->created_at, NULL);
+	do_gettimeofday(&inst->created_at);
 }
 
 static void
@@ -398,10 +399,12 @@ proposer_move_instance(khash_t(instance)* f, khash_t(instance)* t,
 	int rv;
 	khiter_t k;
 	k = kh_get_instance(f, inst->iid);
-	assert(k != kh_end(f));
+	// assert(k != kh_end(f));
+	WARN_ON(k == kh_end(f));
 	kh_del_instance(f, k);
 	k = kh_put_instance(t, inst->iid, &rv);
-	assert(rv > 0);
+	// assert(rv > 0);
+	WARN_ON(rv <= 0);
 	kh_value(t, k) = inst;
 	quorum_clear(&inst->quorum);
 }
@@ -429,15 +432,16 @@ static struct instance*
 instance_new(iid_t iid, ballot_t ballot, int acceptors)
 {
 	struct instance* inst;
-	inst = malloc(sizeof(struct instance));
+	inst = kmalloc(sizeof(struct instance), GFP_KERNEL);
 	inst->iid = iid;
 	inst->ballot = ballot;
 	inst->value_ballot = 0;
 	inst->value = NULL;
 	inst->promised_value = NULL;
-	gettimeofday(&inst->created_at, NULL);
+	do_gettimeofday(&inst->created_at);
 	quorum_init(&inst->quorum, acceptors);
-	assert(inst->iid > 0);
+	// assert(inst->iid > 0);
+	WARN_ON(inst->iid <= 0);
 	return inst;
 }
 
@@ -449,7 +453,7 @@ instance_free(struct instance* inst)
 		paxos_value_free(inst->value);
 	if (instance_has_promised_value(inst))
 		paxos_value_free(inst->promised_value);
-	free(inst);
+	kfree(inst);
 }
 
 static int

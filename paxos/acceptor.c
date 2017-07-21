@@ -26,9 +26,13 @@
  */
 
 
-#include "acceptor.h"
-#include "storage.h"
-#include <linux/kernel.h>
+#include "include/acceptor.h"
+#include "include/storage.h"
+#include <linux/types.h> //stdint, stdarg
+#include <linux/kernel.h> // stdlib, string, limits
+#include <linux/module.h>
+#include <linux/slab.h> //kmalloc
+
 // #include <stdlib.h>
 // #include <string.h>
 
@@ -48,10 +52,10 @@ struct acceptor*
 acceptor_new(int id)
 {
 	struct acceptor* a;
-	a = malloc(sizeof(struct acceptor));
+	a = kmalloc(sizeof(struct acceptor), GFP_KERNEL);
 	storage_init(&a->store, id);
 	if (storage_open(&a->store) != 0) {
-		free(a);
+		kfree(a);
 		return NULL;
 	}
 	if (storage_tx_begin(&a->store) != 0)
@@ -67,7 +71,7 @@ void
 acceptor_free(struct acceptor* a)
 {
 	storage_close(&a->store);
-	free(a);
+	kfree(a);
 }
 
 int
@@ -184,7 +188,7 @@ paxos_accept_to_accepted(int id, paxos_accept* acc, paxos_message* out)
 	char* value = NULL;
 	int value_size = acc->value.paxos_value_len;
 	if (value_size > 0) {
-		value = malloc(value_size);
+		value = kmalloc(value_size, GFP_KERNEL);
 		memcpy(value, acc->value.paxos_value_val, value_size);
 	}
 	out->type = PAXOS_ACCEPTED;

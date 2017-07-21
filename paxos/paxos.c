@@ -26,14 +26,15 @@
  */
 
 
-#include "paxos.h"
+#include "include/paxos.h"
 // #include <stdlib.h>
 // #include <string.h>
 // #include <stdio.h>
+#include <linux/kernel.h> // stdlib, string, limits
 // #include <time.h>
 // #include <sys/time.h>
-#include <linux/kernel.h>
 #include <linux/time.h>
+#include <linux/slab.h> //kmalloc
 
 
 struct paxos_config paxos_config =
@@ -61,9 +62,9 @@ paxos_value*
 paxos_value_new(const char* value, size_t size)
 {
 	paxos_value* v;
-	v = malloc(sizeof(paxos_value));
+	v = kmalloc(sizeof(paxos_value), GFP_KERNEL);
 	v->paxos_value_len = size;
-	v->paxos_value_val = malloc(size);
+	v->paxos_value_val = kmalloc(size, GFP_KERNEL);
 	memcpy(v->paxos_value_val, value, size);
 	return v;
 }
@@ -71,22 +72,22 @@ paxos_value_new(const char* value, size_t size)
 void
 paxos_value_free(paxos_value* v)
 {
-	free(v->paxos_value_val);
-	free(v);
+	kfree(v->paxos_value_val);
+	kfree(v);
 }
 
 static void
 paxos_value_destroy(paxos_value* v)
 {
 	if (v->paxos_value_len > 0)
-		free(v->paxos_value_val);
+		kfree(v->paxos_value_val);
 }
 
 void
 paxos_accepted_free(paxos_accepted* a)
 {
 	paxos_accepted_destroy(a);
-	free(a);
+	kfree(a);
 }
 
 void
@@ -136,17 +137,33 @@ paxos_message_destroy(paxos_message* m)
 void
 paxos_log(int level, const char* format, va_list ap)
 {
-	int off;
-	char msg[1024];
+	int off = 0;
+	char msg[1000];
 	struct timeval tv;
 
 	if (level > paxos_config.verbosity)
 		return;
 
-	gettimeofday(&tv,NULL);
-	off = strftime(msg, sizeof(msg), "%d %b %H:%M:%S. ", localtime(&tv.tv_sec));
+	do_gettimeofday(&tv);
+	// off = strftime(msg, sizeof(msg), "%d %b %H:%M:%S. ", localtime(&tv.tv_sec));
 	vsnprintf(msg+off, sizeof(msg)-off, format, ap);
-	fprintf(stdout,"%s\n", msg);
+	// fprintf(stdout,"%s\n", msg);
+	printk(KERN_INFO "%s", msg);
+
+	// unsigned long get_time;
+  // int sec, hr, min, tmp1,tmp2, tmp3;
+  // struct timeval tv;
+  // struct tm tv2;
+	//
+  // do_gettimeofday(&tv);
+  // get_time = tv.tv_sec;
+  // sec = get_time % 60;
+  // tmp1 = get_time / 60;
+  // min = tmp1 % 60;
+  // tmp2 = tmp1 / 60;
+  // hr = (tmp2 % 24) - 4;
+	//
+  // printk(KERN_INFO "time ::  %d:%d:%d\n",hr,min,sec);
 }
 
 void

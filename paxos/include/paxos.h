@@ -34,8 +34,9 @@ extern "C" {
 #endif
 
 // #include <stdarg.h>
-#include <sys/libkern.h>
+// #include <sys/libkern.h>
 // #include <sys/types.h>
+#include <linux/kernel.h>
 #include <linux/types.h>
 #include "paxos_types.h"
 

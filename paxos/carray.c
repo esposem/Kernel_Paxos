@@ -26,10 +26,12 @@
  */
 
 
-#include "carray.h"
+#include "include/carray.h"
 // #include <stdlib.h>
-// #include <assert.h>
 #include <linux/kernel.h>
+#include <linux/slab.h>
+
+// #include <assert.h>
 
 struct carray
 {
@@ -48,22 +50,24 @@ struct carray*
 carray_new(int size)
 {
 	struct carray* a;
-	a = malloc(sizeof(struct carray));
-	assert(a != NULL);
+	a = kmalloc(sizeof(struct carray), GFP_KERNEL);
+	// assert(a != NULL);
+	WARN_ON(a == NULL);
 	a->head = 0;
 	a->tail = 0;
 	a->size = size;
 	a->count = 0;
-	a->array = malloc(sizeof(void*)*a->size);
-	assert(a->array != NULL);
+	a->array = kmalloc(sizeof(void*)*a->size, GFP_KERNEL);
+	// assert(a->array != NULL);
+	WARN_ON(a->array == NULL);
 	return a;
 }
 
 void
 carray_free(struct carray* a)
 {
-	free(a->array);
-	free(a);
+	kfree(a->array);
+	kfree(a);
 }
 
 int
@@ -121,12 +125,12 @@ carray_grow(struct carray* a)
 	struct carray* tmp = carray_new(a->size * 2);
 	for (i = 0; i < a->count; i++)
 		carray_push_back(tmp, carray_at(a, i));
-	free(a->array);
+	kfree(a->array);
 	a->head = 0;
 	a->tail = tmp->tail;
 	a->size = tmp->size;
 	a->array = tmp->array;
-	free(tmp);
+	kfree(tmp);
 }
 
 static void*

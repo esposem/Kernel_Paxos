@@ -26,8 +26,9 @@
  */
 
 
-#include "storage.h"
-#include "khash.h"
+#include "include/storage.h"
+#include <linux/slab.h>
+#include "include/khash.h"
 
 KHASH_MAP_INIT_INT(record, paxos_accepted*);
 
@@ -42,7 +43,7 @@ static void paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src);
 static struct mem_storage*
 mem_storage_new(int acceptor_id)
 {
-	struct mem_storage* s = malloc(sizeof(struct mem_storage));
+	struct mem_storage* s = kmalloc(sizeof(struct mem_storage), GFP_KERNEL);
 	if (s == NULL)
 		return s;
 	s->trim_iid = 0;
@@ -63,7 +64,7 @@ mem_storage_close(void* handle)
 	paxos_accepted* accepted;
 	kh_foreach_value(s->records, accepted, paxos_accepted_free(accepted));
 	kh_destroy_record(s->records);
-	free(s);
+	kfree(s);
 }
 
 static int
@@ -99,11 +100,11 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 	int rv;
 	khiter_t k;
 	struct mem_storage* s = handle;
-	paxos_accepted* record = malloc(sizeof(paxos_accepted));
+	paxos_accepted* record = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
 	paxos_accepted_copy(record, acc);
 	k = kh_put_record(s->records, acc->iid, &rv);
 	if (rv == -1) { // error
-		free(record);
+		kfree(record);
 		return -1;
 	}
 	if (rv == 0) { // key is already present
@@ -143,7 +144,7 @@ paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src)
 {
 	memcpy(dst, src, sizeof(paxos_accepted));
 	if (dst->value.paxos_value_len > 0) {
-		dst->value.paxos_value_val = malloc(src->value.paxos_value_len);
+		dst->value.paxos_value_val = kmalloc(src->value.paxos_value_len, GFP_KERNEL);
 		memcpy(dst->value.paxos_value_val, src->value.paxos_value_val,
 			src->value.paxos_value_len);
 	}
