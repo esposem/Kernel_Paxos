@@ -26,17 +26,16 @@
  */
 
 
-#include "storage_utils.h"
+#include "include/storage_utils.h"
 // #include <stdlib.h>
 // #include <string.h>
 #include <linux/kernel.h>
-
-
+#include <linux/slab.h>
 char*
 paxos_accepted_to_buffer(paxos_accepted* acc)
 {
 	size_t len = acc->value.paxos_value_len;
-	char* buffer = malloc(sizeof(paxos_accepted) + len);
+	char* buffer = kmalloc(sizeof(paxos_accepted) + len, GFP_KERNEL);
 	if (buffer == NULL)
 		return NULL;
 	memcpy(buffer, acc, sizeof(paxos_accepted));
@@ -51,7 +50,7 @@ paxos_accepted_from_buffer(char* buffer, paxos_accepted* out)
 {
 	memcpy(out, buffer, sizeof(paxos_accepted));
 	if (out->value.paxos_value_len > 0) {
-		out->value.paxos_value_val = malloc(out->value.paxos_value_len);
+		out->value.paxos_value_val = kmalloc(out->value.paxos_value_len, GFP_KERNEL);
 		memcpy(out->value.paxos_value_val,
 			&buffer[sizeof(paxos_accepted)],
 			out->value.paxos_value_len);

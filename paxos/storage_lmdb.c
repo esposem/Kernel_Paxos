@@ -27,19 +27,19 @@
  */
 
 
-#include "storage.h"
-#include "storage_utils.h"
-// #include <lmdb.h>
-#include <linux/lmdb.h>
+#include "include/storage.h"
+#include "include/storage_utils.h"
+#include <lmdb.h>
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include <string.h>
 #include <linux/kernel.h>
-#include <linux/errno.h>
-#include <linux/stat.h>
-
 // #include <errno.h>
 // #include <sys/stat.h>
+#include <linux/errno.h>
+#include <linux/stat.h>
+#include <linux/unistd.h>
+#include <linux/slab.h>
 // #include <assert.h>
 
 struct lmdb_storage
@@ -56,8 +56,8 @@ static int
 lmdb_compare_iid(const MDB_val* lhs, const MDB_val* rhs)
 {
 	iid_t lid, rid;
-	assert(lhs->mv_size == sizeof(iid_t));
-	assert(rhs->mv_size == sizeof(iid_t));
+	WARN_ON(lhs->mv_size != sizeof(iid_t));
+	WARN_ON(rhs->mv_size != sizeof(iid_t));
 	lid = *((iid_t*) lhs->mv_data);
 	rid = *((iid_t*) rhs->mv_data);
 	return (lid == rid) ? 0 : (lid < rid) ? -1 : 1;
@@ -128,7 +128,7 @@ lmdb_storage_init(struct lmdb_storage* s, char* db_env_path)
 static struct lmdb_storage*
 lmdb_storage_new(int acceptor_id)
 {
-	struct lmdb_storage* s = malloc(sizeof(struct lmdb_storage));
+	struct lmdb_storage* s = kmalloc(sizeof(struct lmdb_storage), GFP_KERNEL);
 	memset(s, 0, sizeof(struct lmdb_storage));
 	s->acceptor_id = acceptor_id;
 	return s;
@@ -143,7 +143,7 @@ lmdb_storage_open(void* handle)
 	int dir_exists, result;
 	size_t lmdb_env_path_length = strlen(paxos_config.lmdb_env_path) + 16;
 
-	lmdb_env_path = malloc(lmdb_env_path_length);
+	lmdb_env_path = kmalloc(lmdb_env_path_length, GFP_KERNEL);
 	snprintf(lmdb_env_path, lmdb_env_path_length, "%s_%d",
 	  paxos_config.lmdb_env_path, s->acceptor_id);
 
@@ -176,7 +176,7 @@ error:
 	}
 
 cleanup_exit:
-	free(lmdb_env_path);
+	kfree(lmdb_env_path);
 	return result;
 }
 
@@ -193,7 +193,7 @@ lmdb_storage_close(void* handle)
 	if (s->env) {
 		mdb_env_close(s->env);
 	}
-	free(s);
+	kfree(s);
 	paxos_log_info("lmdb storage closed successfully");
 }
 
@@ -201,7 +201,7 @@ static int
 lmdb_storage_tx_begin(void* handle)
 {
 	struct lmdb_storage* s = handle;
-	assert(s->txn == NULL);
+	WARN_ON(s->txn != NULL);
 	return mdb_txn_begin(s->env, NULL, 0, &s->txn);
 }
 
@@ -210,7 +210,7 @@ lmdb_storage_tx_commit(void* handle)
 {
 	struct lmdb_storage* s = handle;
 	int result;
-	assert(s->txn);
+	WARN_ON(s->txn == NULL);
 	result = mdb_txn_commit(s->txn);
 	s->txn = NULL;
 	return result;
@@ -249,7 +249,7 @@ lmdb_storage_get(void* handle, iid_t iid, paxos_accepted* out)
 	}
 
 	paxos_accepted_from_buffer(data.mv_data, out);
-	assert(iid == out->iid);
+	WARN_ON(iid != out->iid);
 
 	return 1;
 }
@@ -269,7 +269,7 @@ lmdb_storage_put(void* handle, paxos_accepted* acc)
 	data.mv_size = sizeof(paxos_accepted) + acc->value.paxos_value_len;
 
 	result = mdb_put(s->txn, s->dbi, &key, &data, 0);
-	free(buffer);
+	kfree(buffer);
 	return result;
 }
 
@@ -287,7 +287,7 @@ lmdb_storage_get_trim_instance(void* handle)
 	if ((result = mdb_get(s->txn, s->dbi, &key, &data)) != 0) {
 		if (result != MDB_NOTFOUND) {
 			paxos_log_error("mdb_get failed: %s", mdb_strerror(result));
-			assert(result == 0);
+			WARN_ON(result != 0);
 		} else {
 			iid = 0;
 		}
@@ -315,7 +315,7 @@ lmdb_storage_put_trim_instance(void* handle, iid_t iid)
 	result = mdb_put(s->txn, s->dbi, &key, &data, 0);
 	if (result != 0)
 		paxos_log_error("%s\n", mdb_strerror(result));
-	assert(result == 0);
+	WARN_ON(result != 0);
 
 	return 0;
 }
@@ -344,7 +344,7 @@ lmdb_storage_trim(void* handle, iid_t iid)
 
 	do {
 		if ((result = mdb_cursor_get(cursor, &key, &data, MDB_NEXT)) == 0) {
-			assert(key.mv_size = sizeof(iid_t));
+			// assert(key.mv_size = sizeof(iid_t)); ????
 			min = *(iid_t*)key.mv_data;
 		} else {
 			goto cleanup_exit;

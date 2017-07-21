@@ -26,12 +26,12 @@
  */
 
 
-#include "learner.h"
-#include "khash.h"
+#include "include/learner.h"
+#include "include/khash.h"
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
-#include <linux/kernel.h>
+#include <linux/kernel.h> // stdlib, string, limits
 
 struct instance
 {
@@ -69,7 +69,7 @@ struct learner*
 learner_new(int acceptors)
 {
 	struct learner* l;
-	l = malloc(sizeof(struct learner));
+	l = kmalloc(sizeof(struct learner), GFP_KERNEL);
 	l->acceptors = acceptors;
 	l->current_iid = 1;
 	l->highest_iid_closed = 1;
@@ -84,7 +84,7 @@ learner_free(struct learner* l)
 	struct instance* inst;
 	kh_foreach_value(l->instances, inst, instance_free(inst, l->acceptors));
 	kh_destroy(instance, l->instances);
-	free(l);
+	kfree(l);
 }
 
 void
@@ -169,7 +169,8 @@ learner_get_instance_or_create(struct learner* l, iid_t iid)
 	if (inst == NULL) {
 		int rv;
 		khiter_t k = kh_put_instance(l->instances, iid, &rv);
-		assert(rv != -1);
+		// assert(rv != -1);
+		WARN_ON(rv == -1);
 		inst = instance_new(l->acceptors);
 		kh_value(l->instances, k) = inst;
 	}
@@ -190,9 +191,9 @@ instance_new(int acceptors)
 {
 	int i;
 	struct instance* inst;
-	inst = malloc(sizeof(struct instance));
+	inst = kmalloc(sizeof(struct instance), GFP_KERNEL);
 	memset(inst, 0, sizeof(struct instance));
-	inst->acks = malloc(sizeof(paxos_accepted*) * acceptors);
+	inst->acks = kmalloc(sizeof(paxos_accepted*) * acceptors, GFP_KERNEL);
 	for (i = 0; i < acceptors; ++i)
 		inst->acks[i] = NULL;
 	return inst;
@@ -205,8 +206,8 @@ instance_free(struct instance* inst, int acceptors)
 	for (i = 0; i < acceptors; i++)
 		if (inst->acks[i] != NULL)
 			paxos_accepted_free(inst->acks[i]);
-	free(inst->acks);
-	free(inst);
+	kfree(inst->acks);
+	kfree(inst);
 }
 
 static void
@@ -290,7 +291,7 @@ static paxos_accepted*
 paxos_accepted_dup(paxos_accepted* ack)
 {
 	paxos_accepted* copy;
-	copy = malloc(sizeof(paxos_accepted));
+	copy = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
 	memcpy(copy, ack, sizeof(paxos_accepted));
 	paxos_value_copy(&copy->value, &ack->value);
 	return copy;
@@ -302,7 +303,7 @@ paxos_value_copy(paxos_value* dst, paxos_value* src)
 	int len = src->paxos_value_len;
 	dst->paxos_value_len = len;
 	if (src->paxos_value_val != NULL) {
-		dst->paxos_value_val = malloc(len);
+		dst->paxos_value_val = kmalloc(len, GFP_KERNEL);
 		memcpy(dst->paxos_value_val, src->paxos_value_val, len);
 	}
 }

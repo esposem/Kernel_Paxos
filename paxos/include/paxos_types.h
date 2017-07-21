@@ -29,7 +29,7 @@
 #ifndef _PAXOS_TYPES_H_
 #define _PAXOS_TYPES_H_
 
-#include <stdint.h> .
+// #include <stdint.h>
 #include <linux/types.h>
 
 struct paxos_value

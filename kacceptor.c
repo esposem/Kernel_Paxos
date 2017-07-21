@@ -6,6 +6,16 @@
 #include <asm/atomic.h>
 #include <linux/time.h>
 #include <net/sock.h>
+#include "include/acceptor.h"
+// #include "include/carray.h"
+// #include "include/khash.h"
+// #include "include/learner.h"
+// #include "include/paxos_types.h"
+// #include "include/paxos.h"
+// #include "include/proposer.h"
+// #include "include/quorum.h"
+// #include "include/storage_utils.h"
+// #include "include/storage.h"
 
 MODULE_LICENSE("MIT");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");
@@ -275,12 +285,15 @@ void udp_server_start(void){
 
 static int __init network_server_init(void)
 {
+  struct acceptor * n;
   if(len < 0 || len > MAX_UDP_SIZE){
     printk(KERN_INFO MODULE_NAME"Wrong len, using default one");
     len = 50;
   }
   len++;
   atomic_set(&released_socket, 1);
+  n =  acceptor_new(3);
+  acceptor_free(n);
   kacceptor = kmalloc(sizeof(struct udp_acceptor_service), GFP_KERNEL);
   if(!kacceptor){
     printk(KERN_INFO MODULE_NAME"Failed to initialize server [network_server_init]");

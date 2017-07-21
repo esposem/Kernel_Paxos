@@ -26,27 +26,29 @@
  */
 
 
-#include "storage.h"
+#include "include/storage.h"
 // #include <stdlib.h>
 #include <linux/kernel.h>
-
+// #include <linux/slab.h>
 
 void
 storage_init(struct storage* store, int acceptor_id)
 {
-	switch(paxos_config.storage_backend) {
-		case PAXOS_MEM_STORAGE:
-			storage_init_mem(store, acceptor_id);
-			break;
-		#ifdef HAS_LMDB
-		case PAXOS_LMDB_STORAGE:
-			storage_init_lmdb(store, acceptor_id);
-			break;
-		#endif
-		default:
-		paxos_log_error("Storage backend not available");
-		exit(0);
-	}
+	storage_init_mem(store, acceptor_id);
+
+	// switch(paxos_config.storage_backend) {
+	// 	case PAXOS_MEM_STORAGE:
+	// 		storage_init_mem(store, acceptor_id);
+	// 		break;
+	// 	#ifdef HAS_LMDB
+	// 	case PAXOS_LMDB_STORAGE:
+	// 		storage_init_lmdb(store, acceptor_id);
+	// 		break;
+	// 	#endif
+	// 	default:
+	// 	paxos_log_error("Storage backend not available");
+	// 	// exit(0);
+	// }
 }
 
 int

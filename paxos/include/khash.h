@@ -95,14 +95,17 @@ int main() {
 
 // #include <stdlib.h>
 // #include <string.h>
+// #include <limits.h>
 #include <linux/kernel.h>
 #include <linux/limits.h>
+#include <linux/slab.h>
+
 
 /* compiler specific configuration */
 
-#if UINT_MAX == 0xffffffffu
+#if UINT_MAX == ~0U
 typedef unsigned int khint32_t;
-#elif ULONG_MAX == 0xffffffffu
+#elif ULONG_MAX == ~0U
 typedef unsigned long khint32_t;
 #endif
 
@@ -145,17 +148,17 @@ typedef khint_t khiter_t;
 #define kroundup32(x) (--(x), (x)|=(x)>>1, (x)|=(x)>>2, (x)|=(x)>>4, (x)|=(x)>>8, (x)|=(x)>>16, ++(x))
 #endif
 
-#ifndef kcalloc
-#define kcalloc(N,Z) calloc(N,Z)
-#endif
-#ifndef kmalloc
-#define kmalloc(Z) malloc(Z)
-#endif
+//#ifndef kcalloc
+//#define kcalloc(N,Z) calloc(N,Z)
+//#endif
+//#ifndef kmalloc
+//#define kmalloc(Z) kmalloc(Z, GFP_KERNEL)
+//#endif
 #ifndef krealloc
-#define krealloc(P,Z) realloc(P,Z)
+#define krealloc(P,Z) krealloc(P,Z, GFP_KERNEL)
 #endif
 #ifndef kfree
-#define kfree(P) free(P)
+#define kfree(P) kfree(P)
 #endif
 
 static const double __ac_HASH_UPPER = 0.77;
@@ -179,7 +182,7 @@ static const double __ac_HASH_UPPER = 0.77;
 
 #define __KHASH_IMPL(name, SCOPE, khkey_t, khval_t, kh_is_map, __hash_func, __hash_equal) \
 	SCOPE kh_##name##_t *kh_init_##name(void) {							\
-		return (kh_##name##_t*)kcalloc(1, sizeof(kh_##name##_t));		\
+		return (kh_##name##_t*)kmalloc( sizeof(kh_##name##_t), GFP_KERNEL);		\
 	}																	\
 	SCOPE void kh_destroy_##name(kh_##name##_t *h)						\
 	{																	\
@@ -219,7 +222,7 @@ static const double __ac_HASH_UPPER = 0.77;
 			if (new_n_buckets < 4) new_n_buckets = 4;					\
 			if (h->size >= (khint_t)(new_n_buckets * __ac_HASH_UPPER + 0.5)) j = 0;	/* requested size is too small */ \
 			else { /* hash table size to be changed (shrink or expand); rehash */ \
-				new_flags = (khint32_t*)kmalloc(__ac_fsize(new_n_buckets) * sizeof(khint32_t));	\
+				new_flags = (khint32_t*)kmalloc(__ac_fsize(new_n_buckets) * sizeof(khint32_t), GFP_KERNEL);	\
 				if (!new_flags) return -1;								\
 				memset(new_flags, 0xaa, __ac_fsize(new_n_buckets) * sizeof(khint32_t)); \
 				if (h->n_buckets < new_n_buckets) {	/* expand */		\
