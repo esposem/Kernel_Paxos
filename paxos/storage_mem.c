@@ -28,14 +28,20 @@
 
 #include "include/storage.h"
 #include <linux/slab.h>
-#include "include/khash.h"
+#include "include/uthash.h"
 
-KHASH_MAP_INIT_INT(record, paxos_accepted*);
+// KHASH_MAP_INIT_INT(record, paxos_accepted*);
 
-struct mem_storage
+struct hash_item {
+	iid_t iid;
+	paxos_accepted *value;
+	UT_hash_handle hh;
+};
+
+struct mem_storage //db
 {
 	iid_t trim_iid;
-	kh_record_t* records;
+	struct hash_item * record;
 };
 
 static void paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src);
@@ -47,7 +53,7 @@ mem_storage_new(int acceptor_id)
 	if (s == NULL)
 		return s;
 	s->trim_iid = 0;
-	s->records = kh_init(record);
+	s->record = NULL;
 	return s;
 }
 
@@ -61,10 +67,15 @@ static void
 mem_storage_close(void* handle)
 {
 	struct mem_storage* s = handle;
-	paxos_accepted* accepted;
-	kh_foreach_value(s->records, accepted, paxos_accepted_free(accepted));
-	kh_destroy_record(s->records);
-	kfree(s);
+	struct hash_item * current_hash, *tmp;
+
+ HASH_ITER(hh , s->record, current_hash, tmp) {
+	  HASH_DEL(s->record, current_hash);
+	  paxos_accepted_free(current_hash->value);
+		kfree(current_hash);
+ }
+ kfree(s);
+
 }
 
 static int
@@ -85,47 +96,49 @@ mem_storage_tx_abort(void* handle) { }
 static int
 mem_storage_get(void* handle, iid_t iid, paxos_accepted* out)
 {
-	khiter_t k;
 	struct mem_storage* s = handle;
-	k = kh_get_record(s->records, iid);
-	if (k == kh_end(s->records))
+	struct hash_item * h;
+
+  HASH_FIND_INT( s->record, &iid, h);  /* h: output pointer */
+	if(h == NULL){
 		return 0;
-	paxos_accepted_copy(out, kh_value(s->records, k));
-	return 1;
+	}
+	paxos_accepted_copy(out, h->value);
+
+  return 1;
 }
 
 static int
 mem_storage_put(void* handle, paxos_accepted* acc)
 {
-	int rv;
-	khiter_t k;
 	struct mem_storage* s = handle;
-	paxos_accepted* record = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
-	paxos_accepted_copy(record, acc);
-	k = kh_put_record(s->records, acc->iid, &rv);
-	if (rv == -1) { // error
-		kfree(record);
-		return -1;
+	struct hash_item * a;
+
+	HASH_FIND_INT(s->record, &(acc->iid), a);  /* iid already in the hash? */
+	if (a==NULL) {
+		a = kmalloc(sizeof(struct hash_item), GFP_KERNEL);
+	} else{
+		paxos_accepted_free(a->value);
 	}
-	if (rv == 0) { // key is already present
-		paxos_accepted_free(kh_value(s->records, k));
-	}
-	kh_value(s->records, k) = record;
+	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
+	paxos_accepted_copy(val, acc);
+	a->value = val;
+	a->iid = acc->iid;
+	HASH_ADD_INT(s->record, iid, a);
+
 	return 0;
 }
 
 static int
 mem_storage_trim(void* handle, iid_t iid)
 {
-	khiter_t k;
 	struct mem_storage* s = handle;
-	for (k = kh_begin(s->records); k != kh_end(s->records); ++k) {
-		if (kh_exist(s->records, k)) {
-			paxos_accepted* acc = kh_value(s->records, k);
-			if (acc->iid <= iid) {
-				paxos_accepted_free(acc);
-				kh_del_record(s->records, k);
-			}
+	struct hash_item *hash_el, *tmp;
+	HASH_ITER(hh, s->record, hash_el, tmp) {
+		if(hash_el->iid <= iid){
+			HASH_DEL(s->record, hash_el);
+			paxos_accepted_free(hash_el->value);
+			kfree(hash_el);
 		}
 	}
 	s->trim_iid = iid;
