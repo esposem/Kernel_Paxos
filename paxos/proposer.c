@@ -29,13 +29,16 @@
 #include "include/proposer.h"
 #include "include/carray.h"
 #include "include/quorum.h"
-#include "include/khash.h"
+#include "include/uthash.h"
+
+
 // #include <assert.h>
 // #include <string.h>
 // #include <stdlib.h>
 #include <linux/kernel.h> // stdlib, string, limits
 #include <linux/slab.h>
 #include <linux/time.h>
+
 
 struct instance
 {
@@ -46,8 +49,8 @@ struct instance
 	ballot_t value_ballot;
 	struct quorum quorum;
 	struct timeval created_at;
+	UT_hash_handle hh;
 };
-KHASH_MAP_INIT_INT(instance, struct instance*)
 
 struct proposer
 {
@@ -56,13 +59,14 @@ struct proposer
 	struct carray* values;
 	iid_t max_trim_iid;
 	iid_t next_prepare_iid;
-	khash_t(instance)* prepare_instances; /* Waiting for prepare acks */
-	khash_t(instance)* accept_instances;  /* Waiting for accept acks */
+	struct instance * prepare_instances; /* Waiting for prepare acks */
+	struct instance * accept_instances;  /* Waiting for accept acks */
 };
 
 struct timeout_iterator
 {
-	khiter_t pi, ai;
+	struct instance * pi;
+	struct instance * ai;
 	struct timeval timeout;
 	struct proposer* proposer;
 };
@@ -70,9 +74,9 @@ struct timeout_iterator
 static ballot_t proposer_next_ballot(struct proposer* p, ballot_t b);
 static void proposer_preempt(struct proposer* p, struct instance* inst,
 	paxos_prepare* out);
-static void proposer_move_instance(khash_t(instance)* f, khash_t(instance)* t,
+static void proposer_move_instance(struct instance * f, struct instance * t,
 	struct instance* inst);
-static void proposer_trim_instances(struct proposer* p, khash_t(instance)* h,
+static void proposer_trim_instances(struct proposer* p, struct instance * h,
 	iid_t iid);
 static struct instance* instance_new(iid_t iid, ballot_t ballot, int acceptors);
 static void instance_free(struct instance* inst);
@@ -94,19 +98,25 @@ proposer_new(int id, int acceptors)
 	p->max_trim_iid = 0;
 	p->next_prepare_iid = 0;
 	p->values = carray_new(128);
-	p->prepare_instances = kh_init(instance);
-	p->accept_instances = kh_init(instance);
+	p->prepare_instances = NULL;
+	p->accept_instances = NULL;
 	return p;
 }
 
 void
 proposer_free(struct proposer* p)
 {
-	struct instance* inst;
-	kh_foreach_value(p->prepare_instances, inst, instance_free(inst));
-	kh_foreach_value(p->accept_instances, inst, instance_free(inst));
-	kh_destroy(instance, p->prepare_instances);
-	kh_destroy(instance, p->accept_instances);
+	struct instance* inst, * tmp;
+	HASH_ITER(hh , p->prepare_instances, inst, tmp) {
+ 	  HASH_DEL(p->prepare_instances, inst);
+ 	  instance_free(inst);
+  }
+
+	HASH_ITER(hh , p->accept_instances, inst, tmp) {
+ 	  HASH_DEL(p->accept_instances, inst);
+ 	  instance_free(inst);
+  }
+
 	carray_foreach(p->values, carray_paxos_value_free);
 	carray_free(p->values);
 	kfree(p);
@@ -123,7 +133,7 @@ proposer_propose(struct proposer* p, const char* value, size_t size)
 int
 proposer_prepared_count(struct proposer* p)
 {
-	return kh_size(p->prepare_instances);
+	return HASH_COUNT(p->prepare_instances);
 }
 
 void
@@ -141,14 +151,10 @@ proposer_set_instance_id(struct proposer* p, iid_t iid)
 void
 proposer_prepare(struct proposer* p, paxos_prepare* out)
 {
-	int rv;
-	iid_t iid = ++(p->next_prepare_iid);
+	iid_t id = ++(p->next_prepare_iid);
 	ballot_t bal = proposer_next_ballot(p, 0);
-	struct instance* inst = instance_new(iid, bal, p->acceptors);
-	khiter_t k = kh_put_instance(p->prepare_instances, iid, &rv);
-	// assert(rv > 0);
-	WARN_ON(rv <= 0);
-	kh_value(p->prepare_instances, k) = inst;
+	struct instance* inst = instance_new(id, bal, p->acceptors);
+	HASH_ADD_INT(p->prepare_instances, iid, inst);
 	*out = (paxos_prepare) {inst->iid, inst->ballot};
 }
 
@@ -156,13 +162,15 @@ int
 proposer_receive_promise(struct proposer* p, paxos_promise* ack,
 	paxos_prepare* out)
 {
-	khiter_t k = kh_get_instance(p->prepare_instances, ack->iid);
+	// khiter_t k = kh_get_instance(p->prepare_instances, ack->iid);
+	struct instance * inst;
+	HASH_FIND_INT(p->prepare_instances, &ack->iid, inst);
 
-	if (k == kh_end(p->prepare_instances)) {
+	if (inst == NULL) {
 		paxos_log_debug("Proposer: Promise dropped, instance %u not pending", ack->iid);
 		return 0;
 	}
-	struct instance* inst = kh_value(p->prepare_instances, k);
+	// struct instance* inst = kh_value(p->prepare_instances, k);
 
 	if (ack->ballot < inst->ballot) {
 		paxos_log_debug("Proposer: Promise dropped, too old");
@@ -208,17 +216,16 @@ proposer_receive_promise(struct proposer* p, paxos_promise* ack,
 int
 proposer_accept(struct proposer* p, paxos_accept* out)
 {
-	khiter_t k;
 	struct instance* inst = NULL;
-	khash_t(instance)* h = p->prepare_instances;
+	struct instance * i;
 
 	// Find smallest inst->iid
-	for (k = kh_begin(h); k != kh_end(h); ++k) {
-		if (!kh_exist(h, k))
-			continue;
-		else if (inst == NULL || inst->iid > kh_value(h, k)->iid)
-			inst = kh_value(h, k);
-	}
+	for(i=p->prepare_instances; i != NULL; i=i->hh.next) {
+		if (inst == NULL || inst->iid > i->iid){
+			inst = i;
+		}
+  }
+
 
 	if (inst == NULL || !quorum_reached(&inst->quorum))
 		return 0;
@@ -243,14 +250,16 @@ proposer_accept(struct proposer* p, paxos_accept* out)
 int
 proposer_receive_accepted(struct proposer* p, paxos_accepted* ack)
 {
-	khiter_t k = kh_get_instance(p->accept_instances, ack->iid);
+	struct instance * inst;
+	// khiter_t k = kh_get_instance(p->accept_instances, ack->iid);
+	HASH_FIND_INT(p->accept_instances, &ack->iid, inst);
 
-	if (k == kh_end(p->accept_instances)) {
+	if (inst == NULL) {
 		paxos_log_debug("Proposer: Accept ack dropped, iid: %u not pending", ack->iid);
 		return 0;
 	}
 
-	struct instance* inst = kh_value(p->accept_instances, k);
+	// struct instance* inst = kh_value(p->accept_instances, k);
 
 	if (ack->ballot == inst->ballot) {
 		if (!quorum_add(&inst->quorum, ack->aid)) {
@@ -267,7 +276,8 @@ proposer_receive_accepted(struct proposer* p, paxos_accepted* ack)
 					inst->value = NULL;
 				}
 			}
-			kh_del_instance(p->accept_instances, k);
+
+			HASH_DEL(p->accept_instances, inst);
 			paxos_log_debug("Proposer: Closed instance");
 			instance_free(inst);
 		}
@@ -282,14 +292,15 @@ int
 proposer_receive_preempted(struct proposer* p, paxos_preempted* ack,
 	paxos_prepare* out)
 {
-	khiter_t k = kh_get_instance(p->accept_instances, ack->iid);
+	struct instance * inst;
+	HASH_FIND_INT(p->accept_instances, &ack->iid, inst);
 
-	if (k == kh_end(p->accept_instances)) {
+
+	if (inst == NULL) {
 		paxos_log_debug("Proposer: Preempted dropped, iid: %u not pending", ack->iid);
 		return 0;
 	}
 
-	struct instance* inst = kh_value(p->accept_instances, k);
 
 	if (ack->ballot > inst->ballot) {
 		paxos_log_debug("Proposer: Received N < prev_prop, Instance %u preempted: ballot %d ack ballot %d",
@@ -318,25 +329,25 @@ proposer_timeout_iterator(struct proposer* p)
 {
 	struct timeout_iterator* iter;
 	iter = kmalloc(sizeof(struct timeout_iterator), GFP_KERNEL);
-	iter->pi = kh_begin(p->prepare_instances);
-	iter->ai = kh_begin(p->accept_instances);
+	iter->pi = p->prepare_instances;
+	iter->ai = p->accept_instances;
 	iter->proposer = p;
 	do_gettimeofday(&iter->timeout);
 	return iter;
 }
 
 static struct instance*
-next_timedout(khash_t(instance)* h, khiter_t* k, struct timeval* t)
+next_timedout(struct instance * h, struct instance * k, struct timeval* t)
 {
-	for (; *k != kh_end(h); ++(*k)) {
-		if (!kh_exist(h, *k))
-			continue;
-		struct instance* inst = kh_value(h, *k);
+	for(; k != NULL; k=k->hh.next) {
+		struct instance* inst = k;
 		if (quorum_reached(&inst->quorum))
 			continue;
+
 		if (instance_has_timedout(inst, t))
 			return inst;
 	}
+
 	return NULL;
 }
 
@@ -345,7 +356,7 @@ timeout_iterator_prepare(struct timeout_iterator* iter, paxos_prepare* out)
 {
 	struct instance* inst;
 	struct proposer* p = iter->proposer;
-	inst = next_timedout(p->prepare_instances, &iter->pi, &iter->timeout);
+	inst = next_timedout(p->prepare_instances, iter->pi, &iter->timeout);
 	if (inst == NULL)
 		return 0;
 	*out = (paxos_prepare){inst->iid, inst->ballot};
@@ -358,7 +369,7 @@ timeout_iterator_accept(struct timeout_iterator* iter, paxos_accept* out)
 {
 	struct instance* inst;
 	struct proposer* p = iter->proposer;
-	inst = next_timedout(p->accept_instances, &iter->ai, &iter->timeout);
+	inst = next_timedout(p->accept_instances, iter->ai, &iter->timeout);
 	if (inst == NULL)
 		return 0;
 	instance_to_accept(inst, out);
@@ -393,39 +404,31 @@ proposer_preempt(struct proposer* p, struct instance* inst, paxos_prepare* out)
 }
 
 static void
-proposer_move_instance(khash_t(instance)* f, khash_t(instance)* t,
+proposer_move_instance(struct instance * f, struct instance * t,
 	struct instance* inst)
 {
-	int rv;
-	khiter_t k;
-	k = kh_get_instance(f, inst->iid);
-	// assert(k != kh_end(f));
-	WARN_ON(k == kh_end(f));
-	kh_del_instance(f, k);
-	k = kh_put_instance(t, inst->iid, &rv);
-	// assert(rv > 0);
-	WARN_ON(rv <= 0);
-	kh_value(t, k) = inst;
+	struct instance * out;
+	HASH_FIND_INT(f, &inst->iid, out);
+	HASH_DEL(f, out);
+	HASH_ADD_INT(t, iid, inst);
 	quorum_clear(&inst->quorum);
 }
 
 static void
-proposer_trim_instances(struct proposer* p, khash_t(instance)* h, iid_t iid)
+proposer_trim_instances(struct proposer* p, struct instance* h, iid_t iid)
 {
-	khiter_t k;
-	for (k = kh_begin(h); k != kh_end(h); ++k) {
-		if (!kh_exist(h, k))
-			continue;
-		struct instance* inst = kh_value(h,k);
+	struct instance * i;
+	for(i=h; i != NULL; i=i->hh.next) {
+		struct instance* inst = i;
 		if (inst->iid <= iid) {
 			if (instance_has_value(inst)) {
 				carray_push_back(p->values, inst->value);
 				inst->value = NULL;
 			}
-			kh_del_instance(h, k);
+			HASH_DEL(h, i);
 			instance_free(inst);
 		}
-	}
+  }
 }
 
 static struct instance*
@@ -441,7 +444,7 @@ instance_new(iid_t iid, ballot_t ballot, int acceptors)
 	do_gettimeofday(&inst->created_at);
 	quorum_init(&inst->quorum, acceptors);
 	// assert(inst->iid > 0);
-	WARN_ON(inst->iid <= 0);
+	// WARN_ON(inst->iid <= 0);
 	return inst;
 }
 

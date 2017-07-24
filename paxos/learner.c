@@ -27,7 +27,10 @@
 
 
 #include "include/learner.h"
-#include "include/khash.h"
+// #include "include/khash.h"
+#include "include/uthash.h"
+#include "linux/slab.h"
+
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
@@ -39,8 +42,9 @@ struct instance
 	ballot_t last_update_ballot;
 	paxos_accepted** acks;
 	paxos_accepted* final_value;
+	UT_hash_handle hh;
 };
-KHASH_MAP_INIT_INT(instance, struct instance*)
+// KHASH_MAP_INIT_INT(instance, struct instance*)
 
 struct learner
 {
@@ -48,7 +52,8 @@ struct learner
 	int late_start;
 	iid_t current_iid;
 	iid_t highest_iid_closed;
-	khash_t(instance)* instances;
+	struct instance * instances;
+	// khash_t(instance)* instances;
 };
 
 static struct instance* learner_get_instance(struct learner* l, iid_t iid);
@@ -74,17 +79,21 @@ learner_new(int acceptors)
 	l->current_iid = 1;
 	l->highest_iid_closed = 1;
 	l->late_start = !paxos_config.learner_catch_up;
-	l->instances = kh_init(instance);
+	l->instances = NULL;
 	return l;
 }
 
 void
 learner_free(struct learner* l)
 {
-	struct instance* inst;
-	kh_foreach_value(l->instances, inst, instance_free(inst, l->acceptors));
-	kh_destroy(instance, l->instances);
-	kfree(l);
+	struct instance * inst, *tmp;
+
+ HASH_ITER(hh , l->instances, inst, tmp) {
+	  HASH_DEL(l->instances, inst);
+	  instance_free(inst, l->acceptors);
+ }
+ kfree(l);
+
 }
 
 void
@@ -149,11 +158,9 @@ learner_has_holes(struct learner* l, iid_t* from, iid_t* to)
 static struct instance*
 learner_get_instance(struct learner* l, iid_t iid)
 {
-	khiter_t k;
-	k = kh_get_instance(l->instances, iid);
-	if (k == kh_end(l->instances))
-		return NULL;
-	return kh_value(l->instances, k);
+	struct instance * h;
+  HASH_FIND_INT( l->instances, &iid, h);  /* h: output pointer */
+	return h;
 }
 
 static struct instance*
@@ -167,12 +174,8 @@ learner_get_instance_or_create(struct learner* l, iid_t iid)
 {
 	struct instance* inst = learner_get_instance(l, iid);
 	if (inst == NULL) {
-		int rv;
-		khiter_t k = kh_put_instance(l->instances, iid, &rv);
-		// assert(rv != -1);
-		WARN_ON(rv == -1);
 		inst = instance_new(l->acceptors);
-		kh_value(l->instances, k) = inst;
+		HASH_ADD_INT(l->instances, iid, inst);
 	}
 	return inst;
 }
@@ -180,9 +183,7 @@ learner_get_instance_or_create(struct learner* l, iid_t iid)
 static void
 learner_delete_instance(struct learner* l, struct instance* inst)
 {
-	khiter_t k;
-	k = kh_get_instance(l->instances, inst->iid);
-	kh_del_instance(l->instances, k);
+	HASH_DEL(l->instances, inst);
 	instance_free(inst, l->acceptors);
 }
 

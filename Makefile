@@ -3,7 +3,9 @@ obj-m += kclient.o
 obj-m += klearner.o
 obj-m += kacceptor.o
 
+
 kacceptor-objs:= \
+	./kpaxos/kacceptor.o \
 	paxos/acceptor.o \
 	paxos/carray.o \
 	paxos/learner.o \
@@ -14,6 +16,41 @@ kacceptor-objs:= \
 	paxos/storage_utils.o \
 	paxos/storage.o
 
+klearner-objs:= \
+	./kpaxos/klearner.o \
+	paxos/acceptor.o \
+	paxos/carray.o \
+	paxos/learner.o \
+	paxos/paxos.o \
+	paxos/proposer.o \
+	paxos/quorum.o \
+	paxos/storage_mem.o \
+	paxos/storage_utils.o \
+	paxos/storage.o
+
+kproposer-objs:= \
+	./kpaxos/kproposer.o \
+	paxos/acceptor.o \
+	paxos/carray.o \
+	paxos/learner.o \
+	paxos/paxos.o \
+	paxos/proposer.o \
+	paxos/quorum.o \
+	paxos/storage_mem.o \
+	paxos/storage_utils.o \
+	paxos/storage.o
+
+kclient-objs:= \
+	./kpaxos/kclient.o \
+	paxos/acceptor.o \
+	paxos/carray.o \
+	paxos/learner.o \
+	paxos/paxos.o \
+	paxos/proposer.o \
+	paxos/quorum.o \
+	paxos/storage_mem.o \
+	paxos/storage_utils.o \
+	paxos/storage.o
 
 EXTRA_CFLAGS:= -I$(PWD)/paxos
 

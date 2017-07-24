@@ -25,10 +25,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define UTHASH_H
 
 #define UTHASH_VERSION 2.0.2
-
-#include <string.h>   /* memcmp, memset, strlen */
-#include <stddef.h>   /* ptrdiff_t */
-#include <stdlib.h>   /* exit */
+//exit replaced by return
+// #include <string.h>   /* memcmp, memset, strlen */
+// #include <stddef.h>   /* ptrdiff_t */
+#include <linux/stddef.h>
+#include <linux/kernel.h>
+// #include <stdlib.h>   /* exit */
 
 /* These macros use decltype or the earlier __typeof GNU extension.
    As decltype is only available in newer compilers (VS2010 or gcc 4.3+
@@ -73,20 +75,22 @@ typedef unsigned int uint32_t;
 typedef unsigned char uint8_t;
 #endif
 #elif defined(__GNUC__) && !defined(__VXWORKS__)
-#include <stdint.h>
+// #include <stdint.h>
+#include <linux/types.h>
+
 #else
 typedef unsigned int uint32_t;
 typedef unsigned char uint8_t;
 #endif
 
 #ifndef uthash_fatal
-#define uthash_fatal(msg) exit(-1)        /* fatal error (out of memory,etc) */
+#define uthash_fatal(msg)         /* fatal error (out of memory,etc) */
 #endif
 #ifndef uthash_malloc
-#define uthash_malloc(sz) malloc(sz)      /* malloc fcn                      */
+#define uthash_malloc(sz) kmalloc(sz, GFP_KERNEL)      /* malloc fcn                      */
 #endif
 #ifndef uthash_free
-#define uthash_free(ptr,sz) free(ptr)     /* free fcn                        */
+#define uthash_free(ptr,sz) kfree(ptr)     /* free fcn                        */
 #endif
 #ifndef uthash_bzero
 #define uthash_bzero(a,n) memset(a,'\0',n)
@@ -424,7 +428,7 @@ do {                                                                            
  * This is for uthash developer only; it compiles away if HASH_DEBUG isn't defined.
  */
 #ifdef HASH_DEBUG
-#define HASH_OOPS(...) do { fprintf(stderr,__VA_ARGS__); exit(-1); } while (0)
+#define HASH_OOPS(...) do { fprintf(stderr,__VA_ARGS__); return(-1); } while (0)
 #define HASH_FSCK(hh,head,where)                                                 \
 do {                                                                             \
   struct UT_hash_handle *_thh;                                                   \
