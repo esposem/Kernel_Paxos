@@ -1,11 +1,11 @@
-obj-m += kproposer.o
-obj-m += kclient.o
-obj-m += klearner.o
+# obj-m += kproposer.o
+# obj-m += kclient.o
+# obj-m += klearner.o
 obj-m += kacceptor.o
 
 
 kacceptor-objs:= \
-	./kpaxos/kacceptor.o \
+	kpaxos/kacceptor.o \
 	paxos/acceptor.o \
 	paxos/carray.o \
 	paxos/learner.o \
@@ -14,45 +14,50 @@ kacceptor-objs:= \
 	paxos/quorum.o \
 	paxos/storage_mem.o \
 	paxos/storage_utils.o \
-	paxos/storage.o
+	paxos/storage.o \
+	evpaxos/message.o \
+	evpaxos/paxos_types_pack.o
+	# evpaxos/peers.o \
+	evpaxos/config.o \
+	evpaxos/evacceptor.o
 
-klearner-objs:= \
-	./kpaxos/klearner.o \
-	paxos/acceptor.o \
-	paxos/carray.o \
-	paxos/learner.o \
-	paxos/paxos.o \
-	paxos/proposer.o \
-	paxos/quorum.o \
-	paxos/storage_mem.o \
-	paxos/storage_utils.o \
-	paxos/storage.o
+# klearner-objs:= \
+# 	./kpaxos/klearner.o \
+# 	paxos/acceptor.o \
+# 	paxos/carray.o \
+# 	paxos/learner.o \
+# 	paxos/paxos.o \
+# 	paxos/proposer.o \
+# 	paxos/quorum.o \
+# 	paxos/storage_mem.o \
+# 	paxos/storage_utils.o \
+# 	paxos/storage.o
+#
+# kproposer-objs:= \
+# 	./kpaxos/kproposer.o \
+# 	paxos/acceptor.o \
+# 	paxos/carray.o \
+# 	paxos/learner.o \
+# 	paxos/paxos.o \
+# 	paxos/proposer.o \
+# 	paxos/quorum.o \
+# 	paxos/storage_mem.o \
+# 	paxos/storage_utils.o \
+# 	paxos/storage.o
+#
+# kclient-objs:= \
+# 	./kpaxos/kclient.o \
+# 	paxos/acceptor.o \
+# 	paxos/carray.o \
+# 	paxos/learner.o \
+# 	paxos/paxos.o \
+# 	paxos/proposer.o \
+# 	paxos/quorum.o \
+# 	paxos/storage_mem.o \
+# 	paxos/storage_utils.o \
+# 	paxos/storage.o
 
-kproposer-objs:= \
-	./kpaxos/kproposer.o \
-	paxos/acceptor.o \
-	paxos/carray.o \
-	paxos/learner.o \
-	paxos/paxos.o \
-	paxos/proposer.o \
-	paxos/quorum.o \
-	paxos/storage_mem.o \
-	paxos/storage_utils.o \
-	paxos/storage.o
-
-kclient-objs:= \
-	./kpaxos/kclient.o \
-	paxos/acceptor.o \
-	paxos/carray.o \
-	paxos/learner.o \
-	paxos/paxos.o \
-	paxos/proposer.o \
-	paxos/quorum.o \
-	paxos/storage_mem.o \
-	paxos/storage_utils.o \
-	paxos/storage.o
-
-EXTRA_CFLAGS:= -I$(PWD)/paxos
+EXTRA_CFLAGS:= -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
 
 ccflags-y := -std=gnu99 -Wno-declaration-after-statement
 

@@ -26,9 +26,9 @@
  */
 
 
-#include "include/storage.h"
+#include "storage.h"
 #include <linux/slab.h>
-#include "include/uthash.h"
+#include "uthash.h"
 
 // KHASH_MAP_INIT_INT(record, paxos_accepted*);
 

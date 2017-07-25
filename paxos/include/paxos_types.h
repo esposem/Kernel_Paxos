@@ -29,8 +29,10 @@
 #ifndef _PAXOS_TYPES_H_
 #define _PAXOS_TYPES_H_
 
-// #include <stdint.h>
 #include <linux/types.h>
+
+
+typedef unsigned char msgpack_packer;
 
 struct paxos_value
 {

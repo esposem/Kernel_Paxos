@@ -26,9 +26,8 @@
  */
 
 
-#include "include/learner.h"
-// #include "include/khash.h"
-#include "include/uthash.h"
+#include "learner.h"
+#include "uthash.h"
 #include "linux/slab.h"
 
 // #include <stdlib.h>

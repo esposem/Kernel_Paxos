@@ -26,15 +26,13 @@
  */
 
 
-#include "include/acceptor.h"
-#include "include/storage.h"
+#include "acceptor.h"
+#include "storage.h"
 #include <linux/types.h> //stdint, stdarg
 #include <linux/kernel.h> // stdlib, string, limits
 #include <linux/module.h>
 #include <linux/slab.h> //kmalloc
 
-// #include <stdlib.h>
-// #include <string.h>
 
 struct acceptor
 {

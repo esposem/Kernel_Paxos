@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, University of Lugano
+ * Copyright (c) 2013-2015, University of Lugano
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,31 +26,25 @@
  */
 
 
-#include "storage_utils.h"
-#include <linux/kernel.h>
-#include <linux/slab.h>
-char*
-paxos_accepted_to_buffer(paxos_accepted* acc)
-{
-	size_t len = acc->value.paxos_value_len;
-	char* buffer = kmalloc(sizeof(paxos_accepted) + len, GFP_KERNEL);
-	if (buffer == NULL)
-		return NULL;
-	memcpy(buffer, acc, sizeof(paxos_accepted));
-	if (len > 0) {
-		memcpy(&buffer[sizeof(paxos_accepted)], acc->value.paxos_value_val, len);
-	}
-	return buffer;
-}
+#ifndef _EVPAXOS_INTERNAL_H_
+#define _EVPAXOS_INTERNAL_H_
 
-void
-paxos_accepted_from_buffer(char* buffer, paxos_accepted* out)
-{
-	memcpy(out, buffer, sizeof(paxos_accepted));
-	if (out->value.paxos_value_len > 0) {
-		out->value.paxos_value_val = kmalloc(out->value.paxos_value_len, GFP_KERNEL);
-		memcpy(out->value.paxos_value_val,
-			&buffer[sizeof(paxos_accepted)],
-			out->value.paxos_value_len);
-	}
-}
+#include "peers.h"
+#include "evpaxos.h"
+
+struct evlearner* evlearner_init_internal(struct evpaxos_config* config,
+	struct peers* peers, deliver_function f, void* arg);
+
+void evlearner_free_internal(struct evlearner* l);
+
+struct evacceptor* evacceptor_init_internal(int id,
+	struct evpaxos_config* config, struct peers* peers);
+
+void evacceptor_free_internal(struct evacceptor* a);
+
+struct evproposer* evproposer_init_internal(int id,
+	struct evpaxos_config* config, struct peers* peers);
+
+void evproposer_free_internal(struct evproposer* p);
+
+#endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, University of Lugano
+ * Copyright (c) 2013-2014, University of Lugano
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,31 +26,25 @@
  */
 
 
-#include "storage_utils.h"
-#include <linux/kernel.h>
-#include <linux/slab.h>
-char*
-paxos_accepted_to_buffer(paxos_accepted* acc)
-{
-	size_t len = acc->value.paxos_value_len;
-	char* buffer = kmalloc(sizeof(paxos_accepted) + len, GFP_KERNEL);
-	if (buffer == NULL)
-		return NULL;
-	memcpy(buffer, acc, sizeof(paxos_accepted));
-	if (len > 0) {
-		memcpy(&buffer[sizeof(paxos_accepted)], acc->value.paxos_value_val, len);
-	}
-	return buffer;
-}
+#ifndef _CONFIG_READER_H_
+#define _CONFIG_READER_H_
 
-void
-paxos_accepted_from_buffer(char* buffer, paxos_accepted* out)
-{
-	memcpy(out, buffer, sizeof(paxos_accepted));
-	if (out->value.paxos_value_len > 0) {
-		out->value.paxos_value_val = kmalloc(out->value.paxos_value_len, GFP_KERNEL);
-		memcpy(out->value.paxos_value_val,
-			&buffer[sizeof(paxos_accepted)],
-			out->value.paxos_value_len);
-	}
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct evpaxos_config;
+
+struct evpaxos_config* evpaxos_config_read(const char* path);
+void evpaxos_config_free(struct evpaxos_config* config);
+struct sockaddr_in evpaxos_proposer_address(struct evpaxos_config* c, int i);
+int evpaxos_proposer_listen_port(struct evpaxos_config* c, int i);
+int evpaxos_acceptor_count(struct evpaxos_config* config);
+struct sockaddr_in evpaxos_acceptor_address(struct evpaxos_config* c, int i);
+int evpaxos_acceptor_listen_port(struct evpaxos_config* c, int i);
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif
