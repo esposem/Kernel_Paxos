@@ -6,15 +6,8 @@
 #include <asm/atomic.h>
 #include <linux/time.h>
 #include <net/sock.h>
-#include "include/acceptor.h"
-// #include "include/carray.h"
-// #include "include/learner.h"
-// #include "include/paxos_types.h"
-// #include "include/paxos.h"
-// #include "include/proposer.h"
-// #include "include/quorum.h"
-// #include "include/storage_utils.h"
-// #include "include/storage.h"
+
+#include "acceptor.h"
 
 MODULE_LICENSE("MIT");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

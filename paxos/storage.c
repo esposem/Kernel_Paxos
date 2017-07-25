@@ -26,10 +26,8 @@
  */
 
 
-#include "include/storage.h"
-// #include <stdlib.h>
+#include "storage.h"
 #include <linux/kernel.h>
-// #include <linux/slab.h>
 
 void
 storage_init(struct storage* store, int acceptor_id)

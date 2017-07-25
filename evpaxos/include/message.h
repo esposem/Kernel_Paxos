@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, University of Lugano
+ * Copyright (c) 2013-2014, University of Lugano
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,31 +26,30 @@
  */
 
 
-#include "storage_utils.h"
-#include <linux/kernel.h>
-#include <linux/slab.h>
-char*
-paxos_accepted_to_buffer(paxos_accepted* acc)
-{
-	size_t len = acc->value.paxos_value_len;
-	char* buffer = kmalloc(sizeof(paxos_accepted) + len, GFP_KERNEL);
-	if (buffer == NULL)
-		return NULL;
-	memcpy(buffer, acc, sizeof(paxos_accepted));
-	if (len > 0) {
-		memcpy(&buffer[sizeof(paxos_accepted)], acc->value.paxos_value_val, len);
-	}
-	return buffer;
-}
+#ifndef _TCP_SENDBUF_H_
+#define _TCP_SENDBUF_H_
 
-void
-paxos_accepted_from_buffer(char* buffer, paxos_accepted* out)
-{
-	memcpy(out, buffer, sizeof(paxos_accepted));
-	if (out->value.paxos_value_len > 0) {
-		out->value.paxos_value_val = kmalloc(out->value.paxos_value_len, GFP_KERNEL);
-		memcpy(out->value.paxos_value_val,
-			&buffer[sizeof(paxos_accepted)],
-			out->value.paxos_value_len);
-	}
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "paxos_types.h"
+#include <net/udp.h>
+// #include <event2/buffer.h>
+// #include <event2/bufferevent.h>
+
+void send_paxos_message(struct sockaddr_in* bev, paxos_message* msg);
+void send_paxos_prepare(struct sockaddr_in* bev, paxos_prepare* msg);
+void send_paxos_promise(struct sockaddr_in* bev, paxos_promise* msg);
+void send_paxos_accept(struct sockaddr_in* bev, paxos_accept* msg);
+void send_paxos_accepted(struct sockaddr_in* bev, paxos_accepted* msg);
+void send_paxos_preempted(struct sockaddr_in* bev, paxos_preempted* msg);
+void send_paxos_repeat(struct sockaddr_in* bev, paxos_repeat* msg);
+void send_paxos_trim(struct sockaddr_in* bev, paxos_trim* msg);
+// int recv_paxos_message(struct evbuffer* in, paxos_message* out);
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif

@@ -26,15 +26,10 @@
  */
 
 
-#include "include/proposer.h"
-#include "include/carray.h"
-#include "include/quorum.h"
-#include "include/uthash.h"
-
-
-// #include <assert.h>
-// #include <string.h>
-// #include <stdlib.h>
+#include "proposer.h"
+#include "carray.h"
+#include "quorum.h"
+#include "uthash.h"
 #include <linux/kernel.h> // stdlib, string, limits
 #include <linux/slab.h>
 #include <linux/time.h>

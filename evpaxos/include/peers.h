@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, University of Lugano
+ * Copyright (c) 2013-2014, University of Lugano
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,31 +26,40 @@
  */
 
 
-#include "storage_utils.h"
-#include <linux/kernel.h>
-#include <linux/slab.h>
-char*
-paxos_accepted_to_buffer(paxos_accepted* acc)
-{
-	size_t len = acc->value.paxos_value_len;
-	char* buffer = kmalloc(sizeof(paxos_accepted) + len, GFP_KERNEL);
-	if (buffer == NULL)
-		return NULL;
-	memcpy(buffer, acc, sizeof(paxos_accepted));
-	if (len > 0) {
-		memcpy(&buffer[sizeof(paxos_accepted)], acc->value.paxos_value_val, len);
-	}
-	return buffer;
-}
+#ifndef _PEERS_H_
+#define _PEERS_H_
 
-void
-paxos_accepted_from_buffer(char* buffer, paxos_accepted* out)
-{
-	memcpy(out, buffer, sizeof(paxos_accepted));
-	if (out->value.paxos_value_len > 0) {
-		out->value.paxos_value_val = kmalloc(out->value.paxos_value_len, GFP_KERNEL);
-		memcpy(out->value.paxos_value_val,
-			&buffer[sizeof(paxos_accepted)],
-			out->value.paxos_value_len);
-	}
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "paxos.h"
+#include "evpaxos.h"
+#include "paxos_types.h"
+// #include <event2/bufferevent.h>
+
+struct peer;
+struct peers;
+
+typedef void (*peer_cb)(struct peer* p, paxos_message* m, void* arg);
+typedef void (*peer_iter_cb)(struct peer* p, void* arg);
+
+struct peers* peers_new(struct event_base* base, struct evpaxos_config* config);
+void peers_free(struct peers* p);
+int peers_count(struct peers* p);
+void peers_connect_to_acceptors(struct peers* p);
+int peers_listen(struct peers* p, int port);
+void peers_subscribe(struct peers* p, paxos_message_type t, peer_cb cb, void*);
+void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);
+void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
+struct peer* peers_get_acceptor(struct peers* p, int id);
+struct event_base* peers_get_event_base(struct peers* p);
+int peer_get_id(struct peer* p);
+struct bufferevent* peer_get_buffer(struct peer* p);
+int peer_connected(struct peer* p);
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif
