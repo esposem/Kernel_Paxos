@@ -109,9 +109,17 @@ evpaxos_config_read(const char* path)
 	c = kmalloc(sizeof(struct evpaxos_config), GFP_KERNEL);
 	memset(c, 0, sizeof(struct evpaxos_config));
 
-	line = "acceptor 0 127.0.0.3 3000"
+	line = "acceptor 0 127.0.0.3 3003";
 	parse_line(c, line);
-	line = "proposer 0 127.0.0.2 3000"
+	line = "acceptor 0 127.0.0.3 4003";
+	parse_line(c, line);
+	line = "acceptor 0 127.0.0.3 5003";
+	parse_line(c, line);
+	line = "proposer 0 127.0.0.2 3002";
+	parse_line(c, line);
+	line = "proposer 0 127.0.0.2 4002";
+	parse_line(c, line);
+	line = "proposer 0 127.0.0.2 5002";
 	parse_line(c, line);
 
 	return c;
@@ -276,7 +284,7 @@ lookup_option(char* opt)
 static int
 parse_line(struct evpaxos_config* c, char* line)
 {
-	int rv;
+	int rv = 0;
 	char* tok;
 	char* sep = " ";
 	struct option* opt;
@@ -313,7 +321,7 @@ parse_line(struct evpaxos_config* c, char* line)
 		}
 		struct address* pro_addr = &c->proposers[c->proposers_count++];
 		struct address* acc_addr = &c->acceptors[c->acceptors_count++];
-		int rv = parse_address(line, pro_addr);
+		rv = parse_address(line, pro_addr);
 		address_copy(pro_addr, acc_addr);
 		return rv;
 	}
