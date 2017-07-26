@@ -136,6 +136,7 @@ paxos_submit(struct sockaddr_in* bev, char* data, int size)
 // int
 // recv_paxos_message(struct evbuffer* in, paxos_message* out)
 // {
+//  // ALLOCATE HERE
 // 	int rv = 0;
 // 	char* buffer;
 // 	size_t size, offset = 0;
