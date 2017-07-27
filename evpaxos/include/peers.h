@@ -36,6 +36,7 @@ extern "C" {
 #include "paxos.h"
 #include "evpaxos.h"
 #include "paxos_types.h"
+#include "kernel_udp.h"
 // #include <event2/bufferevent.h>
 
 struct peer;
@@ -44,19 +45,15 @@ struct peers;
 typedef void (*peer_cb)(struct peer* p, paxos_message* m, void* arg);
 typedef void (*peer_iter_cb)(struct peer* p, void* arg);
 
-struct peers* peers_new(struct event_base* base, struct evpaxos_config* config);
+struct peers* peers_new(struct sockaddr_in * addr, struct evpaxos_config* config);
 void peers_free(struct peers* p);
 int peers_count(struct peers* p);
-void peers_connect_to_acceptors(struct peers* p);
-int peers_listen(struct peers* p, int port);
-void peers_subscribe(struct peers* p, paxos_message_type t, peer_cb cb, void*);
+int peers_listen(struct peers* p, udp_service * k, char * ip, int * port);
+void peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg);
 void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);
 void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
 struct peer* peers_get_acceptor(struct peers* p, int id);
-struct event_base* peers_get_event_base(struct peers* p);
 int peer_get_id(struct peer* p);
-struct bufferevent* peer_get_buffer(struct peer* p);
-int peer_connected(struct peer* p);
 
 #ifdef __cplusplus
 }
