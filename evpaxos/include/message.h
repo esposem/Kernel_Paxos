@@ -38,15 +38,15 @@ extern "C" {
 // #include <event2/buffer.h>
 // #include <event2/bufferevent.h>
 
-void send_paxos_message(struct sockaddr_in* bev, paxos_message* msg);
-void send_paxos_prepare(struct sockaddr_in* bev, paxos_prepare* msg);
-void send_paxos_promise(struct sockaddr_in* bev, paxos_promise* msg);
-void send_paxos_accept(struct sockaddr_in* bev, paxos_accept* msg);
-void send_paxos_accepted(struct sockaddr_in* bev, paxos_accepted* msg);
-void send_paxos_preempted(struct sockaddr_in* bev, paxos_preempted* msg);
-void send_paxos_repeat(struct sockaddr_in* bev, paxos_repeat* msg);
-void send_paxos_trim(struct sockaddr_in* bev, paxos_trim* msg);
-// int recv_paxos_message(struct evbuffer* in, paxos_message* out);
+void send_paxos_message(struct socket * s, struct sockaddr_in* bev, paxos_message* msg);
+void send_paxos_prepare(struct socket * s, struct sockaddr_in* bev, paxos_prepare* msg);
+void send_paxos_promise(struct socket * s, struct sockaddr_in* bev, paxos_promise* msg);
+void send_paxos_accept(struct socket * s, struct sockaddr_in* bev, paxos_accept* msg);
+void send_paxos_accepted(struct socket * s, struct sockaddr_in* bev, paxos_accepted* msg);
+void send_paxos_preempted(struct socket * s, struct sockaddr_in* bev, paxos_preempted* msg);
+void send_paxos_repeat(struct socket * s, struct sockaddr_in* bev, paxos_repeat* msg);
+void send_paxos_trim(struct socket * s, struct sockaddr_in* bev, paxos_trim* msg);
+int recv_paxos_message(char * data, paxos_message* out, int size);
 
 #ifdef __cplusplus
 }

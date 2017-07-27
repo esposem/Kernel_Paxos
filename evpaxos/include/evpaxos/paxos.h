@@ -68,7 +68,7 @@ typedef void (*deliver_function)(
  * @see evpaxos_replica_free()
  */
 struct evpaxos_replica* evpaxos_replica_init(int id, const char* config,
-	deliver_function cb, void* arg, struct event_base* base);
+	deliver_function cb, void* arg);
 
 /**
  * Destroy a Paxos replica and free all its memory.
@@ -112,7 +112,7 @@ int evpaxos_replica_count(struct evpaxos_replica* replica);
  * a libevent event_base.
  */
 struct evlearner* evlearner_init(const char* config, deliver_function f,
-	void* arg, struct event_base* base);
+	void* arg);
 
 /**
  * Release the memory allocated by the learner
@@ -140,8 +140,7 @@ void evlearner_send_trim(struct evlearner* l, unsigned iid);
  * Initializes a acceptor with a given id (which MUST be unique),
  * a config file and a libevent event_base.
  */
-struct evacceptor* evacceptor_init(int id, const char* config,
-	struct event_base* b);
+struct evacceptor* evacceptor_init(int id, const char* config);
 
 /**
  * Frees the memory allocated by the acceptor.
@@ -155,8 +154,7 @@ void evacceptor_free(struct evacceptor* a);
  *
  * @param id a unique identifier, must be in the range [0...(MAX_N_OF_PROPOSERS-1)]
  */
-struct evproposer* evproposer_init(int id, const char* config,
-	struct event_base* b);
+struct evproposer* evproposer_init(int id, const char* config);
 
 /**
  * Release the memory allocated by the proposer
@@ -173,7 +171,7 @@ void evproposer_set_instance_id(struct evproposer* p, unsigned iid);
 /**
  * Used by clients to submit values to proposers.
  */
-void paxos_submit(struct bufferevent* bev, char* value, int size);
+void paxos_submit(char* value, int size);
 
 #ifdef __cplusplus
 }

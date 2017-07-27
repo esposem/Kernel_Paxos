@@ -31,7 +31,7 @@
 #include "paxos_types_pack.h"
 #include <linux/kernel.h>
 #include <linux/slab.h>
-// #include <net/udp.h>
+#include "kernel_udp.h"
 
 
 
@@ -44,115 +44,95 @@
 // }
 
 void
-send_paxos_message(struct sockaddr_in * bev, paxos_message* msg)
+send_paxos_message(struct socket * s, struct sockaddr_in * bev, paxos_message* msg)
 {
 	msgpack_packer* packer = NULL;
-	// TODO: CHECK bufferevent_pack_data
 	long size_msg = msgpack_pack_paxos_message(packer, msg);
-	// TODO: send message??
+	udp_server_send(s, bev, (char *) packer, size_msg, MSG_WAITALL, NULL);
 	kfree(packer);
 }
 
 void
-send_paxos_prepare(struct sockaddr_in* bev, paxos_prepare* p)
+send_paxos_prepare(struct socket * s,struct sockaddr_in* bev, paxos_prepare* p)
 {
 	paxos_message msg = {
 		.type = PAXOS_PREPARE,
 		.u.prepare = *p };
-	send_paxos_message(bev, &msg);
+	send_paxos_message(s, bev, &msg);
 	paxos_log_debug("Send prepare for iid %d ballot %d", p->iid, p->ballot);
 }
 
 void
-send_paxos_promise(struct sockaddr_in* bev, paxos_promise* p)
+send_paxos_promise(struct socket * s, struct sockaddr_in* bev, paxos_promise* p)
 {
 	paxos_message msg = {
 		.type = PAXOS_PROMISE,
 		.u.promise = *p };
-	send_paxos_message(bev, &msg);
+	send_paxos_message(s, bev, &msg);
 	paxos_log_debug("Send promise for iid %d ballot %d", p->iid, p->ballot);
 }
 
 void
-send_paxos_accept(struct sockaddr_in* bev, paxos_accept* p)
+send_paxos_accept(struct socket * s, struct sockaddr_in* bev, paxos_accept* p)
 {
 	paxos_message msg = {
 		.type = PAXOS_ACCEPT,
 		.u.accept = *p };
-	send_paxos_message(bev, &msg);
+	send_paxos_message(s, bev, &msg);
 	paxos_log_debug("Send accept for iid %d ballot %d", p->iid, p->ballot);
 }
 
 void
-send_paxos_accepted(struct sockaddr_in* bev, paxos_accepted* p)
+send_paxos_accepted(struct socket * s, struct sockaddr_in* bev, paxos_accepted* p)
 {
 	paxos_message msg = {
 		.type = PAXOS_ACCEPTED,
 		.u.accepted = *p };
-	send_paxos_message(bev, &msg);
+	send_paxos_message(s, bev, &msg);
 	paxos_log_debug("Send accepted for inst %d ballot %d", p->iid, p->ballot);
 }
 
 void
-send_paxos_preempted(struct sockaddr_in* bev, paxos_preempted* p)
+send_paxos_preempted(struct socket * s, struct sockaddr_in* bev, paxos_preempted* p)
 {
 	paxos_message msg = {
 		.type = PAXOS_PREEMPTED,
 		.u.preempted = *p };
-	send_paxos_message(bev, &msg);
+	send_paxos_message(s,bev, &msg);
 	paxos_log_debug("Send preempted for inst %d ballot %d", p->iid, p->ballot);
 }
 
 void
-send_paxos_repeat(struct sockaddr_in* bev, paxos_repeat* p)
+send_paxos_repeat(struct socket * s, struct sockaddr_in* bev, paxos_repeat* p)
 {
 	paxos_message msg = {
 		.type = PAXOS_REPEAT,
 		.u.repeat = *p };
-	send_paxos_message(bev, &msg);
+	send_paxos_message(s,bev, &msg);
 	paxos_log_debug("Send repeat for inst %d-%d", p->from, p->to);
 }
 
 void
-send_paxos_trim(struct sockaddr_in* bev, paxos_trim* t)
+send_paxos_trim(struct socket * s, struct sockaddr_in* bev, paxos_trim* t)
 {
 	paxos_message msg = {
 		.type = PAXOS_TRIM,
 		.u.trim = *t };
-	send_paxos_message(bev, &msg);
+	send_paxos_message(s,bev, &msg);
 	paxos_log_debug("Send trim for inst %d", t->iid);
 }
 
 void
-paxos_submit(struct sockaddr_in* bev, char* data, int size)
+paxos_submit(struct socket * s, struct sockaddr_in* bev, char* data, int size)
 {
 	paxos_message msg = {
 		.type = PAXOS_CLIENT_VALUE,
 		.u.client_value.value.paxos_value_len = size,
 		.u.client_value.value.paxos_value_val = data };
-	send_paxos_message(bev, &msg);
+	send_paxos_message(s, bev, &msg);
 }
 
-// int
-// recv_paxos_message(struct evbuffer* in, paxos_message* out)
-// {
-//  // ALLOCATE HERE
-// 	int rv = 0;
-// 	char* buffer;
-// 	size_t size, offset = 0;
-// 	msgpack_unpacked msg;
-//
-// 	size = evbuffer_get_length(in);
-// 	if (size == 0)
-// 		return rv;
-//
-// 	msgpack_unpacked_init(&msg);
-// 	buffer = (char*)evbuffer_pullup(in, size);
-// 	if (msgpack_unpack_next(&msg, buffer, size, &offset)) {
-// 		msgpack_unpack_paxos_message(&msg.data, out);
-// 		evbuffer_drain(in, offset);
-// 		rv = 1;
-// 	}
-// 	msgpack_unpacked_destroy(&msg);
-// 	return rv;
-// }
+int recv_paxos_message(char * data, paxos_message* out, int size)
+{
+	return msgpack_unpack_paxos_message(data, out, size);
+}

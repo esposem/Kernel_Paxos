@@ -9,15 +9,6 @@
 
 #include "kernel_udp.h"
 
-#define MODULE_NAME "Acceptor: "
-#define MAX_RCV_WAIT 100000 // in microseconds
-#define MAX_UDP_SIZE 65507
-
-#define P1A "PREPARE 1A"
-#define A2A "ACCEPT REQ 2A"
-#define P1B "PROMISE 1B"
-#define A2B "ACCEPTED 2B"
-
 static unsigned char learnerip[5] = {127,0,0,4,'\0'};
 static int learnerport = 3000;
 static unsigned char myip[5] = {127,0,0,3,'\0'};
@@ -33,15 +24,12 @@ module_param(len, int, S_IRUGO);
 MODULE_PARM_DESC(len,"Data packet length, default 50, max 65507 (automatically added space for terminating 0)");
 
 static udp_service * kacceptor;
-static atomic_t released_socket = ATOMIC_INIT(0); // 0 no, 1 yes
-static atomic_t thread_running = ATOMIC_INIT(0);   // 0 no, 1 yes
-static atomic_t struct_allocated = ATOMIC_INIT(0); // 0 no, 1 yes
-
+static struct socket * kasocket = NULL;
 
 int connection_handler(void *data)
 {
   struct sockaddr_in address;
-  struct socket *accept_socket = kacceptor->u_socket;
+  struct socket *accept_socket = kasocket;
   int ret;
 
   unsigned char * in_buf = kmalloc(len, GFP_KERNEL);
@@ -55,12 +43,7 @@ int connection_handler(void *data)
   while (1){
 
     if(kthread_should_stop() || signal_pending(current)){
-      // printk(KERN_INFO MODULE_NAME"STOP [connection_handler]");
-      if(atomic_read(&released_socket) == 0){
-        printk(KERN_INFO MODULE_NAME"Released socket [connection_handler]");
-        atomic_set(&released_socket, 1);
-        sock_release(kacceptor->u_socket);
-      }
+      check_sock_allocation(kacceptor, accept_socket);
       kfree(in_buf);
       kfree(out_buf);
       return 0;
@@ -68,7 +51,7 @@ int connection_handler(void *data)
 
     memset(in_buf, '\0', len);
     memset(&address, 0, sizeof(struct sockaddr_in));
-    ret = udp_server_receive(accept_socket, &address, in_buf, len, MSG_WAITALL, &released_socket, MODULE_NAME);
+    ret = udp_server_receive(accept_socket, &address, in_buf, len, MSG_WAITALL, kacceptor);
     if(ret > 0){
       size_buf = strlen(in_buf);
       if(memcmp(in_buf, P1A, size_buf > size_msg ? size_msg : size_buf) == 0){
@@ -76,14 +59,14 @@ int connection_handler(void *data)
         unsigned short i = ntohs(address.sin_port);
         memcpy(&proposerport, &i, sizeof(unsigned short));
         // address is same as receiver
-        _send_message(accept_socket, &address, out_buf, proposerport, P1B, len, MODULE_NAME);
+        _send_message(accept_socket, &address, out_buf, proposerport, P1B, len, kacceptor->name);
       }else if (memcmp(in_buf, A2A, size_buf > size_msg1 ? size_msg1 : size_buf) == 0){
         // address is same as receiver
-        _send_message(accept_socket, &address, out_buf, proposerport, A2B, len, MODULE_NAME);
+        _send_message(accept_socket, &address, out_buf, proposerport, A2B, len, kacceptor->name);
         address.sin_addr.s_addr = htonl(create_address(learnerip));
-        _send_message(accept_socket, &address, out_buf, learnerport, A2B, len, MODULE_NAME);
+        _send_message(accept_socket, &address, out_buf, learnerport, A2B, len, kacceptor->name);
       }else{
-        printk(KERN_INFO MODULE_NAME"Received %s?", in_buf);
+        printk(KERN_INFO "%s Received %s?", kacceptor->name, in_buf);
       }
     }
   }
@@ -93,71 +76,29 @@ int connection_handler(void *data)
 
 int udp_server_listen(void)
 {
-  int server_err;
-  struct socket *conn_socket;
-  struct sockaddr_in server;
-  struct timeval tv;
-
-  server_err = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &kacceptor->u_socket);
-  if(server_err < 0){
-    printk(KERN_INFO MODULE_NAME"Error: %d while creating socket [udp_server_listen]", server_err);
-    atomic_set(&thread_running, 0);
-    return 0;
-  }else{
-    atomic_set(&released_socket, 0);
-    printk(KERN_INFO MODULE_NAME"Created socket [udp_server_listen]");
-  }
-
-  conn_socket = kacceptor->u_socket;
-  server.sin_addr.s_addr = htonl(create_address(myip));
-  server.sin_family = AF_INET;
-  server.sin_port = htons(myport);
-
-  server_err = conn_socket->ops->bind(conn_socket, (struct sockaddr*)&server, sizeof(server));
-  if(server_err < 0) {
-    printk(KERN_INFO MODULE_NAME"Error: %d while binding socket [udp_server_listen]", server_err);
-    atomic_set(&released_socket, 1);
-    sock_release(kacceptor->u_socket);
-    atomic_set(&thread_running, 0);
-    return 0;
-  }else{
-    printk(KERN_INFO MODULE_NAME"Socket is bind to 127.0.0.3 [udp_server_listen]");
-  }
-
-  tv.tv_sec = 0;
-  tv.tv_usec = MAX_RCV_WAIT;
-  kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&tv, sizeof(tv));
-
+  udp_server_init(kacceptor, &kasocket, myip, &myport);
   connection_handler(NULL);
-  atomic_set(&thread_running, 0);
+  atomic_set(&kacceptor->thread_running, 0);
   return 0;
 }
 
 void udp_server_start(void){
-  kacceptor->u_thread = kthread_run((void *)udp_server_listen, NULL, MODULE_NAME);
+  kacceptor->u_thread = kthread_run((void *)udp_server_listen, NULL, kacceptor->name);
   if(kacceptor->u_thread >= 0){
-    atomic_set(&thread_running,1);
-    printk(KERN_INFO MODULE_NAME "Thread running [udp_server_start]");
+    atomic_set(&kacceptor->thread_running,1);
+    printk(KERN_INFO "%s Thread running [udp_server_start]", kacceptor->name);
   }else{
-    printk(KERN_INFO MODULE_NAME "Error in starting thread. Terminated [udp_server_start]");
+    printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kacceptor->name);
   }
 }
 
 static int __init network_server_init(void)
 {
-  if(len < 0 || len > MAX_UDP_SIZE){
-    printk(KERN_INFO MODULE_NAME"Wrong len, using default one");
-    len = 50;
-  }
-  len++;
-  atomic_set(&released_socket, 1);
   kacceptor = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kacceptor){
-    printk(KERN_INFO MODULE_NAME"Failed to initialize server [network_server_init]");
+    printk(KERN_INFO "Failed to initialize ACCEPTOR [network_server_init]");
   }else{
-    atomic_set(&struct_allocated,1);
-    memset(kacceptor, 0, sizeof(udp_service));
-    printk(KERN_INFO MODULE_NAME "Server initialized [network_server_init]");
+    init_service(kacceptor, "Acceptor:", &len);
     udp_server_start();
   }
   return 0;
@@ -165,7 +106,7 @@ static int __init network_server_init(void)
 
 static void __exit network_server_exit(void)
 {
-  udp_server_quit(kacceptor, &struct_allocated, &thread_running, &released_socket, MODULE_NAME);
+  udp_server_quit(kacceptor, kasocket);
 }
 
 
