@@ -34,22 +34,23 @@
 #include "kernel_udp.h"
 
 
-
-// static int
-// sockaddr_in_pack_data(void* data, const char* buf, size_t len)
-// {
-// 	struct sockaddr_in* bev = (struct sockaddr_in*)data;
-// 	// bufferevent_write(bev, buf, len);
-// 	return 0;
-// }
-
 void
 send_paxos_message(struct socket * s, struct sockaddr_in * bev, paxos_message* msg)
 {
 	msgpack_packer* packer = NULL;
 	long size_msg = msgpack_pack_paxos_message(packer, msg);
-	udp_server_send(s, bev, (char *) packer, size_msg, MSG_WAITALL, NULL);
+	udp_server_send(s, bev, (unsigned char *) packer, size_msg, NULL);
 	kfree(packer);
+}
+
+void
+send_paxos_learner_hi(struct socket * s,struct sockaddr_in* bev, paxos_learner_hi* p)
+{
+	paxos_message msg = {
+		.type = PAXOS_LEARNER_HI,
+		.u.learner_hi = *p };
+	send_paxos_message(s, bev, &msg);
+	// paxos_log_debug("Send hi for iid %d ballot %d", p->iid, p->ballot);
 }
 
 void

@@ -17,10 +17,6 @@ static int myport = 3001;
 module_param(myport, int, S_IRUGO);
 MODULE_PARM_DESC(myport,"The receiving port, default 3001");
 
-static int len = 50;
-module_param(len, int, S_IRUGO);
-MODULE_PARM_DESC(len,"Data packet length, default 50, max 65507 (automatically added space for terminating 0)");
-
 static udp_service * kclient;
 static struct socket * kcsocket;
 
@@ -30,12 +26,11 @@ int connection_handler(void *data)
   struct socket *client_socket = kcsocket;
 
   int ret;
-  unsigned char * in_buf = kmalloc(len, GFP_KERNEL);
-  unsigned char * out_buf = kmalloc(len, GFP_KERNEL);
+  unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_KERNEL);
+  unsigned char * out_buf = kmalloc(strlen(VFC), GFP_KERNEL);
   size_t size_msg, size_buf;
-
-  address.sin_addr.s_addr = htonl(create_address(proposerip));
-  _send_message(client_socket, &address, out_buf, proposerport, "VALUE FROM CLIENT", len, kclient->name);
+  prepare_sockaddr(&address, proposerport, NULL, proposerip);
+  udp_server_send(client_socket,&address, VFC, strlen(VFC), kclient->name);
 
   while (1){
 
@@ -47,13 +42,13 @@ int connection_handler(void *data)
     }
 
 
-    memset(in_buf, '\0', len);
+    memset(in_buf, '\0', MAX_UDP_SIZE);
     memset(&address, 0, sizeof(struct sockaddr_in));
-    ret = udp_server_receive(client_socket, &address, in_buf, len, MSG_WAITALL, kclient);
+    ret = udp_server_receive(client_socket, &address, in_buf, MSG_WAITALL, kclient);
     if(ret > 0){
-      size_msg = strlen("ALL DONE");
+      size_msg = strlen(AD);
       size_buf = strlen(in_buf);
-      if(memcmp(in_buf, "ALL DONE", size_buf > size_msg ? size_msg : size_buf) == 0){
+      if(memcmp(in_buf, AD, size_buf > size_msg ? size_msg : size_buf) == 0){
         printk(KERN_INFO "%s All done, terminating client [connection_handler]", kclient->name);
       }
     }
@@ -86,7 +81,7 @@ static int __init network_server_init(void)
   if(!kclient){
     printk(KERN_INFO "Failed to initialize CLIENT [network_server_init]");
   }else{
-    init_service(kclient, "Client:", &len);
+    init_service(kclient, "Client:");
     udp_server_start();
   }
   return 0;

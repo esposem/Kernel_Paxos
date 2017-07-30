@@ -63,16 +63,13 @@ struct peers
 	struct subscription subs[32];
 };
 
-// static struct timeval reconnect_timeout = {2,0};
 static struct peer* make_peer(struct peers* p, int id, struct sockaddr_in* in);
 static void free_peer(struct peer* p);
 static void free_all_peers(struct peer** p, int count);
 static int on_read(char * data,struct peer * arg, int size);
-// static void on_client_event(struct bufferevent* bev, short events, void *arg);
 
 
-struct peers*
-peers_new(struct sockaddr_in * addr, struct evpaxos_config* config)
+struct peers* peers_new(struct sockaddr_in * addr, struct evpaxos_config* config, int id)
 {
 	struct peers* p = kmalloc(sizeof(struct peers), GFP_KERNEL);
 	p->peers_count = 0;
@@ -81,7 +78,7 @@ peers_new(struct sockaddr_in * addr, struct evpaxos_config* config)
 	p->peers = NULL;
 	p->clients = NULL;
 	p->sock = NULL;
-	p->me = make_peer(p, -1, addr);
+	p->me = make_peer(p, id, addr);
 	p->config = config;
 	return p;
 }
@@ -113,7 +110,7 @@ void
 peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg)
 {
 	int i;
-	paxos_log_debug("Sent this message to %d peers", p->clients_count);
+	// paxos_log_debug("Sent this message to %d peers", p->clients_count);
 	for (i = 0; i < p->clients_count; ++i)
 		cb(p->clients[i], arg);
 }
@@ -128,10 +125,45 @@ peers_get_acceptor(struct peers* p, int id)
 	return NULL;
 }
 
+// client, add to peers
+void add_proposers_from_config(int myid, struct peers * p){
+	struct sockaddr_in addr;
+	for(int i = 0; i < evpaxos_proposer_count(p->config); i++){
+		if(i != myid){
+			addr = evpaxos_proposer_address(p->config, i);
+			p->peers[i] = make_peer(p, i, &addr);
+			p->peers_count++;
+		}
+	}
+}
+
+// learner and proposer, add to peers
+void add_acceptors_from_config(int myid, struct peers * p){
+	struct sockaddr_in addr;
+	for(int i = 0; i < evpaxos_acceptor_count(p->config); i++){
+		if(i != myid){
+			addr = evpaxos_acceptor_address(p->config, i);
+			p->peers[i] = make_peer(p, i, &addr);
+			p->peers_count++;
+		}
+	}
+}
+
 int
 peer_get_id(struct peer* p)
 {
 	return p->id;
+}
+
+static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
+	for (int i = 0; i < p->clients_count; ++i){
+		if(memcmp(&(addr->sin_port), &(p->clients[i]->addr.sin_port), sizeof(unsigned short)) == 0
+	&& memcmp(&(addr->sin_addr), &(p->clients[i]->addr.sin_addr), sizeof(struct in_addr)) == 0){
+			return;
+		}
+	}
+	p->clients[p->clients_count] = make_peer(p, p->clients_count, addr);
+	p->clients_count++;
 }
 
 int
@@ -139,9 +171,9 @@ peers_listen(struct peers* p, udp_service * k, char * ip, int * port)
 {
 	int ret;
 	struct sockaddr_in address;
-	int size_buf = 100;
+	int size_bigger_buf = 0;
 	unsigned char * bigger_buff = NULL;
-	unsigned char * in_buf = kmalloc(size_buf, GFP_KERNEL);
+	unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_KERNEL);
 
 	int n_packet_toget =0, first_time = 0;
 
@@ -157,32 +189,35 @@ peers_listen(struct peers* p, udp_service * k, char * ip, int * port)
       return 0;
     }
 
-		memset(in_buf, '\0', size_buf);
+		memset(in_buf, '\0', MAX_UDP_SIZE);
     memset(&address, 0, sizeof(struct sockaddr_in));
-		ret = udp_server_receive(p->sock, &address, in_buf, size_buf, MSG_WAITALL, k);
+		ret = udp_server_receive(p->sock, &address, in_buf, MSG_WAITALL, k);
 		if(ret > 0){
 			if(first_time == 0){
-				ret = on_read(in_buf, p->me, size_buf);
+				add_or_update_client(&address, p);
+				ret = on_read(in_buf, p->me, MAX_UDP_SIZE);
 				if(ret != 0){
 					while(ret > 0){
-						ret -= size_buf;
+						ret -= MAX_UDP_SIZE;
 						n_packet_toget++;
 					}
-					bigger_buff = krealloc(in_buf, size_buf * (n_packet_toget +1), GFP_KERNEL);
-					in_buf+=size_buf;
-					memset(in_buf, '\0', size_buf * n_packet_toget);
+					size_bigger_buf = MAX_UDP_SIZE * (n_packet_toget +1);
+					bigger_buff = krealloc(in_buf, size_bigger_buf, GFP_KERNEL);
+					in_buf+=MAX_UDP_SIZE;
+					memset(in_buf, '\0', MAX_UDP_SIZE * n_packet_toget);
 					first_time = 1;
 				}
 			}else{
-				strncat(bigger_buff, in_buf, size_buf);
+				strncat(bigger_buff, in_buf, MAX_UDP_SIZE);
 				n_packet_toget--;
 				if(n_packet_toget == 0){
 					first_time = 0;
+					in_buf = bigger_buff;
+					on_read(bigger_buff, p->me, size_bigger_buf);
 				}
 			}
 		}
 	}
-	// paxos_log_info("Listening on port %d", port);
 	return 1;
 }
 
@@ -213,8 +248,9 @@ static int
 on_read(char * data,struct peer * arg, int size)
 {
 	paxos_message msg;
-	if(recv_paxos_message(data, &msg, size) == 1){// returns if the packet is partial
-		return 1;
+	int ret;
+	if((ret = recv_paxos_message(data, &msg, size)) != 0){// returns if the packet is partial
+		return ret;
 	}
 	dispatch_message(arg, &msg);
 	paxos_message_destroy(&msg);

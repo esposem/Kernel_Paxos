@@ -26,12 +26,13 @@ struct udp_service
 
 typedef struct udp_service udp_service;
 
-extern void _send_message(struct socket * s, struct sockaddr_in * a, unsigned char * buff, int p, char * data, int len, char * MODULE_NAME);
-extern int udp_server_send(struct socket *sock, struct sockaddr_in *address, const char *buf, const size_t length, unsigned long flags, char * MODULE_NAME);
-extern int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigned char *buf,int size, unsigned long flags, udp_service * k);
 extern u32 create_address(u8 *ip);
+extern void prepare_sockaddr(struct sockaddr_in * address, int port, struct in_addr * addr, unsigned char * ip);
 extern void udp_server_init(udp_service * k, struct socket ** s, unsigned char * myip, int * myport);
-extern void init_service(udp_service * k, char * name, int * len);
+extern void init_service(udp_service * k, char * name);
+extern void _send_message(struct socket * s, struct sockaddr_in * a, unsigned char * buff, int p, char * data, int len, char * module_name);
+extern int udp_server_send(struct socket *sock, struct sockaddr_in * address, const char *buf, const size_t length, char * module_name);
+extern int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigned char *buf, unsigned long flags, udp_service * k);
 extern void check_sock_allocation(udp_service * k, struct socket * s);
 extern void udp_server_quit(udp_service * k, struct socket * s);
 

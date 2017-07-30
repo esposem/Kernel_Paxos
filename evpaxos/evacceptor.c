@@ -172,6 +172,7 @@ evacceptor_init(int id, const char* config_file, struct event_base* base)
 	if (peers_listen(peers, port) == 0)
 		return NULL;
 	struct evacceptor* acceptor = evacceptor_init_internal(id, config, peers);
+
 	evpaxos_config_free(config);
 	return acceptor;
 }
