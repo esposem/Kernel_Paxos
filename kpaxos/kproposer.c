@@ -19,10 +19,6 @@ static unsigned short clientport;
 module_param(myport, int, S_IRUGO);
 MODULE_PARM_DESC(myport,"The receiving port, default 3002");
 
-static int len = 50;
-module_param(len, int, S_IRUGO);
-MODULE_PARM_DESC(len,"Data packet length, default 50, max 65507 (automatically added space for terminating 0)");
-
 static udp_service * kproposer;
 static struct socket * kpsocket;
 
@@ -32,8 +28,8 @@ int connection_handler(void *data)
   struct socket *proposer_socket = kpsocket;
 
   int ret;
-  unsigned char * in_buf = kmalloc(len, GFP_KERNEL);
-  unsigned char * out_buf = kmalloc(len, GFP_KERNEL);
+  unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_KERNEL);
+  // unsigned char * out_buf = kmalloc(strlen(), GFP_KERNEL);
   size_t size_buf, size_msg1, size_msg2, size_msg3;
 
 
@@ -46,33 +42,28 @@ int connection_handler(void *data)
     if(kthread_should_stop() || signal_pending(current)){
       check_sock_allocation(kproposer, proposer_socket);
       kfree(in_buf);
-      kfree(out_buf);
+      // kfree(out_buf);
       return 0;
     }
 
-    memset(in_buf, '\0', len);
+    memset(in_buf, '\0', MAX_UDP_SIZE);
     memset(&address, 0, sizeof(struct sockaddr_in));
-    ret = udp_server_receive(proposer_socket, &address, in_buf, len, MSG_WAITALL, kproposer);
+    ret = udp_server_receive(proposer_socket, &address, in_buf, MSG_WAITALL, kproposer);
     if(ret > 0){
       size_buf = strlen(in_buf);
       if(memcmp(in_buf, VFC, size_buf > size_msg1 ? size_msg1 : size_buf) == 0){
         memcpy(&clientaddr, &address.sin_addr, sizeof(struct in_addr));
         unsigned short i = ntohs(address.sin_port);
         memcpy(&clientport, &i, sizeof(unsigned short));
-        address.sin_addr.s_addr = htonl(create_address(acceptorip));
-        _send_message(proposer_socket, &address, out_buf, acceptorport, P1A, len, kproposer->name);
-
+        prepare_sockaddr(&address, acceptorport, NULL, acceptorip);
+        udp_server_send(proposer_socket, &address, P1A, strlen(P1A), kproposer->name);
       }else if (memcmp(in_buf, P1B, size_buf > size_msg2 ? size_msg2 : size_buf) == 0){
-        // address.sin_addr.s_addr = htonl(create_address(acceptorip));
-        _send_message(proposer_socket, &address, out_buf, acceptorport, A2A, len, kproposer->name);
-
+        prepare_sockaddr(&address, acceptorport, NULL, acceptorip);
+        udp_server_send(proposer_socket, &address, A2A, strlen(A2A), kproposer->name);
       } else if (memcmp(in_buf, A2B, size_buf > size_msg3 ? size_msg3 : size_buf) == 0){
-        address.sin_addr = clientaddr;
-        // TODO retrieve client port
-        _send_message(proposer_socket, &address, out_buf, 3001, "ALL DONE", len, kproposer->name);
-
+        prepare_sockaddr(&address, clientport, &clientaddr, NULL);
+        udp_server_send(proposer_socket, &address, AD, strlen(AD), kproposer->name);
       }
-
     }
   }
 
@@ -103,7 +94,7 @@ static int __init network_server_init(void)
   if(!kproposer){
     printk(KERN_INFO "Failed to initialize server [network_server_init]");
   }else{
-    init_service(kproposer, "Proposer:", &len);
+    init_service(kproposer, "Proposer:");
     udp_server_start();
   }
   return 0;

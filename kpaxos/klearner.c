@@ -14,11 +14,6 @@ static int myport = 3000;
 module_param(myport, int, S_IRUGO);
 MODULE_PARM_DESC(myport,"The receiving port, default 3000");
 
-static int len = 50;
-module_param(len, int, S_IRUGO);
-// the \0 is allocated, but not sent. It's just for printing purposes
-MODULE_PARM_DESC(len,"Data packet length, default 50, max 65507 (automatically added space for terminating 0)");
-
 static udp_service * klearner;
 static struct socket * klsocket;
 int connection_handler(void *data)
@@ -27,25 +22,25 @@ int connection_handler(void *data)
   struct socket *learner_socket = klsocket;
 
   int ret;
-  unsigned char * in_buf = kmalloc(len, GFP_KERNEL);
-  unsigned char * out_buf= kmalloc(len, GFP_KERNEL);
+  unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_KERNEL);
+  // unsigned char * out_buf= kmalloc(strlen(), GFP_KERNEL);
 
   while (1){
 
     if(kthread_should_stop() || signal_pending(current)){
       check_sock_allocation(klearner, learner_socket);
       kfree(in_buf);
-      kfree(out_buf);
+      // kfree(out_buf);
       return 0;
     }
 
-    memset(in_buf, '\0', len);
+    memset(in_buf, '\0', MAX_UDP_SIZE);
     memset(&address, 0, sizeof(struct sockaddr_in));
-    ret = udp_server_receive(learner_socket, &address, in_buf, len, MSG_WAITALL,klearner);
+    ret = udp_server_receive(learner_socket, &address, in_buf, MSG_WAITALL,klearner);
 
     if(ret > 0){
       if(memcmp(in_buf, A2B, 11) == 0){
-        printk(KERN_INFO "%sGOT ACCEPTED 2B", klearner->name);
+        printk(KERN_INFO "%s GOT ACCEPTED 2B", klearner->name);
         return 0;
       }
     }
@@ -78,7 +73,7 @@ static int __init network_server_init(void)
   if(!klearner){
     printk(KERN_INFO "Failed to initialize server [network_server_init]");
   }else{
-    init_service(klearner, "Learner:", &len);
+    init_service(klearner, "Learner:");
     udp_server_start();
   }
   return 0;

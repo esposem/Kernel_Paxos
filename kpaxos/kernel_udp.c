@@ -31,54 +31,70 @@ void check_sock_allocation(udp_service * k, struct socket * s){
   }
 }
 
-int udp_server_send(struct socket *sock, struct sockaddr_in *address, const char *buf, const size_t length, unsigned long flags, \
-   char * MODULE_NAME)
+void prepare_sockaddr(struct sockaddr_in * address, int port, struct in_addr * addr, unsigned char * ip){
+  address->sin_family = AF_INET;
+  address->sin_port = htons(port);
+
+  if(addr == NULL){
+    address->sin_addr.s_addr = htonl(create_address(ip));
+  }else{
+    address->sin_addr = *addr;
+  }
+}
+
+// returns the number of packets sent
+// need to memset buffer to \0 before
+// and copy data in buffer
+int udp_server_send(struct socket *sock, struct sockaddr_in * address, const char *buf, const size_t buffer_size, char * module_name)
 {
     struct msghdr msg;
     struct kvec vec;
-    int lenn, written = 0, left =length;
+    int lenn, min, npacket =0;
+    int l = buffer_size;
+
     mm_segment_t oldmm;
 
     msg.msg_name    = address;
     msg.msg_namelen = sizeof(struct sockaddr_in);
     msg.msg_control = NULL;
     msg.msg_controllen = 0;
-    msg.msg_flags = flags;
+    msg.msg_flags = MSG_WAITALL;
 
     oldmm = get_fs(); set_fs(KERNEL_DS);
 
-    repeat_send:
-    vec.iov_len = left;
-    vec.iov_base = (char *)buf + written;
-
-    lenn = kernel_sendmsg(sock, &msg, &vec, left, left);
-
-    if((lenn == -ERESTARTSYS) || (!(flags & MSG_WAITALL) && (lenn == -EAGAIN))){
-      goto repeat_send;
-    }
-
-    if(lenn > 0)
-    {
-      written += lenn;
-      left -= lenn;
-      if(left){
-        printk(KERN_INFO "%s Sent only a piece, remaining %d [udp_server_send]", MODULE_NAME, left );
-        goto repeat_send;
+    while(l > 0){
+      if(l < MAX_UDP_SIZE){
+        min = l;
+      }else{
+        min = MAX_UDP_SIZE;
       }
+      vec.iov_len = min;
+      vec.iov_base = (char *)buf;
+      l -= min;
+      buf += min;
+      npacket++;
+
+      lenn = kernel_sendmsg(sock, &msg, &vec, min, min);
+      printk(KERN_INFO "%s Sent message to %pI4 : %hu, size %d [udp_server_send]",module_name, &address->sin_addr, ntohs(address->sin_port), lenn);
     }
 
     set_fs(oldmm);
-    printk(KERN_INFO "%s Sent message to %pI4 : %hu [udp_server_send]",MODULE_NAME, &address->sin_addr, ntohs(address->sin_port));
 
-    return written?written:lenn;
+    return npacket;
 }
 
-int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigned char *buf,int size, unsigned long flags,\
+// buff MUST be MAX_UDP_SIZE big, so it can intercept any sized packet
+// returns the amount of data that has received
+// no need to memset buffer to \0 before
+int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigned char *buf, unsigned long flags,\
     udp_service * k)
 {
   struct msghdr msg;
   struct kvec vec;
   int lenm;
+
+  memset(address, 0, sizeof(struct sockaddr_in));
+  memset(buf, '\0', MAX_UDP_SIZE);
 
   msg.msg_name = address;
   msg.msg_namelen = sizeof(struct sockaddr_in);
@@ -86,7 +102,7 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
   msg.msg_controllen = 0;
   msg.msg_flags = flags;
 
-  vec.iov_len = size;
+  vec.iov_len = MAX_UDP_SIZE;
   vec.iov_base = buf;
 
   lenm = -EAGAIN;
@@ -95,25 +111,15 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
       check_sock_allocation(k, sock);
       return 0;
     }else{
-      // TODO test size
-      lenm = kernel_recvmsg(sock, &msg, &vec, size, size, flags);
+      lenm = kernel_recvmsg(sock, &msg, &vec, MAX_UDP_SIZE, MAX_UDP_SIZE, flags);
       if(lenm > 0){
         address = (struct sockaddr_in *) msg.msg_name;
-        printk(KERN_INFO "%s Received message from %pI4 : %hu saying %s [udp_server_receive]",k->name,&address->sin_addr, ntohs(address->sin_port), buf);
+        printk(KERN_INFO "%s Received message from %pI4 : %hu , size %d [udp_server_receive]",k->name,&address->sin_addr, ntohs(address->sin_port), lenm);
       }
     }
   }
 
   return lenm;
-}
-
-// TODO: add struct and serialize it, void * data. Check for how much data has been sent
-void _send_message(struct socket * s, struct sockaddr_in * a, unsigned char * buff, int p, char * data, int len, char * MODULE_NAME ){
-  a->sin_family = AF_INET;
-  a->sin_port = htons(p);
-  memset(buff, '\0', len);
-  strncat(buff, data, len-1);
-  udp_server_send(s, a, buff,strlen(buff), MSG_WAITALL, MODULE_NAME);
 }
 
 void udp_server_init(udp_service * k, struct socket ** s, unsigned char * myip, int * myport){
@@ -145,7 +151,7 @@ void udp_server_init(udp_service * k, struct socket ** s, unsigned char * myip, 
     atomic_set(&k->thread_running, 0);
     return;
   }else{
-    printk(KERN_INFO "%s Socket is bind to %d.%d.%d%d [udp_server_listen]",k->name, *myip, *(myip +1), *(myip + 2), *(myip + 3) );
+    printk(KERN_INFO "%s Socket is bind to %d.%d.%d.%d [udp_server_listen]",k->name, *myip, *(myip +1), *(myip + 2), *(myip + 3) );
   }
 
   tv.tv_sec = 0;
@@ -153,23 +159,14 @@ void udp_server_init(udp_service * k, struct socket ** s, unsigned char * myip, 
   kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&tv, sizeof(tv));
 }
 
-void check_params(int * len, udp_service * k){
-  if(*len < 0 || *len > MAX_UDP_SIZE){
-    printk(KERN_INFO "%s Wrong len, using default one", k->name);
-    *len = 50;
-  }
-  (*len)++;
-}
-
-void init_service(udp_service * k, char * name, int * len){
+void init_service(udp_service * k, char * name){
   memset(k, 0, sizeof(udp_service));
   atomic_set(&k->socket_allocated, 0);
   atomic_set(&k->thread_running, 0);
   size_t stlen = strlen(name) + 1;
   k->name = kmalloc(stlen, GFP_KERNEL);
   memcpy(k->name, name, stlen);
-  printk(KERN_INFO  "%s Initialized", k->name);
-  check_params(len, k);
+  printk(KERN_INFO "%s Initialized", k->name);
 }
 
 void udp_server_quit(udp_service * k, struct socket * s){

@@ -19,10 +19,6 @@ static unsigned short proposerport;
 module_param(myport, int, S_IRUGO);
 MODULE_PARM_DESC(myport,"The receiving port, default 3003");
 
-static int len = 50;
-module_param(len, int, S_IRUGO);
-MODULE_PARM_DESC(len,"Data packet length, default 50, max 65507 (automatically added space for terminating 0)");
-
 static udp_service * kacceptor;
 static struct socket * kasocket = NULL;
 
@@ -32,8 +28,8 @@ int connection_handler(void *data)
   struct socket *accept_socket = kasocket;
   int ret;
 
-  unsigned char * in_buf = kmalloc(len, GFP_KERNEL);
-  unsigned char * out_buf = kmalloc(len, GFP_KERNEL);
+  unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_KERNEL);
+  unsigned char * out_buf = kmalloc(strlen(A2B), GFP_KERNEL);
   size_t size_msg, size_msg1, size_buf;
 
 
@@ -49,22 +45,25 @@ int connection_handler(void *data)
       return 0;
     }
 
-    memset(in_buf, '\0', len);
+    memset(in_buf, '\0', MAX_UDP_SIZE);
     memset(&address, 0, sizeof(struct sockaddr_in));
-    ret = udp_server_receive(accept_socket, &address, in_buf, len, MSG_WAITALL, kacceptor);
+    ret = udp_server_receive(accept_socket, &address, in_buf, MSG_WAITALL, kacceptor);
     if(ret > 0){
       size_buf = strlen(in_buf);
+
       if(memcmp(in_buf, P1A, size_buf > size_msg ? size_msg : size_buf) == 0){
         memcpy(&proposeraddr, &address.sin_addr, sizeof(struct in_addr));
         unsigned short i = ntohs(address.sin_port);
         memcpy(&proposerport, &i, sizeof(unsigned short));
-        // address is same as receiver
-        _send_message(accept_socket, &address, out_buf, proposerport, P1B, len, kacceptor->name);
+        prepare_sockaddr(&address, proposerport, &proposeraddr, NULL);
+        udp_server_send(accept_socket, &address, P1B, strlen(P1B), kacceptor->name);
+
       }else if (memcmp(in_buf, A2A, size_buf > size_msg1 ? size_msg1 : size_buf) == 0){
-        // address is same as receiver
-        _send_message(accept_socket, &address, out_buf, proposerport, A2B, len, kacceptor->name);
-        address.sin_addr.s_addr = htonl(create_address(learnerip));
-        _send_message(accept_socket, &address, out_buf, learnerport, A2B, len, kacceptor->name);
+        prepare_sockaddr(&address, proposerport, &proposeraddr, NULL);
+        udp_server_send(accept_socket, &address, A2B, strlen(A2B), kacceptor->name);
+        prepare_sockaddr(&address, learnerport, NULL, learnerip);
+        udp_server_send(accept_socket, &address, P1B, strlen(P1B), kacceptor->name);
+
       }else{
         printk(KERN_INFO "%s Received %s?", kacceptor->name, in_buf);
       }
@@ -98,7 +97,7 @@ static int __init network_server_init(void)
   if(!kacceptor){
     printk(KERN_INFO "Failed to initialize ACCEPTOR [network_server_init]");
   }else{
-    init_service(kacceptor, "Acceptor:", &len);
+    init_service(kacceptor, "Acceptor:");
     udp_server_start();
   }
   return 0;

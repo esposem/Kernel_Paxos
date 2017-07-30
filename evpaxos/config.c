@@ -155,6 +155,12 @@ evpaxos_acceptor_count(struct evpaxos_config* config)
 	return config->acceptors_count;
 }
 
+int
+evpaxos_proposer_count(struct evpaxos_config* config)
+{
+	return config->proposers_count;
+}
+
 struct sockaddr_in
 evpaxos_acceptor_address(struct evpaxos_config* config, int i)
 {
