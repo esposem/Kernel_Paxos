@@ -27,7 +27,7 @@
 
 
 #include "storage_utils.h"
-#include <linux/kernel.h>
+
 #include <linux/slab.h>
 char*
 paxos_accepted_to_buffer(paxos_accepted* acc)

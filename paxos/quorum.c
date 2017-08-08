@@ -28,7 +28,7 @@
 
 #include "paxos.h"
 #include "quorum.h"
-#include <linux/kernel.h> // stdlib, string, limits
+ // stdlib, string, limits
 #include <linux/slab.h>
 
 

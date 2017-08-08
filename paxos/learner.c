@@ -33,7 +33,7 @@
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
-#include <linux/kernel.h> // stdlib, string, limits
+ // stdlib, string, limits
 
 struct instance
 {

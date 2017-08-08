@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // #include <string.h>   /* memcmp, memset, strlen */
 // #include <stddef.h>   /* ptrdiff_t */
 #include <linux/stddef.h>
-#include <linux/kernel.h>
+
 // #include <stdlib.h>   /* exit */
 
 /* These macros use decltype or the earlier __typeof GNU extension.

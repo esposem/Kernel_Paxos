@@ -27,29 +27,31 @@
 
 
 #include "evpaxos.h"
-#include "peers.h"
 #include "acceptor.h"
 #include "message.h"
-#include <linux/kernel.h>
+//
 #include <linux/slab.h>
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <event2/event.h>
-
+#include <linux/timer.h>
+#include <linux/udp.h>
+#include "peers.h"
 
 struct evacceptor
 {
 	struct peers* peers;
 	struct acceptor* state;
-	struct event* timer_ev;
+	struct timer_list timer_ev;
 	struct timeval timer_tv;
 };
 
 
+void paxos_acceptor_listen(udp_service * k, struct evacceptor * ev){
+	peers_listen(ev->peers, k);
+}
+
 static void
 peer_send_paxos_message(struct peer* p, void* arg)
 {
-	send_paxos_message(peer_get_buffer(p), arg);
+	send_paxos_message(get_socket(p), get_sockaddr(p), arg);
 }
 
 /*
@@ -64,7 +66,7 @@ evacceptor_handle_prepare(struct peer* p, paxos_message* msg, void* arg)
 	paxos_log_debug("Acceptor: Received PREPARE for iid %d, ballot %d",
 		prepare->iid, prepare->ballot);
 	if (acceptor_receive_prepare(a->state, prepare, &out) != 0) {
-		send_paxos_message(peer_get_buffer(p), &out);
+		send_paxos_message( get_socket(p),get_sockaddr(p), &out);
 		paxos_message_destroy(&out);
 		paxos_log_debug("Acceptor: sent promise for iid %d", prepare->iid);
 	}
@@ -87,7 +89,7 @@ evacceptor_handle_accept(struct peer* p, paxos_message* msg, void* arg)
 			peers_foreach_client(a->peers, peer_send_paxos_message, &out);
 		} else if (out.type == PAXOS_PREEMPTED) {
 			paxos_log_debug("Acceptor: Sent PREEMPTED to all proposers ");
-			send_paxos_message(peer_get_buffer(p), &out);
+			send_paxos_message(get_socket(p), get_sockaddr(p), &out);
 		}
 		paxos_message_destroy(&out);
 	}
@@ -104,7 +106,7 @@ evacceptor_handle_repeat(struct peer* p, paxos_message* msg, void* arg)
 	for (iid = repeat->from; iid <= repeat->to; ++iid) {
 		if (acceptor_receive_repeat(a->state, iid, &accepted)) {
 			paxos_log_debug("Acceptor: sent a repeated PAXOS_ACCEPTED to proposer");
-			send_paxos_accepted(peer_get_buffer(p), &accepted);
+			send_paxos_accepted(get_socket(p), get_sockaddr(p), &accepted);
 			paxos_accepted_destroy(&accepted);
 		}
 	}
@@ -120,13 +122,13 @@ evacceptor_handle_trim(struct peer* p, paxos_message* msg, void* arg)
 }
 
 static void
-send_acceptor_state(int fd, short ev, void* arg)
+send_acceptor_state(unsigned long arg)
 {
 	struct evacceptor* a = (struct evacceptor*)arg;
 	paxos_message msg = {.type = PAXOS_ACCEPTOR_STATE};
 	acceptor_set_current_state(a->state, &msg.u.state);
 	peers_foreach_client(a->peers, peer_send_paxos_message, &msg);
-	// event_add(a->timer_ev, &a->timer_tv);
+	mod_timer(&a->timer_ev, jiffies + timeval_to_jiffies(&(a->timer_tv)));
 }
 
 struct evacceptor*
@@ -144,16 +146,15 @@ evacceptor_init_internal(int id, struct evpaxos_config* c, struct peers* p)
 	peers_subscribe(p, PAXOS_TRIM, evacceptor_handle_trim, acceptor);
 	paxos_log_debug("Acceptor: Subscribed to PAXOS_PREPARE, PAXOS_ACCEPT, PAXOS_TRIM, PAXOS_REPEAT");
 
-	struct event_base* base = peers_get_event_base(p);
-	// acceptor->timer_ev = evtimer_new(base, send_acceptor_state, acceptor);
+	setup_timer( &acceptor->timer_ev,  send_acceptor_state, (unsigned long) acceptor);
 	acceptor->timer_tv = (struct timeval){1, 0};
-	// event_add(acceptor->timer_ev, &acceptor->timer_tv);
+	mod_timer(&acceptor->timer_ev, jiffies + timeval_to_jiffies(&acceptor->timer_tv));
 
 	return acceptor;
 }
 
 struct evacceptor*
-evacceptor_init(int id, const char* config_file, struct event_base* base)
+evacceptor_init(int id, const char* config_file, udp_service * k)
 {
 	struct evpaxos_config* config = evpaxos_config_read(config_file);
 	if (config  == NULL)
@@ -166,13 +167,10 @@ evacceptor_init(int id, const char* config_file, struct event_base* base)
 		evpaxos_config_free(config);
 		return NULL;
 	}
-
-	struct peers* peers = peers_new(base, config);
-	int port = evpaxos_acceptor_listen_port(config, id);
-	if (peers_listen(peers, port) == 0)
-		return NULL;
+	struct sockaddr_in addr = evpaxos_acceptor_address(config,id);
+	struct peers* peers = peers_new(&addr, config, id);
 	struct evacceptor* acceptor = evacceptor_init_internal(id, config, peers);
-
+	peers_sock_init(peers,k);
 	evpaxos_config_free(config);
 	return acceptor;
 }
@@ -180,7 +178,7 @@ evacceptor_init(int id, const char* config_file, struct event_base* base)
 void
 evacceptor_free_internal(struct evacceptor* a)
 {
-	// event_free(a->timer_ev);
+	del_timer(&a->timer_ev);
 	acceptor_free(a->state);
 	kfree(a);
 }

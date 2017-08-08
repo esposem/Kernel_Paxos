@@ -29,7 +29,7 @@
 #include "peers.h"
 #include "message.h"
 #include <linux/errno.h>
-#include <linux/kernel.h>
+
 #include <linux/types.h>
 #include <linux/inet.h>
 #include <linux/slab.h>
@@ -149,6 +149,18 @@ void add_acceptors_from_config(int myid, struct peers * p){
 	}
 }
 
+struct socket * get_socket(struct peer * p){
+	return p->peers->sock;
+}
+
+struct sockaddr_in * get_sockaddr(struct peer * p){
+	return &p->addr;
+}
+
+struct peer * get_me(struct peers * p){
+	return p->me;
+}
+
 int
 peer_get_id(struct peer* p)
 {
@@ -166,8 +178,12 @@ static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
 	p->clients_count++;
 }
 
+void peers_sock_init(struct peers* p, udp_service * k){
+	udp_server_init(k, &p->sock, &p->me->addr);
+}
+
 int
-peers_listen(struct peers* p, udp_service * k, char * ip, int * port)
+peers_listen(struct peers* p, udp_service * k)
 {
 	int ret;
 	struct sockaddr_in address;
@@ -176,8 +192,6 @@ peers_listen(struct peers* p, udp_service * k, char * ip, int * port)
 	unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_KERNEL);
 
 	int n_packet_toget =0, first_time = 0;
-
-	udp_server_init(k, &p->sock, ip, port);
 
 	while(1){
 		if(kthread_should_stop() || signal_pending(current)){
@@ -257,26 +271,6 @@ on_read(char * data,struct peer * arg, int size)
 	return 0;
 
 }
-
-// static void
-// on_client_event(struct bufferevent* bev, short ev, void *arg)
-// {
-// 	struct peer* p = (struct peer*)arg;
-// 	if (ev & BEV_EVENT_EOF || ev & BEV_EVENT_ERROR) {
-// 		int i;
-// 		struct peer** clients = p->peers->clients;
-// 		for (i = p->id; i < p->peers->clients_count-1; ++i) {
-// 			clients[i] = clients[i+1];
-// 			clients[i]->id = i;
-// 		}
-// 		p->peers->clients_count--;
-// 		p->peers->clients = realloc(p->peers->clients,
-// 			sizeof(struct peer*) * (p->peers->clients_count));
-// 		free_peer(p);
-// 	} else {
-// 		paxos_log_error("Event %d not handled", ev);
-// 	}
-// }
 
 static struct peer*
 make_peer(struct peers* peers, int id, struct sockaddr_in* addr)

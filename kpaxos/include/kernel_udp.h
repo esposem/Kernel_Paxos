@@ -28,7 +28,7 @@ typedef struct udp_service udp_service;
 
 extern u32 create_address(u8 *ip);
 extern void prepare_sockaddr(struct sockaddr_in * address, int port, struct in_addr * addr, unsigned char * ip);
-extern void udp_server_init(udp_service * k, struct socket ** s, unsigned char * myip, int * myport);
+extern void udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * address);
 extern void init_service(udp_service * k, char * name);
 extern void _send_message(struct socket * s, struct sockaddr_in * a, unsigned char * buff, int p, char * data, int len, char * module_name);
 extern int udp_server_send(struct socket *sock, struct sockaddr_in * address, const char *buf, const size_t length, char * module_name);

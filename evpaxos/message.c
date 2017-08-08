@@ -29,7 +29,7 @@
 #include "paxos.h"
 #include "message.h"
 #include "paxos_types_pack.h"
-#include <linux/kernel.h>
+
 #include <linux/slab.h>
 #include "kernel_udp.h"
 
@@ -48,7 +48,8 @@ send_paxos_learner_hi(struct socket * s,struct sockaddr_in* bev, paxos_learner_h
 {
 	paxos_message msg = {
 		.type = PAXOS_LEARNER_HI,
-		.u.learner_hi = *p };
+		.u.learner_hi.value.paxos_value_len=0,
+	 	.u.learner_hi.value.paxos_value_val = NULL};
 	send_paxos_message(s, bev, &msg);
 	// paxos_log_debug("Send hi for iid %d ballot %d", p->iid, p->ballot);
 }

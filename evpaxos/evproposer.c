@@ -30,9 +30,8 @@
 #include "peers.h"
 #include "message.h"
 #include "proposer.h"
-#include <string.h>
-#include <stdlib.h>
-#include <event2/event.h>
+#include <linux/timer.h>
+#include <linux/slab.h>
 
 struct evproposer
 {
@@ -41,20 +40,20 @@ struct evproposer
 	struct proposer* state;
 	struct peers* peers;
 	struct timeval tv;
-	struct event* timeout_ev;
+	struct timer_list timeout_ev;
 };
 
 
 static void
 peer_send_prepare(struct peer* p, void* arg)
 {
-	send_paxos_prepare(peer_get_buffer(p), arg);
+	send_paxos_prepare(get_socket(p), get_sockaddr(p), arg);
 }
 
 static void
 peer_send_accept(struct peer* p, void* arg)
 {
-	send_paxos_accept(peer_get_buffer(p), arg);
+	send_paxos_accept(get_socket(p), get_sockaddr(p), arg);
 }
 
 static void
@@ -142,9 +141,9 @@ evproposer_handle_acceptor_state(struct peer* p, paxos_message* msg, void* arg)
 }
 
 static void
-evproposer_check_timeouts(evutil_socket_t fd, short event, void *arg)
+evproposer_check_timeouts(unsigned long arg)
 {
-	struct evproposer* p = arg;
+	struct evproposer* p = (struct evproposer *) arg;
 	struct timeout_iterator* iter = proposer_timeout_iterator(p->state);
 
 	paxos_prepare pr;
@@ -160,11 +159,11 @@ evproposer_check_timeouts(evutil_socket_t fd, short event, void *arg)
 	}
 
 	timeout_iterator_free(iter);
-	event_add(p->timeout_ev, &p->tv);
+	mod_timer(&p->timeout_ev, jiffies + timeval_to_jiffies(&(p->tv)));
 }
 
 static void
-evproposer_preexec_once(evutil_socket_t fd, short event, void *arg)
+evproposer_preexec_once(struct evproposer * arg)
 {
 	struct evproposer* p = arg;
 	proposer_preexecute(p);
@@ -176,7 +175,7 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers)
 	struct evproposer* p;
 	int acceptor_count = evpaxos_acceptor_count(c);
 
-	p = malloc(sizeof(struct evproposer));
+	p = kmalloc(sizeof(struct evproposer), GFP_KERNEL);
 	p->id = id;
 	p->preexec_window = paxos_config.proposer_preexec_window;
 
@@ -189,23 +188,24 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers)
 	paxos_log_debug("Proposer: Subscribed to PAXOS_PROMISE, PAXOS_ACCEPTED, PAXOS_PREEMPTED, PAXOS_CLIENT_VALUE");
 
 	// Setup timeout
-	struct event_base* base = peers_get_event_base(peers);
 	p->tv.tv_sec = paxos_config.proposer_timeout;
 	p->tv.tv_usec = 0;
-	p->timeout_ev = evtimer_new(base, evproposer_check_timeouts, p);
-	event_add(p->timeout_ev, &p->tv);
+	setup_timer( &p->timeout_ev,  evproposer_check_timeouts, (unsigned long) p);
+	mod_timer(&p->timeout_ev, jiffies + timeval_to_jiffies(&p->tv));
+
 
 	p->state = proposer_new(p->id, acceptor_count);
 	paxos_log_debug("Proposer: Created an internal proposer");
 	p->peers = peers;
 
-	event_base_once(base, 0, EV_TIMEOUT, evproposer_preexec_once, p, NULL);
+	evproposer_preexec_once(p);
+	// event_base_once(base, 0, EV_TIMEOUT, evproposer_preexec_once, p, NULL);
 
 	return p;
 }
 
 struct evproposer*
-evproposer_init(int id, const char* config_file, struct event_base* base)
+evproposer_init(int id, const char* config_file, udp_service * k)
 {
 	struct evpaxos_config* config = evpaxos_config_read(config_file);
 
@@ -218,23 +218,25 @@ evproposer_init(int id, const char* config_file, struct event_base* base)
 		return NULL;
 	}
 
-	struct peers* peers = peers_new(base, config);
-	peers_connect_to_acceptors(peers);
-	int port = evpaxos_proposer_listen_port(config, id);
-	int rv = peers_listen(peers, port);
-	if (rv == 0)
-		return NULL;
+	struct sockaddr_in addr = evpaxos_proposer_address(config,id);
+	struct peers* peers = peers_new(&addr, config, id);
+	add_acceptors_from_config(-1, peers);
 	struct evproposer* p = evproposer_init_internal(id, config, peers);
+	peers_sock_init(peers, k);
 	evpaxos_config_free(config);
 	return p;
+}
+
+void paxos_proposer_listen(udp_service * k, struct evproposer * ev){
+	peers_listen(ev->peers, k);
 }
 
 void
 evproposer_free_internal(struct evproposer* p)
 {
-	event_free(p->timeout_ev);
+	// event_free(p->timeout_ev);
 	proposer_free(p->state);
-	free(p);
+	kfree(p);
 }
 
 void

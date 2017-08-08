@@ -27,7 +27,7 @@
 
 
 #include "paxos.h"
-#include <linux/kernel.h> // stdlib, string, limits
+ // stdlib, string, limits
 #include <linux/time.h>
 #include <linux/slab.h> //kmalloc
 

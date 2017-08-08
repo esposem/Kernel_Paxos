@@ -27,7 +27,7 @@
 
 
 #include "storage.h"
-#include <linux/kernel.h>
+
 
 void
 storage_init(struct storage* store, int acceptor_id)
