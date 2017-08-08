@@ -28,7 +28,7 @@
 
 #include "paxos.h"
 #include "evpaxos.h"
-#include <linux/kernel.h>
+
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/slab.h> //kmalloc
@@ -49,8 +49,10 @@ struct evpaxos_config
 {
 	int proposers_count;
 	int acceptors_count;
+	// int learners_count;
 	struct address proposers[MAX_N_OF_PROPOSERS];
 	struct address acceptors[MAX_N_OF_PROPOSERS];
+	// struct address learners[MAX_N_OF_LEARNERS];
 };
 
 enum option_type
@@ -111,16 +113,23 @@ evpaxos_config_read(const char* path)
 
 	line = "acceptor 0 127.0.0.3 3003";
 	parse_line(c, line);
-	line = "acceptor 0 127.0.0.3 4003";
+	line = "acceptor 1 127.0.0.3 4003";
 	parse_line(c, line);
-	line = "acceptor 0 127.0.0.3 5003";
+	line = "acceptor 2 127.0.0.3 5003";
 	parse_line(c, line);
 	line = "proposer 0 127.0.0.2 3002";
 	parse_line(c, line);
-	line = "proposer 0 127.0.0.2 4002";
+	line = "proposer 1 127.0.0.2 4002";
 	parse_line(c, line);
-	line = "proposer 0 127.0.0.2 5002";
+	line = "proposer 2 127.0.0.2 5002";
 	parse_line(c, line);
+	// line = "learner 0 127.0.0.4 3004"; 
+	// parse_line(c, line);
+	// line = "learner 1 127.0.0.4 4004";
+	// parse_line(c, line);
+	// line = "learner 2 127.0.0.4 5004";
+	// parse_line(c, line);
+
 
 	return c;
 
@@ -166,6 +175,12 @@ evpaxos_acceptor_address(struct evpaxos_config* config, int i)
 {
 	return address_to_sockaddr(&config->acceptors[i]);
 }
+
+// struct sockaddr_in
+// evpaxos_learner_address(struct evpaxos_config* config, int i)
+// {
+// 	return address_to_sockaddr(&config->learners[i]);
+// }
 
 int
 evpaxos_acceptor_listen_port(struct evpaxos_config* config, int i)
@@ -317,6 +332,16 @@ parse_line(struct evpaxos_config* c, char* line)
 		struct address* addr = &c->proposers[c->proposers_count++];
 		return parse_address(line, addr);
 	}
+
+	// if (strcasecmp(tok, "l") == 0 || strcasecmp(tok, "learner") == 0) {
+	// 	if (c->learners_count >= MAX_N_OF_LEARNERS) {
+	// 		paxos_log_error("Number of learners exceded maximum of: %d\n",
+	// 			MAX_N_OF_LEARNERS);
+	// 		return 0;
+	// 	}
+	// 	struct address* addr = &c->learners[c->learners_count++];
+	// 	return parse_address(line, addr);
+	// }
 
 	if (strcasecmp(tok, "r") == 0 || strcasecmp(tok, "replica") == 0) {
 		if (c->proposers_count >= MAX_N_OF_PROPOSERS ||

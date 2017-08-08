@@ -471,43 +471,43 @@ int msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v, 
 }
 
 long msgpack_pack_paxos_learner_hi(msgpack_packer* p, paxos_learner_hi * v){
-	int len = strlen(v->value.paxos_value_val) + 1;
-	long size = (sizeof(unsigned int) * 2) + len;
+	// int len = strlen(v->value.paxos_value_val) + 1;
+	long size = (sizeof(unsigned int) * 1);
 	p = kmalloc(size , GFP_KERNEL);
 	unsigned char * tmp = (unsigned char *) p;
 
 	unsigned int type = PAXOS_LEARNER_HI;
-	char * value = v->value.paxos_value_val;
+	// char * value = v->value.paxos_value_val;
 
 	#ifndef _BIG_ENDIAN
 		// Machine is little endian, transform the packet data from little to big endian
 		serialize_int_to_big(&type, &tmp);
-		serialize_int_to_big(&len, &tmp);
+		// serialize_int_to_big(&len, &tmp);
 	#else
 		cp_int_packet(&type, &tmp);
-		cp_int_packet(&len, &tmp);
+		// cp_int_packet(&len, &tmp);
 	#endif
-	memcpy(tmp, value, len);
+	// memcpy(tmp, value, len);
 	return size;
 }
 
 int msgpack_unpack_paxos_learner_hi(msgpack_packer* o, paxos_learner_hi* v, int packet_len){
-	unsigned char * buffer = (unsigned char *) o;
-	int size;
-	#ifndef _BIG_ENDIAN
-	// Machine is little endian, transform the packet from big to little endian
-		deserialize_int_to_big(&size, &buffer);
-	#else
-		dcp_int_packet(&size, &buffer);
-	#endif
-	// buffer now is pointing to the beginning of value.
-	// check with the len if match
-	packet_len -= (sizeof (unsigned int));
-	if(size > packet_len){
-		memcpy(v->value.paxos_value_val, buffer,packet_len);
-		return size-packet_len;
-	}
-	memcpy(v->value.paxos_value_val, buffer,size);
+	// unsigned char * buffer = (unsigned char *) o;
+	// int size;
+	// #ifndef _BIG_ENDIAN
+	// // Machine is little endian, transform the packet from big to little endian
+	// 	deserialize_int_to_big(&size, &buffer);
+	// #else
+	// 	dcp_int_packet(&size, &buffer);
+	// #endif
+	// // buffer now is pointing to the beginning of value.
+	// // check with the len if match
+	// packet_len -= (sizeof (unsigned int));
+	// if(size > packet_len){
+	// 	memcpy(v->value.paxos_value_val, buffer,packet_len);
+	// 	return size-packet_len;
+	// }
+	// memcpy(v->value.paxos_value_val, buffer,size);
 	return 0;
 }
 
@@ -559,7 +559,6 @@ int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size)
 		dcp_int_packet(&v->type, &o);
 	#endif
 	size -= sizeof(unsigned int);
-	// v->type = MSGPACK_OBJECT_AT(o,0).u64;
 
 	switch (v->type) {
 	case PAXOS_PREPARE:
@@ -590,7 +589,7 @@ int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size)
 		partial_message = msgpack_unpack_paxos_client_value(o, &v->u.client_value, size);
 		break;
 	case PAXOS_LEARNER_HI:
-		partial_message = msgpack_unpack_paxos_learner_hi(o, &v->u.learner_hi, size);
+		// partial_message = msgpack_unpack_paxos_learner_hi(o, &v->u.learner_hi, size);
 		break;
 	}
 	return partial_message;

@@ -34,9 +34,7 @@ extern "C" {
 #endif
 
 #include "paxos_types.h"
-#include <net/udp.h>
-// #include <event2/buffer.h>
-// #include <event2/bufferevent.h>
+#include <linux/udp.h>
 
 void send_paxos_message(struct socket * s, struct sockaddr_in* bev, paxos_message* msg);
 void send_paxos_prepare(struct socket * s, struct sockaddr_in* bev, paxos_prepare* msg);

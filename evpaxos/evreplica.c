@@ -28,7 +28,8 @@
 
 #include "evpaxos_internal.h"
 #include "message.h"
-#include <stdlib.h>
+// #include <stdlib.h>
+#include <linux/slab.h>
 
 struct evpaxos_replica
 {
@@ -52,17 +53,18 @@ evpaxos_replica_deliver(unsigned iid, char* value, size_t size, void* arg)
 
 struct evpaxos_replica*
 evpaxos_replica_init(int id, const char* config_file, deliver_function f,
-	void* arg, struct event_base* base)
+	void* arg, udp_service * k )
 {
 	struct evpaxos_replica* r;
 	struct evpaxos_config* config;
-	r = malloc(sizeof(struct evpaxos_replica));
+	r = kmalloc(sizeof(struct evpaxos_replica), GFP_KERNEL);
 
 	config = evpaxos_config_read(config_file);
 	paxos_log_debug("Read config file");
 
-	r->peers = peers_new(base, config);
-	peers_connect_to_acceptors(r->peers);
+	struct sockaddr_in addr = evpaxos_acceptor_address(config,id);
+	r->peers = peers_new(&addr, config, id);
+	// peers_connect_to_acceptors(r->peers);
 	paxos_log_debug("Connected to other acceptors, starting acceptor, proposer and learner");
 
 	r->acceptor = evacceptor_init_internal(id, config, r->peers);
@@ -72,9 +74,9 @@ evpaxos_replica_init(int id, const char* config_file, deliver_function f,
 	r->deliver = f;
 	r->arg = arg;
 
-	int port = evpaxos_acceptor_listen_port(config, id);
-	paxos_log_debug("Listening for answers to port %d",port );
-	if (peers_listen(r->peers, port) == 0) {
+	// int port = evpaxos_acceptor_listen_port(config, id);
+	// paxos_log_debug("Listening for answers to port %d",port );
+	if (peers_listen(r->peers, k) == 0) {
 		evpaxos_config_free(config);
 		evpaxos_replica_free(r);
 		return NULL;
@@ -82,6 +84,11 @@ evpaxos_replica_init(int id, const char* config_file, deliver_function f,
 
 	evpaxos_config_free(config);
 	return r;
+}
+
+
+void paxos_replica_listen(udp_service * k, struct evpaxos_replica * ev){
+	peers_listen(ev->peers, k);
 }
 
 void
@@ -92,7 +99,7 @@ evpaxos_replica_free(struct evpaxos_replica* r)
 	evproposer_free_internal(r->proposer);
 	evacceptor_free_internal(r->acceptor);
 	peers_free(r->peers);
-	free(r);
+	kfree(r);
 }
 
 void
@@ -106,7 +113,7 @@ evpaxos_replica_set_instance_id(struct evpaxos_replica* r, unsigned iid)
 static void
 peer_send_trim(struct peer* p, void* arg)
 {
-	send_paxos_trim(peer_get_buffer(p), arg);
+	send_paxos_trim(get_socket(p), get_sockaddr(p), arg);
 }
 
 void
@@ -123,10 +130,10 @@ evpaxos_replica_submit(struct evpaxos_replica* r, char* value, int size)
 	struct peer* p;
 	for (i = 0; i < peers_count(r->peers); ++i) {
 		p = peers_get_acceptor(r->peers, i);
-		if (peer_connected(p)) {
-			paxos_submit(peer_get_buffer(p), value, size);
+		// if (peer_connected(p)) {
+			paxos_submit(get_socket(p), get_sockaddr(p), value, size);
 			return;
-		}
+		// }
 	}
 }
 

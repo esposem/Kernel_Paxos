@@ -37,7 +37,6 @@ extern "C" {
 #include "evpaxos.h"
 #include "paxos_types.h"
 #include "kernel_udp.h"
-// #include <event2/bufferevent.h>
 
 struct peer;
 struct peers;
@@ -48,14 +47,17 @@ typedef void (*peer_iter_cb)(struct peer* p, void* arg);
 struct peers* peers_new(struct sockaddr_in * addr, struct evpaxos_config* config, int id);
 void peers_free(struct peers* p);
 int peers_count(struct peers* p);
-int peers_listen(struct peers* p, udp_service * k, char * ip, int * port);
+void peers_sock_init(struct peers* p, udp_service * k);
+int peers_listen(struct peers* p, udp_service * k);
 void peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg);
 void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);
 void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
 struct peer* peers_get_acceptor(struct peers* p, int id);
 void add_proposers_from_config(int myid, struct peers * p);
 void add_acceptors_from_config(int myid, struct peers * p);
-
+struct socket * get_socket(struct peer * p);
+struct sockaddr_in * get_sockaddr(struct peer * p);
+struct peer * get_me(struct peers * p);
 int peer_get_id(struct peer* p);
 
 #ifdef __cplusplus
