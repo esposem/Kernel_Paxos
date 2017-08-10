@@ -46,7 +46,7 @@ struct client
 };
 
 static udp_service * kclient;
-static struct socket * kcsocket;
+struct client* c = NULL;
 
 static void
 random_string(char *s, const int len)
@@ -130,7 +130,7 @@ on_stats(unsigned long arg)
 static struct client*
 make_client(const char* config, int proposer_id, int outstanding, int value_size)
 {
-	struct client* c;
+
 	c = kmalloc(sizeof(struct client), GFP_KERNEL);
 
 	memset(&c->stats, 0, sizeof(struct stats));
@@ -147,8 +147,6 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 	c->outstanding = outstanding;
 	c->send_buffer = kmalloc(sizeof(struct client_value) + value_size, GFP_KERNEL);
 
-
-
   setup_timer( &c->stats_ev,  on_stats, (unsigned long) c);
 	c->stats_interval = (struct timeval){1, 0};
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
@@ -157,10 +155,13 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 	paxos_log_debug("Client: Creating an internal learner...");
 
 	c->learner = evlearner_init(config, on_deliver, c, kclient);
-  for (int i = 0; i < c->outstanding; ++i)
-    client_submit_value(c);
-
-  paxos_learner_listen(kclient, c->learner);
+	if (c->learner == NULL) {
+		printk(KERN_INFO "%s:Could not start the learner!", kclient->name);
+	}else{
+		for (int i = 0; i < c->outstanding; ++i)
+	    client_submit_value(c);
+		paxos_learner_listen(kclient, c->learner);
+	}
 
 	return c;
 }
@@ -168,6 +169,8 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 static void
 client_free(struct client* c)
 {
+	del_timer(&c->stats_ev);
+
 	kfree(c->send_buffer);
 	if (c->learner)
 		evlearner_free(c->learner);
@@ -184,12 +187,12 @@ start_client(const char* config, int proposer_id, int outstanding, int value_siz
 
 int udp_server_listen(void)
 {
-  atomic_set(&kclient->thread_running, 0);
 	int proposer_id = 0; //TODO param
 	int outstanding = 1; //TODO param
 	int value_size = 64; //TODO param
 	const char* config = "../paxos.conf";
 	start_client(config, proposer_id, outstanding, value_size);
+	atomic_set(&kclient->thread_running, 0);
   return 0;
 }
 
@@ -218,7 +221,9 @@ static int __init network_server_init(void)
 static void __exit network_server_exit(void)
 {
   // clent_free() should have been freed when it's stopped
-  udp_server_quit(kclient, kcsocket);
+	if(c != NULL)
+		del_timer(&c->stats_ev);
+  udp_server_quit(kclient);
 }
 
 module_init(network_server_init)

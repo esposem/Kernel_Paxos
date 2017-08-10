@@ -37,8 +37,8 @@
 void
 send_paxos_message(struct socket * s, struct sockaddr_in * bev, paxos_message* msg)
 {
-	msgpack_packer* packer = NULL;
-	long size_msg = msgpack_pack_paxos_message(packer, msg);
+	msgpack_packer * packer;
+	long size_msg = msgpack_pack_paxos_message(&packer, msg);
 	udp_server_send(s, bev, (unsigned char *) packer, size_msg, NULL);
 	kfree(packer);
 }

@@ -73,22 +73,23 @@ evpaxos_replica_init(int id, const char* config_file, deliver_function f,
 		evpaxos_replica_deliver, r);
 	r->deliver = f;
 	r->arg = arg;
-
-	// int port = evpaxos_acceptor_listen_port(config, id);
-	// paxos_log_debug("Listening for answers to port %d",port );
-	if (peers_listen(r->peers, k) == 0) {
-		evpaxos_config_free(config);
-		evpaxos_replica_free(r);
-		return NULL;
-	}
-
 	evpaxos_config_free(config);
-	return r;
+	if(peers_sock_init(r->peers, k) == 0){
+		return r;
+	}
+	return NULL;
 }
 
 
 void paxos_replica_listen(udp_service * k, struct evpaxos_replica * ev){
 	peers_listen(ev->peers, k);
+}
+
+void stop_replica_timer(struct evpaxos_replica * r){
+	printk("Replica Timer stopped");
+	stop_acceptor_timer(r->acceptor);
+	stop_proposer_timer(r->proposer);
+	stop_learner_timer(r->learner);
 }
 
 void

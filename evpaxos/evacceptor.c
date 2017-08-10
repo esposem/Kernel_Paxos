@@ -169,10 +169,18 @@ evacceptor_init(int id, const char* config_file, udp_service * k)
 	}
 	struct sockaddr_in addr = evpaxos_acceptor_address(config,id);
 	struct peers* peers = peers_new(&addr, config, id);
-	struct evacceptor* acceptor = evacceptor_init_internal(id, config, peers);
-	peers_sock_init(peers,k);
+	if(peers_sock_init(peers,k) >= 0){
+		struct evacceptor* acceptor = evacceptor_init_internal(id, config, peers);
+		evpaxos_config_free(config);
+		return acceptor;
+	}
 	evpaxos_config_free(config);
-	return acceptor;
+	return NULL;
+}
+
+void stop_acceptor_timer(struct evacceptor * a){
+	printk("Acceptor Timer stopped");
+	del_timer(&a->timer_ev);
 }
 
 void

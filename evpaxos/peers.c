@@ -128,7 +128,9 @@ peers_get_acceptor(struct peers* p, int id)
 // client, add to peers
 void add_proposers_from_config(int myid, struct peers * p){
 	struct sockaddr_in addr;
-	for(int i = 0; i < evpaxos_proposer_count(p->config); i++){
+	int n = evpaxos_proposer_count(p->config);
+	p->peers = krealloc(p->peers, sizeof(struct peer*) * n, GFP_KERNEL);
+	for(int i = 0; i < n; i++){
 		if(i != myid){
 			addr = evpaxos_proposer_address(p->config, i);
 			p->peers[i] = make_peer(p, i, &addr);
@@ -140,7 +142,9 @@ void add_proposers_from_config(int myid, struct peers * p){
 // learner and proposer, add to peers
 void add_acceptors_from_config(int myid, struct peers * p){
 	struct sockaddr_in addr;
-	for(int i = 0; i < evpaxos_acceptor_count(p->config); i++){
+	int n = evpaxos_acceptor_count(p->config);
+	p->peers = krealloc(p->peers, sizeof(struct peer*) * n, GFP_KERNEL);
+	for(int i = 0; i < n; i++){
 		if(i != myid){
 			addr = evpaxos_acceptor_address(p->config, i);
 			p->peers[i] = make_peer(p, i, &addr);
@@ -174,12 +178,13 @@ static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
 			return;
 		}
 	}
+	p->clients = krealloc(p->clients, sizeof(struct peer) * p->clients_count + 1, GFP_KERNEL);
 	p->clients[p->clients_count] = make_peer(p, p->clients_count, addr);
 	p->clients_count++;
 }
 
-void peers_sock_init(struct peers* p, udp_service * k){
-	udp_server_init(k, &p->sock, &p->me->addr);
+int peers_sock_init(struct peers* p, udp_service * k){
+	return udp_server_init(k, &p->sock, &p->me->addr);
 }
 
 int
@@ -192,9 +197,10 @@ peers_listen(struct peers* p, udp_service * k)
 	unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_KERNEL);
 
 	int n_packet_toget =0, first_time = 0;
-
+	printk(KERN_INFO "%s Listening", k->name);
 	while(1){
 		if(kthread_should_stop() || signal_pending(current)){
+			printk(KERN_INFO "Stopped!");
       check_sock_allocation(k, p->sock);
       kfree(in_buf);
 			if(bigger_buff != NULL){

@@ -58,11 +58,11 @@ void dcp_int_packet(unsigned int * n, unsigned char ** buffer){
 	*buffer+=sizeof(unsigned int);
 }
 
-long msgpack_pack_paxos_prepare(msgpack_packer* p, paxos_prepare* v)
+long msgpack_pack_paxos_prepare(msgpack_packer** p, paxos_prepare* v)
 {
 	long size = (sizeof(unsigned int) * 3);
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_PREPARE;
 	unsigned int iid = v->iid;
@@ -96,12 +96,12 @@ void msgpack_unpack_paxos_prepare(msgpack_packer* o, paxos_prepare* v)
 	#endif
 }
 
-long msgpack_pack_paxos_promise(msgpack_packer* p, paxos_promise* v)
+long msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v)
 {
-	int len = strlen(v->value.paxos_value_val) + 1;
+	int len = v->value.paxos_value_len; //TODO
 	long size = (sizeof(unsigned int) * 6) + len;
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_PROMISE;
 	unsigned int aid = v->aid;
@@ -159,12 +159,12 @@ int msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v, int packet
 	return 0;
 }
 
-long msgpack_pack_paxos_accept(msgpack_packer* p, paxos_accept* v)
+long msgpack_pack_paxos_accept(msgpack_packer** p, paxos_accept* v)
 {
 	int len = strlen(v->value.paxos_value_val) + 1;
 	long size = (sizeof(unsigned int) * 4) + len;
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_ACCEPT;
 	unsigned int iid = v->iid;
@@ -213,12 +213,12 @@ int msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int packet_l
 	return 0;
 }
 
-long msgpack_pack_paxos_accepted(msgpack_packer* p, paxos_accepted* v)
+long msgpack_pack_paxos_accepted(msgpack_packer** p, paxos_accepted* v)
 {
 	int len = strlen(v->value.paxos_value_val) + 1;
 	long size = (sizeof(unsigned int) * 6) + len;
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_ACCEPTED;
 	unsigned int aid = v->aid;
@@ -274,11 +274,11 @@ int msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v, int pack
 	return 0;
 }
 
-long msgpack_pack_paxos_preempted(msgpack_packer* p, paxos_preempted* v)
+long msgpack_pack_paxos_preempted(msgpack_packer** p, paxos_preempted* v)
 {
 	long size = (sizeof(unsigned int) * 4);
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_PREEMPTED;
 	unsigned int aid = v->aid;
@@ -317,11 +317,11 @@ void msgpack_unpack_paxos_preempted(msgpack_packer* o, paxos_preempted* v)
 	#endif
 }
 
-long msgpack_pack_paxos_repeat(msgpack_packer* p, paxos_repeat* v)
+long msgpack_pack_paxos_repeat(msgpack_packer** p, paxos_repeat* v)
 {
 	long size = (sizeof(unsigned int) * 3);
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_REPEAT;
 	unsigned int from = v->from;
@@ -356,11 +356,11 @@ void msgpack_unpack_paxos_repeat(msgpack_packer* o, paxos_repeat* v)
 	#endif
 }
 
-long msgpack_pack_paxos_trim(msgpack_packer* p, paxos_trim* v)
+long msgpack_pack_paxos_trim(msgpack_packer** p, paxos_trim* v)
 {
 	long size = (sizeof(unsigned int) * 2);
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_TRIM;
 	unsigned int iid = v->iid;
@@ -388,11 +388,11 @@ void msgpack_unpack_paxos_trim(msgpack_packer* o, paxos_trim* v)
 	#endif
 }
 
-long msgpack_pack_paxos_acceptor_state(msgpack_packer* p, paxos_acceptor_state* v)
+long msgpack_pack_paxos_acceptor_state(msgpack_packer** p, paxos_acceptor_state* v)
 {
 	long size = (sizeof(unsigned int) * 3);
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_ACCEPTOR_STATE;
 	unsigned int aid = v->aid;
@@ -427,12 +427,12 @@ void msgpack_unpack_paxos_acceptor_state(msgpack_packer* o, paxos_acceptor_state
 	#endif
 }
 
-long msgpack_pack_paxos_client_value(msgpack_packer* p, paxos_client_value* v)
+long msgpack_pack_paxos_client_value(msgpack_packer** p, paxos_client_value* v)
 {
 	int len = strlen(v->value.paxos_value_val) + 1;
 	long size = (sizeof(unsigned int) * 2) + len;
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_CLIENT_VALUE;
 	char * value = v->value.paxos_value_val;
@@ -470,11 +470,11 @@ int msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v, 
 	return 0;
 }
 
-long msgpack_pack_paxos_learner_hi(msgpack_packer* p, paxos_learner_hi * v){
+long msgpack_pack_paxos_learner_hi(msgpack_packer** p, paxos_learner_hi * v){
 	// int len = strlen(v->value.paxos_value_val) + 1;
 	long size = (sizeof(unsigned int) * 1);
-	p = kmalloc(size , GFP_KERNEL);
-	unsigned char * tmp = (unsigned char *) p;
+	*p = kmalloc(size , GFP_KERNEL);
+	unsigned char * tmp = (unsigned char *) *p;
 
 	unsigned int type = PAXOS_LEARNER_HI;
 	// char * value = v->value.paxos_value_val;
@@ -511,7 +511,7 @@ int msgpack_unpack_paxos_learner_hi(msgpack_packer* o, paxos_learner_hi* v, int 
 	return 0;
 }
 
-long msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v)
+long msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v)
 {
 	long ret = 0;
 	switch (v->type) {

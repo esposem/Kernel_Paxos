@@ -30,7 +30,6 @@
 #include "carray.h"
 #include "quorum.h"
 #include "uthash.h"
- // stdlib, string, limits
 #include <linux/slab.h>
 #include <linux/time.h>
 
