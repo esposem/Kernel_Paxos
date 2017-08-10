@@ -10,31 +10,31 @@
 #include "kernel_udp.h"
 
 static udp_service * kproposer;
-static struct socket * kpsocket;
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
-MODULE_PARM_DESC(id,"The learner id, default 0");
+MODULE_PARM_DESC(id,"The proposer id, default 0");
+
+struct evproposer* prop = NULL;
 
 static void
 start_proposer(const char* config, int id)
 {
-	struct evproposer* prop;
 
 	prop = evproposer_init(id, config, kproposer);
 	if (prop == NULL) {
 		printk(KERN_INFO "%s: Could not start the proposer!", kproposer->name);
-    return;
+	}else{
+		paxos_proposer_listen(kproposer, prop);
 	}
-  paxos_proposer_listen(kproposer, prop);
 	evproposer_free(prop);
 }
 
 int udp_server_listen(void)
 {
-  atomic_set(&kproposer->thread_running, 0);
   const char* config = "../paxos.conf";
   start_proposer(config, id);
+	atomic_set(&kproposer->thread_running, 0);
   return 0;
 }
 
@@ -62,7 +62,9 @@ static int __init network_server_init(void)
 
 static void __exit network_server_exit(void)
 {
-  udp_server_quit(kproposer, kpsocket);
+	if(prop != NULL)
+		stop_proposer_timer(prop);
+  udp_server_quit(kproposer);
 }
 
 module_init(network_server_init)

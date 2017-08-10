@@ -17,8 +17,12 @@ struct client_value
 	char value[0];
 };
 
+static int id = 0;
+module_param(id, int, S_IRUGO);
+MODULE_PARM_DESC(id,"The replica id, default 0");
+
 static udp_service * kreplica;
-static struct socket * krsocket;
+struct evpaxos_replica* replica = NULL;
 
 static void
 deliver(unsigned iid, char* value, size_t size, void* arg)
@@ -31,31 +35,26 @@ deliver(unsigned iid, char* value, size_t size, void* arg)
 static void
 start_replica(int id, const char* config)
 {
-	struct evpaxos_replica* replica;
 	deliver_function cb = NULL;
 
-	if (verbose)
-		cb = deliver;
+	// if (verbose)
+	// 	cb = deliver;
 
-	replica = evpaxos_replica_init(id, config, cb, NULL, base);
+	replica = evpaxos_replica_init(id, config, cb, deliver, kreplica);
 
 	if (replica == NULL) {
 		printk(KERN_INFO "Could not start the replica!");
-		return;
+	}else{
+		paxos_replica_listen(kreplica, replica);
 	}
-	paxos_replica_listen(kreplica, replica)
 	evpaxos_replica_free(replica);
 }
 
-
-
-
 int udp_server_listen(void)
 {
-
-  atomic_set(&kreplica->thread_running, 0);
   const char* config = "../paxos.conf";
-  start_learner(config);
+  start_replica(id, config);
+	atomic_set(&kreplica->thread_running, 0);
   return 0;
 }
 
@@ -75,7 +74,7 @@ static int __init network_server_init(void)
   if(!kreplica){
     printk(KERN_INFO "Failed to initialize server [network_server_init]");
   }else{
-    init_service(kreplica, "Learner:");
+    init_service(kreplica, "Replica:");
     udp_server_start();
   }
   return 0;
@@ -83,7 +82,10 @@ static int __init network_server_init(void)
 
 static void __exit network_server_exit(void)
 {
-  udp_server_quit(kreplica, krsocket);
+	if(replica != NULL)
+		stop_replica_timer(replica);
+
+  udp_server_quit(kreplica);
 }
 
 module_init(network_server_init)

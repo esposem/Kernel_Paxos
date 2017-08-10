@@ -71,6 +71,7 @@ peer_send_hi(struct peer* p, void* arg)
 static void
 evlearner_check_holes(unsigned long arg)
 {
+	// printk(KERN_INFO "Checking holes");
 	paxos_repeat msg;
 	int chunks = 10;
 	struct evlearner* l = (struct evlearner *) arg;
@@ -124,10 +125,11 @@ evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
 	paxos_log_debug("Learner: allocated a new learner");
 	learner->acceptors = peers;
 
-	peers_foreach_acceptor(peers, peer_send_hi, NULL);
 
 	peers_subscribe(peers, PAXOS_ACCEPTED, evlearner_handle_accepted, learner);
 	paxos_log_debug("Learner: Subscribed to PAXOS_ACCEPTED");
+
+	peers_foreach_acceptor(peers, peer_send_hi, NULL);
 
 	// setup hole checking timer
 	learner->tv.tv_sec = 0;
@@ -156,10 +158,13 @@ evlearner_init(const char* config_file, deliver_function f, void* arg,
 	struct peers* peers = peers_new(&addr, c, -1);
 	add_acceptors_from_config(-1, peers);
 	paxos_log_debug("Learner: Connected to acceptors");
-	struct evlearner* l = evlearner_init_internal(c, peers, f, arg);
-	peers_sock_init(peers, k);
+	if(peers_sock_init(peers, k) >= 0){
+		struct evlearner* l = evlearner_init_internal(c, peers, f, arg);
+		evpaxos_config_free(c);
+		return l;
+	}
 	evpaxos_config_free(c);
-	return l;
+	return NULL;
 }
 
 void paxos_learner_listen(udp_service * k, struct evlearner * ev){
@@ -172,6 +177,11 @@ evlearner_free_internal(struct evlearner* l)
 	del_timer(&l->hole_timer);
 	learner_free(l->state);
 	kfree(l);
+}
+
+void stop_learner_timer(struct evlearner * l){
+	printk("Learner Timer stopped");
+	del_timer(&l->hole_timer);
 }
 
 void

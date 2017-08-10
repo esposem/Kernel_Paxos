@@ -47,7 +47,7 @@ typedef void (*peer_iter_cb)(struct peer* p, void* arg);
 struct peers* peers_new(struct sockaddr_in * addr, struct evpaxos_config* config, int id);
 void peers_free(struct peers* p);
 int peers_count(struct peers* p);
-void peers_sock_init(struct peers* p, udp_service * k);
+int peers_sock_init(struct peers* p, udp_service * k);
 int peers_listen(struct peers* p, udp_service * k);
 void peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg);
 void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);

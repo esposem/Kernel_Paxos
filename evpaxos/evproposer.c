@@ -193,13 +193,12 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers)
 	setup_timer( &p->timeout_ev,  evproposer_check_timeouts, (unsigned long) p);
 	mod_timer(&p->timeout_ev, jiffies + timeval_to_jiffies(&p->tv));
 
-
+	// printk(KERN_INFO "number of acceptor : %d", acceptor_count);
 	p->state = proposer_new(p->id, acceptor_count);
 	paxos_log_debug("Proposer: Created an internal proposer");
 	p->peers = peers;
 
 	evproposer_preexec_once(p);
-	// event_base_once(base, 0, EV_TIMEOUT, evproposer_preexec_once, p, NULL);
 
 	return p;
 }
@@ -221,20 +220,29 @@ evproposer_init(int id, const char* config_file, udp_service * k)
 	struct sockaddr_in addr = evpaxos_proposer_address(config,id);
 	struct peers* peers = peers_new(&addr, config, id);
 	add_acceptors_from_config(-1, peers);
-	struct evproposer* p = evproposer_init_internal(id, config, peers);
-	peers_sock_init(peers, k);
+
+	if(peers_sock_init(peers, k) == 0){
+		struct evproposer* p = evproposer_init_internal(id, config, peers);
+		evpaxos_config_free(config);
+		return p;
+	}
 	evpaxos_config_free(config);
-	return p;
+	return NULL;
 }
 
 void paxos_proposer_listen(udp_service * k, struct evproposer * ev){
 	peers_listen(ev->peers, k);
 }
 
+void stop_proposer_timer(struct evproposer * p){
+	printk("Proposer Timer stopped");
+	del_timer(&p->timeout_ev);
+}
+
 void
 evproposer_free_internal(struct evproposer* p)
 {
-	// event_free(p->timeout_ev);
+	del_timer(&p->timeout_ev);
 	proposer_free(p->state);
 	kfree(p);
 }

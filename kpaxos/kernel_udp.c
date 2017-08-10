@@ -6,8 +6,6 @@
 
 #include "kernel_udp.h"
 
-void check_params(int * len, udp_service * k);
-
 u32 create_address(u8 *ip)
 {
   u32 addr = 0;
@@ -23,22 +21,21 @@ u32 create_address(u8 *ip)
   return addr;
 }
 
-void check_sock_allocation(udp_service * k, struct socket * s){
-  if(atomic_read(&k->socket_allocated) == 1){
-    // printk(KERN_INFO "%s Released socket",k->name);
-    atomic_set(&k->socket_allocated, 0);
-    sock_release(s);
+static char * analyze_error(int err){
+  switch (err) {
+    case -98:
+      return "Address already in use";
+    case -97:
+      return "Address family not supported by protocol";
   }
+  return "not known";
 }
 
-void prepare_sockaddr(struct sockaddr_in * address, int port, struct in_addr * addr, unsigned char * ip){
-  address->sin_family = AF_INET;
-  address->sin_port = htons(port);
-
-  if(addr == NULL){
-    address->sin_addr.s_addr = htonl(create_address(ip));
-  }else{
-    address->sin_addr = *addr;
+void check_sock_allocation(udp_service * k, struct socket * s){
+  if(atomic_read(&k->socket_allocated) == 1){
+    printk(KERN_INFO "%s Released socket",k->name);
+    atomic_set(&k->socket_allocated, 0);
+    sock_release(s);
   }
 }
 
@@ -75,7 +72,7 @@ int udp_server_send(struct socket *sock, struct sockaddr_in * address, const cha
       npacket++;
 
       lenn = kernel_sendmsg(sock, &msg, &vec, min, min);
-      printk(KERN_INFO "%s Sent message to %pI4 : %hu, size %d [udp_server_send]",module_name, &address->sin_addr, ntohs(address->sin_port), lenn);
+      printk(KERN_INFO "%s Sent message to %pI4 : %hu, size %d",module_name, &address->sin_addr, ntohs(address->sin_port), lenn);
     }
 
     set_fs(oldmm);
@@ -114,7 +111,7 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
       lenm = kernel_recvmsg(sock, &msg, &vec, MAX_UDP_SIZE, MAX_UDP_SIZE, flags);
       if(lenm > 0){
         address = (struct sockaddr_in *) msg.msg_name;
-        printk(KERN_INFO "%s Received message from %pI4 : %hu , size %d [udp_server_receive]",k->name,&address->sin_addr, ntohs(address->sin_port), lenm);
+        printk(KERN_INFO "%s Received message from %pI4 : %hu , size %d",k->name,&address->sin_addr, ntohs(address->sin_port), lenm);
       }
     }
   }
@@ -122,7 +119,7 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
   return lenm;
 }
 
-void udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * address){
+int udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * address){
   int server_err;
   struct socket *conn_socket;
   struct sockaddr_in server = *address;
@@ -130,12 +127,12 @@ void udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * a
 
   server_err = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, s);
   if(server_err < 0){
-    printk(KERN_INFO "%s Error %d while creating socket [udp_server_listen]",k->name, server_err);
-    atomic_set(&k->thread_running, 0);
-    return;
+    printk(KERN_INFO "%s Error %d while creating socket",k->name, server_err);
+    // atomic_set(&k->thread_running, 0);
+    return -1;
   }else{
     atomic_set(&k->socket_allocated, 1);
-    printk(KERN_INFO "%s Created socket [udp_server_listen]",k->name);
+    printk(KERN_INFO "%s Created socket",k->name);
   }
 
   conn_socket = *s;
@@ -143,21 +140,22 @@ void udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * a
 
   server_err = conn_socket->ops->bind(conn_socket, (struct sockaddr*)&server, sizeof(server));
   if(server_err < 0) {
-    printk(KERN_INFO "%s Error %d while binding socket [udp_server_listen]",k->name, server_err);
     atomic_set(&k->socket_allocated, 0);
     sock_release(conn_socket);
-    atomic_set(&k->thread_running, 0);
-    return;
+    printk(KERN_INFO "%s Error %d (%s) while binding socket",k->name, server_err, analyze_error(server_err));
+    // atomic_set(&k->thread_running, 0);
+    return -1;
   }else{
     // update the port (might be given as 0, that is random)
     int i = (int) sizeof(struct sockaddr_in);
     inet_getname(conn_socket, (struct sockaddr *) address, &i , 0);
-    printk(KERN_INFO "%s Socket is bind to %pI4 : %hu [udp_server_listen]",k->name, &address->sin_addr, ntohs(address->sin_port));
+    printk(KERN_INFO "%s Socket is bind to %pI4 : %hu",k->name, &address->sin_addr, ntohs(address->sin_port));
+    tv.tv_sec = 0;
+    tv.tv_usec = MAX_RCV_WAIT;
+    kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&tv, sizeof(tv));
   }
+  return 0;
 
-  tv.tv_sec = 0;
-  tv.tv_usec = MAX_RCV_WAIT;
-  kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&tv, sizeof(tv));
 }
 
 void init_service(udp_service * k, char * name){
@@ -170,30 +168,29 @@ void init_service(udp_service * k, char * name){
   printk(KERN_INFO "%s Initialized", k->name);
 }
 
-void udp_server_quit(udp_service * k, struct socket * s){
+void udp_server_quit(udp_service * k){
   int ret;
   if(k!= NULL){
     if(atomic_read(&k->thread_running) == 1){
       atomic_set(&k->thread_running, 0);
       if((ret = kthread_stop(k->u_thread)) == 0){
-        printk(KERN_INFO "%s Terminated thread [network_server_exit]", k->name);
+        printk(KERN_INFO "%s Terminated thread", k->name);
       }else{
-        printk(KERN_INFO "%s Error %d in terminating thread [network_server_exit]", k->name, ret);
+        printk(KERN_INFO "%s Error %d in terminating thread", k->name, ret);
       }
     }else{
-      printk(KERN_INFO "%s Thread was not running [network_server_exit]", k->name);
+      printk(KERN_INFO "%s Thread was not running", k->name);
     }
 
-    if(atomic_read(&k->socket_allocated) == 1){
-      atomic_set(&k->socket_allocated, 0);
-      sock_release(s);
-      printk(KERN_INFO "%s Released socket [network_server_exit]", k->name);
-    }
-    printk(KERN_INFO "%s Module unloaded [network_server_exit]", k->name);
+    // if(atomic_read(&k->socket_allocated) == 1){
+    //   atomic_set(&k->socket_allocated, 0);
+    //   sock_release(s);
+    //   printk(KERN_INFO "%s Released socket", k->name);
+    // }
+    printk(KERN_INFO "%s Module unloaded", k->name);
     kfree(k->name);
     kfree(k);
   }else{
     printk(KERN_INFO "Module was NULL, terminated");
   }
-
 }

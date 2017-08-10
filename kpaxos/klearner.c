@@ -18,10 +18,7 @@ struct client_value
 };
 
 static udp_service * klearner;
-static struct socket * klsocket;
-
-
-
+struct evlearner* lea = NULL;
 static void
 deliver(unsigned iid, char* value, size_t size, void* arg)
 {
@@ -33,28 +30,23 @@ deliver(unsigned iid, char* value, size_t size, void* arg)
 static void
 start_learner(const char* config)
 {
-	struct evlearner* lea;
+	// struct evlearner* lea;
 
 	lea = evlearner_init(config, deliver, NULL, klearner);
 	if (lea == NULL) {
 		printk(KERN_INFO "%s:Could not start the learner!", klearner->name);
-		return;
+	}else{
+		paxos_learner_listen(klearner, lea);
 	}
-  paxos_learner_listen(klearner, lea);
-
 	evlearner_free(lea);
-
 }
-
-
-
 
 int udp_server_listen(void)
 {
 
-  atomic_set(&klearner->thread_running, 0);
   const char* config = "../paxos.conf";
   start_learner(config);
+	atomic_set(&klearner->thread_running, 0);
   return 0;
 }
 
@@ -82,7 +74,9 @@ static int __init network_server_init(void)
 
 static void __exit network_server_exit(void)
 {
-  udp_server_quit(klearner, klsocket);
+	if(lea != NULL)
+		stop_learner_timer(lea);
+  udp_server_quit(klearner);
 }
 
 module_init(network_server_init)

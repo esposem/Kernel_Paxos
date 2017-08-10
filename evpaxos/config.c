@@ -105,31 +105,31 @@ unsigned int inet_addr(char *str)
 struct evpaxos_config*
 evpaxos_config_read(const char* path)
 {
-	char * line;
+	int size_config = 6;
+	char * config_file[] = {
+		"acceptor 0 127.0.0.3 3003",
+		"acceptor 1 127.0.0.3 4003",
+		"acceptor 2 127.0.0.3 5003",
+		"proposer 0 127.0.0.2 3002",
+		"proposer 1 127.0.0.2 4002",
+		"proposer 2 127.0.0.2 5002"
+	};
+
+	// 8(acceptor/proposer) + 1( ) + 2(0-10) + 1( )+ 3(0-255) + 1(.) + 3(0-255) + 1(.) + 3 (0-255) + 1(.) + 3 (0-255) + 1( ) + 5 (0-66000) + 1(\0)
+	// = 35
+	char * 	line = kmalloc(35, GFP_KERNEL);
 	struct evpaxos_config* c = NULL;
 
 	c = kmalloc(sizeof(struct evpaxos_config), GFP_KERNEL);
 	memset(c, 0, sizeof(struct evpaxos_config));
 
-	line = "acceptor 0 127.0.0.3 3003";
-	parse_line(c, line);
-	line = "acceptor 1 127.0.0.3 4003";
-	parse_line(c, line);
-	line = "acceptor 2 127.0.0.3 5003";
-	parse_line(c, line);
-	line = "proposer 0 127.0.0.2 3002";
-	parse_line(c, line);
-	line = "proposer 1 127.0.0.2 4002";
-	parse_line(c, line);
-	line = "proposer 2 127.0.0.2 5002";
-	parse_line(c, line);
-	// line = "learner 0 127.0.0.4 3004"; 
-	// parse_line(c, line);
-	// line = "learner 1 127.0.0.4 4004";
-	// parse_line(c, line);
-	// line = "learner 2 127.0.0.4 5004";
-	// parse_line(c, line);
-
+	for(int i = 0; i < size_config; i++){
+		memset(line, 0, 35);
+		memcpy(line, config_file[i], strlen(config_file[i]) + 1);
+		parse_line(c, line);
+	}
+	
+	kfree(line);
 
 	return c;
 
