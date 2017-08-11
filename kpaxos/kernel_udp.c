@@ -59,7 +59,7 @@ int udp_server_send(struct socket *sock, struct sockaddr_in * address, const cha
 
     oldmm = get_fs(); set_fs(KERNEL_DS);
 
-    while(l > 0){
+    // while(l > 0){
       if(l < MAX_UDP_SIZE){
         min = l;
       }else{
@@ -67,13 +67,13 @@ int udp_server_send(struct socket *sock, struct sockaddr_in * address, const cha
       }
       vec.iov_len = min;
       vec.iov_base = (char *)buf;
-      l -= min;
-      buf += min;
+      // l -= min;
+      // buf += min;
       npacket++;
 
       lenn = kernel_sendmsg(sock, &msg, &vec, min, min);
       printk(KERN_INFO "%s Sent message to %pI4 : %hu, size %d",module_name, &address->sin_addr, ntohs(address->sin_port), lenn);
-    }
+    // }
 
     set_fs(oldmm);
 
