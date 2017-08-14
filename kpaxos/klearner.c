@@ -66,7 +66,7 @@ static int __init network_server_init(void)
   if(!klearner){
     printk(KERN_INFO "Failed to initialize server [network_server_init]");
   }else{
-    init_service(klearner, "Learner:");
+    init_service(klearner, "Learner", -1);
     udp_server_start();
   }
   return 0;

@@ -105,14 +105,20 @@ unsigned int inet_addr(char *str)
 struct evpaxos_config*
 evpaxos_config_read(const char* path)
 {
-	int size_config = 6;
+	// int size_config = 6;
+	// char * config_file[] = {
+	// 	"acceptor 0 127.0.0.3 3003",
+	// 	"acceptor 1 127.0.0.3 4003",
+	// 	"acceptor 2 127.0.0.3 5003",
+	// 	"proposer 0 127.0.0.2 3002",
+	// 	"proposer 1 127.0.0.2 4002",
+	// 	"proposer 2 127.0.0.2 5002"
+	// };
+	int size_config = 3;
 	char * config_file[] = {
-		"acceptor 0 127.0.0.3 3003",
-		"acceptor 1 127.0.0.3 4003",
-		"acceptor 2 127.0.0.3 5003",
-		"proposer 0 127.0.0.2 3002",
-		"proposer 1 127.0.0.2 4002",
-		"proposer 2 127.0.0.2 5002"
+		"replica 0 127.0.0.3 3003",
+		"replica 1 127.0.0.3 4003",
+		"replica 2 127.0.0.3 5003"
 	};
 
 	// 8(acceptor/proposer) + 1( ) + 2(0-10) + 1( )+ 3(0-255) + 1(.) + 3(0-255) + 1(.) + 3 (0-255) + 1(.) + 3 (0-255) + 1( ) + 5 (0-66000) + 1(\0)
@@ -128,7 +134,7 @@ evpaxos_config_read(const char* path)
 		memcpy(line, config_file[i], strlen(config_file[i]) + 1);
 		parse_line(c, line);
 	}
-	
+
 	kfree(line);
 
 	return c;

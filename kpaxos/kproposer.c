@@ -50,11 +50,15 @@ void udp_server_start(void){
 
 static int __init network_server_init(void)
 {
+	if(id < 0 || id > 10){
+		printk(KERN_INFO "you must give an id!");
+		return 0;
+	}
   kproposer = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kproposer){
     printk(KERN_INFO "Failed to initialize server [network_server_init]");
   }else{
-    init_service(kproposer, "Proposer:");
+    init_service(kproposer, "Proposer", id);
     udp_server_start();
   }
   return 0;
