@@ -34,7 +34,7 @@ if [ ! -z $filename1 ]; then
 fi
 
 
-
+echo "Compiling..."
 if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
   echo "Modules Successfully complied"
 
@@ -52,7 +52,7 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
       while [ "$loaded" -gt $j ]
       do
         if sudo rmmod ./$filename$j.ko; then
-          echo "Successfuly unloaded Module " $filename$j
+          echo "Successfully unloaded Module " $filename$j
         else
           echo "Error in unloading the module " $filename$j
         fi
@@ -78,7 +78,7 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
         while [ "$loaded1" -gt $j1 ]
         do
           if sudo rmmod ./$filename1$j1.ko; then
-            echo "Successfuly unloaded Module " $filename1$j1
+            echo "Successfully unloaded Module " $filename1$j1
           else
             echo "Error in unloading the module " $filename1$j1
           fi
@@ -97,7 +97,7 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
   while [ "$nf" -gt $i ]
   do
     if sudo rmmod ./$filename$i.ko; then
-      echo "Successfuly unloaded Module " $filename$i
+      echo "Successfully unloaded Module " $filename$i
     else
       echo "Error in unloading the module $filename$i"
     fi
@@ -109,7 +109,7 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
     while [ "$nf1" -gt $i1 ]
     do
       if sudo rmmod ./$filename1$i1.ko; then
-        echo "Successfuly unloaded Module " $filename1$i1
+        echo "Successfully unloaded Module " $filename1$i1
       else
         echo "Error in unloading the module $filename1$i1"
       fi
@@ -117,6 +117,9 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
     done
   fi
 
+  # echo "Cleaning..."
+  # make clean > /dev/null
+  # echo "Cleaned Successfully"
   echo "Terminated"
 else
   echo "Could not compile the module"

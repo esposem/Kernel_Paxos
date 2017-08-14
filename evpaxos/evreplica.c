@@ -62,15 +62,16 @@ evpaxos_replica_init(int id, const char* config_file, deliver_function f,
 	config = evpaxos_config_read(config_file);
 	paxos_log_debug("Read config file");
 
-	struct sockaddr_in addr = evpaxos_acceptor_address(config,id);
-	r->peers = peers_new(&addr, config, id);
-	// peers_connect_to_acceptors(r->peers);
+	struct sockaddr_in send_addr = evpaxos_acceptor_address(config,id);
+	struct sockaddr_in rcv_addr;
+	memcpy(&send_addr, &rcv_addr, sizeof(struct sockaddr_in));
+	send_addr.sin_port = 0;
+	r->peers = peers_new(&send_addr, &rcv_addr, config, id);
 	paxos_log_debug("Connected to other acceptors, starting acceptor, proposer and learner");
 
-	r->acceptor = evacceptor_init_internal(id, config, r->peers);
-	r->proposer = evproposer_init_internal(id, config, r->peers);
-	r->learner  = evlearner_init_internal(config, r->peers,
-		evpaxos_replica_deliver, r);
+	r->acceptor = evacceptor_init_internal(id, config, r->peers, k);
+	r->proposer = evproposer_init_internal(id, config, r->peers, k);
+	r->learner  = evlearner_init_internal(config, r->peers, evpaxos_replica_deliver, r, k);
 	r->deliver = f;
 	r->arg = arg;
 	evpaxos_config_free(config);
@@ -97,8 +98,11 @@ evpaxos_replica_free(struct evpaxos_replica* r)
 {
 	if (r->learner)
 		evlearner_free_internal(r->learner);
-	evproposer_free_internal(r->proposer);
-	evacceptor_free_internal(r->acceptor);
+	if(r->proposer)
+		evproposer_free_internal(r->proposer);
+	if(r->acceptor)
+		evacceptor_free_internal(r->acceptor);
+
 	peers_free(r->peers);
 	kfree(r);
 }
@@ -114,7 +118,7 @@ evpaxos_replica_set_instance_id(struct evpaxos_replica* r, unsigned iid)
 static void
 peer_send_trim(struct peer* p, void* arg)
 {
-	send_paxos_trim(get_socket(p), get_sockaddr(p), arg);
+	send_paxos_trim(get_send_socket(p), get_sockaddr(p), arg);
 }
 
 void
@@ -132,7 +136,7 @@ evpaxos_replica_submit(struct evpaxos_replica* r, char* value, int size)
 	for (i = 0; i < peers_count(r->peers); ++i) {
 		p = peers_get_acceptor(r->peers, i);
 		// if (peer_connected(p)) {
-			paxos_submit(get_socket(p), get_sockaddr(p), value, size);
+			paxos_submit(get_send_socket(p), get_sockaddr(p), value, size);
 			return;
 		// }
 	}

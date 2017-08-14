@@ -29,7 +29,6 @@
 #include "acceptor.h"
 #include "storage.h"
 #include <linux/types.h> //stdint, stdarg
- // stdlib, string, limits
 #include <linux/module.h>
 #include <linux/slab.h> //kmalloc
 

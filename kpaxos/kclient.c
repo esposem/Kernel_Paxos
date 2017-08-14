@@ -212,7 +212,7 @@ static int __init network_server_init(void)
   if(!kclient){
     printk(KERN_INFO "Failed to initialize CLIENT [network_server_init]");
   }else{
-    init_service(kclient, "Client:");
+    init_service(kclient, "Client" , -1);
     udp_server_start();
   }
   return 0;
