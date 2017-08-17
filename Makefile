@@ -254,7 +254,7 @@ kreplica2-objs:= \
 
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
 
-ccflags-y := -std=gnu99 -Wno-declaration-after-statement
+ccflags-y := -std=gnu99 -Wno-declaration-after-statement -DHASH_DEBUG=1
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules

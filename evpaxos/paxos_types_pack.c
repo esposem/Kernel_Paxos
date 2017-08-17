@@ -98,7 +98,7 @@ void msgpack_unpack_paxos_prepare(msgpack_packer* o, paxos_prepare* v)
 
 long msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v)
 {
-	int len = v->value.paxos_value_len; //TODO
+	int len = v->value.paxos_value_len;
 	long size = (sizeof(unsigned int) * 6) + len;
 	*p = kmalloc(size , GFP_KERNEL);
 	unsigned char * tmp = (unsigned char *) *p;
@@ -148,20 +148,22 @@ int msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v, int packet
 		dcp_int_packet(&v->value_ballot, &buffer);
 		dcp_int_packet(&size, &buffer);
 	#endif
+	v->value.paxos_value_len = size;
 	// buffer now is pointing to the beginning of value.
 	// check with the len if match
-	packet_len -= 5 * (sizeof (unsigned int));
-	if(size > packet_len){
-		memcpy(v->value.paxos_value_val, buffer,packet_len);
-		return size-packet_len;
-	}
+	// packet_len -= 5 * (sizeof (unsigned int));
+	// if(size > packet_len){
+	// 	memcpy(v->value.paxos_value_val, buffer,packet_len);
+	// 	return size-packet_len;
+	// }
+	v->value.paxos_value_val = kmalloc(size, GFP_KERNEL);
 	memcpy(v->value.paxos_value_val, buffer,size);
 	return 0;
 }
 
 long msgpack_pack_paxos_accept(msgpack_packer** p, paxos_accept* v)
 {
-	int len = strlen(v->value.paxos_value_val) + 1;
+	int len = v->value.paxos_value_len;
 	long size = (sizeof(unsigned int) * 4) + len;
 	*p = kmalloc(size , GFP_KERNEL);
 	unsigned char * tmp = (unsigned char *) *p;
@@ -202,20 +204,22 @@ int msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int packet_l
 		dcp_int_packet(&v->ballot, &buffer);
 		dcp_int_packet(&size, &buffer);
 	#endif
+	v->value.paxos_value_len = size;
 	// buffer now is pointing to the beginning of value.
 	// check with the len if match
-	packet_len -= 3 * (sizeof (unsigned int));
-	if(size > packet_len){
-		memcpy(v->value.paxos_value_val, buffer,packet_len);
-		return size-packet_len;
-	}
+	// packet_len -= 3 * (sizeof (unsigned int));
+	// if(size > packet_len){
+	// 	memcpy(v->value.paxos_value_val, buffer,packet_len);
+	// 	return size-packet_len;
+	// }
+	v->value.paxos_value_val = kmalloc(size, GFP_KERNEL);
 	memcpy(v->value.paxos_value_val, buffer,size);
 	return 0;
 }
 
 long msgpack_pack_paxos_accepted(msgpack_packer** p, paxos_accepted* v)
 {
-	int len = strlen(v->value.paxos_value_val) + 1;
+	int len = v->value.paxos_value_len;
 	long size = (sizeof(unsigned int) * 6) + len;
 	*p = kmalloc(size , GFP_KERNEL);
 	unsigned char * tmp = (unsigned char *) *p;
@@ -265,11 +269,13 @@ int msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v, int pack
 		dcp_int_packet(&v->value_ballot, &buffer);
 		dcp_int_packet(&size, &buffer);
 	#endif
-	packet_len -= 5 * (sizeof (unsigned int));
-	if(size > packet_len){
-		memcpy(v->value.paxos_value_val, buffer,packet_len);
-		return size-packet_len;
-	}
+	v->value.paxos_value_len = size;
+	// packet_len -= 5 * (sizeof (unsigned int));
+	// if(size > packet_len){
+	// 	memcpy(v->value.paxos_value_val, buffer,packet_len);
+	// 	return size-packet_len;
+	// }
+	v->value.paxos_value_val = kmalloc(size, GFP_KERNEL);
 	memcpy(v->value.paxos_value_val, buffer,size);
 	return 0;
 }
@@ -429,7 +435,7 @@ void msgpack_unpack_paxos_acceptor_state(msgpack_packer* o, paxos_acceptor_state
 
 long msgpack_pack_paxos_client_value(msgpack_packer** p, paxos_client_value* v)
 {
-	int len = strlen(v->value.paxos_value_val) + 1;
+	int len = v->value.paxos_value_len;
 	long size = (sizeof(unsigned int) * 2) + len;
 	*p = kmalloc(size , GFP_KERNEL);
 	unsigned char * tmp = (unsigned char *) *p;
@@ -459,19 +465,22 @@ int msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v, 
 	#else
 		dcp_int_packet(&size, &buffer);
 	#endif
+	v->value.paxos_value_len = size;
+
 	// buffer now is pointing to the beginning of value.
 	// check with the len if match
-	packet_len -= (sizeof (unsigned int));
-	if(size > packet_len){
-		memcpy(v->value.paxos_value_val, buffer,packet_len);
-		return size-packet_len;
-	}
+	// packet_len -= (sizeof (unsigned int));
+	// if(size > packet_len){
+	// 	memcpy(v->value.paxos_value_val, buffer,packet_len);
+	// 	return size-packet_len;
+	// }
+	v->value.paxos_value_val = kmalloc(size, GFP_KERNEL);
 	memcpy(v->value.paxos_value_val, buffer,size);
 	return 0;
 }
 
 long msgpack_pack_paxos_learner_hi(msgpack_packer** p, paxos_learner_hi * v){
-	// int len = strlen(v->value.paxos_value_val) + 1;
+	// int len = v->value.paxos_value_len;
 	long size = (sizeof(unsigned int) * 1);
 	*p = kmalloc(size , GFP_KERNEL);
 	unsigned char * tmp = (unsigned char *) *p;
@@ -562,33 +571,43 @@ int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size)
 
 	switch (v->type) {
 	case PAXOS_PREPARE:
+		printk(KERN_INFO "\tReceived PAXOS_PREPARE");
 		msgpack_unpack_paxos_prepare(o, &v->u.prepare);
 		break;
 	case PAXOS_PROMISE:
+		printk(KERN_INFO "\tReceived PAXOS_PROMISE");
 		partial_message = msgpack_unpack_paxos_promise(o, &v->u.promise, size);
 		break;
 	case PAXOS_ACCEPT:
+		printk(KERN_INFO "\tReceived PAXOS_ACCEPT");
 		partial_message = msgpack_unpack_paxos_accept(o, &v->u.accept, size);
 		break;
 	case PAXOS_ACCEPTED:
+		printk(KERN_INFO "\tReceived PAXOS_ACCEPTED");
 		partial_message = msgpack_unpack_paxos_accepted(o, &v->u.accepted, size);
 		break;
 	case PAXOS_PREEMPTED:
+		printk(KERN_INFO "\tReceived PAXOS_PREEMPTED");
 		msgpack_unpack_paxos_preempted(o, &v->u.preempted);
 		break;
 	case PAXOS_REPEAT:
+		printk(KERN_INFO "\tReceived PAXOS_REPEAT");
 		msgpack_unpack_paxos_repeat(o, &v->u.repeat);
 		break;
 	case PAXOS_TRIM:
+		printk(KERN_INFO "\tReceived PAXOS_TRIM");
 		msgpack_unpack_paxos_trim(o, &v->u.trim);
 		break;
 	case PAXOS_ACCEPTOR_STATE:
+		printk(KERN_INFO "\tReceived PAXOS_ACCEPTOR_STATE");
 		msgpack_unpack_paxos_acceptor_state(o, &v->u.state);
 		break;
 	case PAXOS_CLIENT_VALUE:
+		printk(KERN_INFO "\tReceived PAXOS_CLIENT_VALUE");
 		partial_message = msgpack_unpack_paxos_client_value(o, &v->u.client_value, size);
 		break;
 	case PAXOS_LEARNER_HI:
+		printk(KERN_INFO "\tReceived PAXOS_LEARNER_HI");
 		// partial_message = msgpack_unpack_paxos_learner_hi(o, &v->u.learner_hi, size);
 		break;
 	}

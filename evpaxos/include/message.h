@@ -36,11 +36,11 @@ extern "C" {
 #include "paxos_types.h"
 #include <linux/udp.h>
 
-void send_paxos_message(struct socket * s, struct sockaddr_in* bev, paxos_message* msg);
-void send_paxos_prepare(struct socket * s, struct sockaddr_in* bev, paxos_prepare* msg);
+void send_paxos_message(struct socket * s, struct sockaddr_in* bev, paxos_message* msg, char * name);
+void send_paxos_prepare(struct socket * s, struct sockaddr_in* bev, void * msg);
 void send_paxos_promise(struct socket * s, struct sockaddr_in* bev, paxos_promise* msg);
-void send_paxos_accept(struct socket * s, struct sockaddr_in* bev, paxos_accept* msg);
-void send_paxos_accepted(struct socket * s, struct sockaddr_in* bev, paxos_accepted* msg);
+void send_paxos_accept(struct socket * s, struct sockaddr_in* bev, void * msg);
+void send_paxos_accepted(struct socket * s, struct sockaddr_in* bev, void * msg);
 void send_paxos_preempted(struct socket * s, struct sockaddr_in* bev, paxos_preempted* msg);
 void send_paxos_repeat(struct socket * s, struct sockaddr_in* bev, paxos_repeat* msg);
 void send_paxos_trim(struct socket * s, struct sockaddr_in* bev, paxos_trim* msg);

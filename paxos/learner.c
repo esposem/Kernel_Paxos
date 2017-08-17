@@ -30,10 +30,15 @@
 #include "uthash.h"
 #include "linux/slab.h"
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
- // stdlib, string, limits
+#ifndef HASH_FIND_IID
+	#define HASH_FIND_IID(head,findint,out)                                          \
+	    HASH_FIND(hh,head,findint,sizeof(iid_t),out)
+#endif
+
+#ifndef HASH_ADD_IID
+	#define HASH_ADD_IID(head,intfield,add)                                          \
+	    HASH_ADD(hh,head,intfield,sizeof(iid_t),add)
+#endif
 
 struct instance
 {
@@ -43,7 +48,6 @@ struct instance
 	paxos_accepted* final_value;
 	UT_hash_handle hh;
 };
-// KHASH_MAP_INIT_INT(instance, struct instance*)
 
 struct learner
 {
@@ -52,7 +56,6 @@ struct learner
 	iid_t current_iid;
 	iid_t highest_iid_closed;
 	struct instance * instances;
-	// khash_t(instance)* instances;
 };
 
 static struct instance* learner_get_instance(struct learner* l, iid_t iid);
@@ -111,7 +114,7 @@ learner_receive_accepted(struct learner* l, paxos_accepted* ack)
 	}
 
 	if (ack->iid < l->current_iid) {
-		paxos_log_debug("Learner: Dropped paxos_accepted for iid %u. Already delivered.",
+		printk(KERN_INFO "Learner: Dropped paxos_accepted for iid %u. Already delivered.",
 			ack->iid);
 		return;
 	}
@@ -123,7 +126,7 @@ learner_receive_accepted(struct learner* l, paxos_accepted* ack)
 
 	if (instance_has_quorum(inst, l->acceptors) && (inst->iid > l->highest_iid_closed)){
 		l->highest_iid_closed = inst->iid;
-		paxos_log_debug("Learner: Instance %u has a quorum and it's > highest iid closed, closing it...", inst->iid);
+		printk(KERN_INFO "Learner: Instance %u has a quorum and it's > highest iid closed, closing it...", inst->iid);
 	}
 }
 
@@ -135,7 +138,7 @@ learner_deliver_next(struct learner* l, paxos_accepted* out)
 	if (inst == NULL || !instance_has_quorum(inst, l->acceptors))
 		return 0;
 
-	paxos_log_debug("Learner: Deleted instance %u", inst->iid );
+	printk(KERN_INFO "Learner: Deleted instance %u", inst->iid );
 	memcpy(out, inst->final_value, sizeof(paxos_accepted));
 	paxos_value_copy(&out->value, &inst->final_value->value);
 	learner_delete_instance(l, inst);
@@ -158,7 +161,7 @@ static struct instance*
 learner_get_instance(struct learner* l, iid_t iid)
 {
 	struct instance * h;
-  HASH_FIND_INT( l->instances, &iid, h);  /* h: output pointer */
+  HASH_FIND_IID( l->instances, &iid, h);  /* h: output pointer */
 	return h;
 }
 
@@ -174,7 +177,7 @@ learner_get_instance_or_create(struct learner* l, iid_t iid)
 	struct instance* inst = learner_get_instance(l, iid);
 	if (inst == NULL) {
 		inst = instance_new(l->acceptors);
-		HASH_ADD_INT(l->instances, iid, inst);
+		HASH_ADD_IID(l->instances, iid, inst);
 	}
 	return inst;
 }
@@ -214,20 +217,20 @@ static void
 instance_update(struct instance* inst, paxos_accepted* accepted, int acceptors)
 {
 	if (inst->iid == 0) {
-		paxos_log_debug("Learner: Received first message for iid: %u", accepted->iid);
+		printk(KERN_INFO "Learner: Received first message for iid: %u", accepted->iid);
 		inst->iid = accepted->iid;
 		inst->last_update_ballot = accepted->ballot;
 	}
 
 	if (instance_has_quorum(inst, acceptors)) {
-		paxos_log_debug("Learner: Dropped paxos_accepted iid %u. Already closed.",
+		printk(KERN_INFO "Learner: Dropped paxos_accepted iid %u. Already closed.",
 			accepted->iid);
 		return;
 	}
 
 	paxos_accepted* prev_accepted = inst->acks[accepted->aid];
 	if (prev_accepted != NULL && prev_accepted->ballot >= accepted->ballot) {
-		paxos_log_debug(" Learner: Dropped paxos_accepted for iid %u."
+		printk(KERN_INFO " Learner: Dropped paxos_accepted for iid %u."
 			"Previous ballot is newer or equal.", accepted->iid);
 		return;
 	}
@@ -263,7 +266,7 @@ instance_has_quorum(struct instance* inst, int acceptors)
 	}
 
 	if (count >= paxos_quorum(acceptors)) {
-		paxos_log_debug("Learner: Reached quorum, iid: %u is closed!", inst->iid);
+		printk(KERN_INFO "Learner: Reached quorum, iid: %u is closed!", inst->iid);
 		inst->final_value = inst->acks[a_valid_index];
 		return 1;
 	}

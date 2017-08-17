@@ -45,7 +45,7 @@ static void
 evpaxos_replica_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 	struct evpaxos_replica* r = arg;
-	paxos_log_debug("Learner: asking the proposer to remove old instances");
+	printk(KERN_INFO "Replica: Learner: asking the proposer to remove old instances");
 	evproposer_set_instance_id(r->proposer, iid);
 	if (r->deliver)
 		r->deliver(iid, value, size, r->arg);
@@ -60,24 +60,28 @@ evpaxos_replica_init(int id, const char* config_file, deliver_function f,
 	r = kmalloc(sizeof(struct evpaxos_replica), GFP_KERNEL);
 
 	config = evpaxos_config_read(config_file);
-	paxos_log_debug("Read config file");
+	printk(KERN_INFO "Replica: Read config file");
 
 	struct sockaddr_in send_addr = evpaxos_acceptor_address(config,id);
-	struct sockaddr_in rcv_addr;
-	memcpy(&send_addr, &rcv_addr, sizeof(struct sockaddr_in));
-	send_addr.sin_port = 0;
-	r->peers = peers_new(&send_addr, &rcv_addr, config, id);
-	paxos_log_debug("Connected to other acceptors, starting acceptor, proposer and learner");
+	// struct sockaddr_in send_addr;
+	// memcpy(&send_addr, &rcv_addr, sizeof(struct sockaddr_in));
+	// send_addr.sin_port = 0;
+	r->peers = peers_new(&send_addr, config, id);
+	add_acceptors_from_config(-1, r->peers);
+	printk(KERN_INFO "Replica: Connected to other acceptors, starting acceptor, proposer and learner");
+	printall(r->peers);
 
-	r->acceptor = evacceptor_init_internal(id, config, r->peers, k);
-	r->proposer = evproposer_init_internal(id, config, r->peers, k);
-	r->learner  = evlearner_init_internal(config, r->peers, evpaxos_replica_deliver, r, k);
-	r->deliver = f;
-	r->arg = arg;
-	evpaxos_config_free(config);
 	if(peers_sock_init(r->peers, k) == 0){
+		r->acceptor = evacceptor_init_internal(id, config, r->peers, k);
+		r->proposer = evproposer_init_internal(id, config, r->peers, k);
+		r->learner  = evlearner_init_internal(config, r->peers, evpaxos_replica_deliver, r, k);
+		r->deliver = f;
+		r->arg = arg;
+		evpaxos_config_free(config);
 		return r;
 	}
+
+	evpaxos_config_free(config);
 	return NULL;
 }
 

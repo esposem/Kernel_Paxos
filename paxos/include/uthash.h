@@ -428,7 +428,8 @@ do {                                                                            
  * This is for uthash developer only; it compiles away if HASH_DEBUG isn't defined.
  */
 #ifdef HASH_DEBUG
-#define HASH_OOPS(...) do { fprintf(stderr,__VA_ARGS__); return(-1); } while (0)
+// #define HASH_OOPS(...) do { printk(KERN_ERR __VA_ARGS__); return -1; } while (0)
+#define HASH_OOPS(...) printk(KERN_ERR __VA_ARGS__);
 #define HASH_FSCK(hh,head,where)                                                 \
 do {                                                                             \
   struct UT_hash_handle *_thh;                                                   \

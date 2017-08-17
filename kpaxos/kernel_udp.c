@@ -161,12 +161,15 @@ int udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * ad
 void init_service(udp_service * k, char * name, int id){
   memset(k, 0, sizeof(udp_service));
   atomic_set(&k->send_socket_allocated, 0);
-  atomic_set(&k->rcv_socket_allocated, 0);
+  // atomic_set(&k->rcv_socket_allocated, 0);
   atomic_set(&k->thread_running, 0);
   for(int i = 0; i < N_TIMER; i++){
     atomic_set(&k->called[i], 0);
+    atomic_set(&k->sending[i], 0);
     k->timer_cb[i] = NULL;
     k->data[i] = 0;
+    // k->to_send[i] = NULL;
+    // k->last_send[i] = NULL;
   }
 
   size_t namelen = strlen(name);
@@ -188,38 +191,6 @@ void init_service(udp_service * k, char * name, int id){
 }
 
 void udp_server_quit(udp_service * k){
-//  printk(KERN_INFO "k null? %s  \n \
-  k->u_thread null? %s \n \
-  k->name null? %s \n \
-  k->thread_running null? %s \n \
-  k->send_socket_allocated null? %s \n \
-  k->rcv_socket_allocated null? %s \n \
-  k->called[0] null? %s \n \
-  k->called[1] null? %s \n \
-  k->called[2] null? %s \n \
-  k->timer_cb[0] null? %s \n \
-  k->timer_cb[1] null? %s \n \
-  k->timer_cb[2] null? %s \n \
-  k->data[0] null? %s \n \
-  k->data[1] null? %s \n \
-  k->data[2] null? %s \n \
-  ",k == NULL? "yes" : "no",  \
-  k->u_thread == NULL ? "Yes" : "no", \
-  k->name == NULL ? "Yes" : "no", \
-  &k->thread_running == NULL ? "Yes" : "no", \
-  &k->send_socket_allocated == NULL ? "Yes" : "no", \
-  &k->rcv_socket_allocated == NULL ? "Yes" : "no", \
-  &k->called[0] == NULL ? "Yes" : "no", \
-  &k->called[1] == NULL ? "Yes" : "no", \
-  &k->called[2] == NULL ? "Yes" : "no", \
-  k->timer_cb[0] == NULL ? "Yes" : "no", \
-  k->timer_cb[1] == NULL ? "Yes" : "no", \
-  k->timer_cb[2] == NULL ? "Yes" : "no", \
-  &k->data[0] == NULL ? "Yes" : "no", \
-  &k->data[1] == NULL ? "Yes" : "no", \
-  &k->data[2] == NULL ? "Yes" : "no" \
-);
-
   int ret;
   if(k!= NULL){
     if(atomic_read(&k->thread_running) == 1){

@@ -71,9 +71,8 @@ client_submit_value(struct client* c)
 	v->size = c->value_size;
 	random_string(v->value, v->size);
 	size_t size = sizeof(struct client_value) + v->size;
-
 	paxos_submit(get_sock(c->learner), &c->proposeradd, c->send_buffer, size);
-	paxos_log_debug("Client: submitted PAXOS_CLIENT_VALUE %s", v->value);
+	printk(KERN_INFO "Client: submitted PAXOS_CLIENT_VALUE len %zu value %s",v->size, v->value);
 }
 
 // Returns t2 - t1 in microseconds.
@@ -112,7 +111,7 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 		update_stats(&c->stats, v, size);
 		client_submit_value(c);
 	}
-	paxos_log_debug("Client: On deliver iid:%d value:%.16s",iid, v->value );
+	printk(KERN_INFO "Client: On deliver iid:%d value:%.16s",iid, v->value );
 }
 
 static void
@@ -134,7 +133,7 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 	c = kmalloc(sizeof(struct client), GFP_KERNEL);
 
 	memset(&c->stats, 0, sizeof(struct stats));
-	paxos_log_debug("Client: Making client, connecting to proposer...");
+	printk(KERN_INFO "Client: Making client, connecting to proposer...");
   struct evpaxos_config* conf = evpaxos_config_read(config);
 	if (conf == NULL) {
 		printk(KERN_INFO "%s: Failed to read config file %s\n",kclient->name, config);
@@ -152,7 +151,7 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 
 	paxos_config.learner_catch_up = 0;
-	paxos_log_debug("Client: Creating an internal learner...");
+	printk(KERN_INFO "Client: Creating an internal learner...");
 
 	c->learner = evlearner_init(config, on_deliver, c, kclient);
 	if (c->learner == NULL) {
