@@ -58,9 +58,9 @@ struct peers
 	struct peer** peers;   /* peers we connected to */
 	struct peer** clients; /* peers we accepted connections from */
 	struct socket * sock_send;
-	struct socket * sock_rcv;
+	// struct socket * sock_rcv;
 	struct peer * me_send;
-	struct peer * me_rcv;
+	// struct peer * me_rcv;
 	struct evpaxos_config* config;
 	int subs_count;
 	struct subscription subs[32];
@@ -71,7 +71,7 @@ static void free_peer(struct peer* p);
 static void free_all_peers(struct peer** p, int count);
 static int on_read(char * data,struct peer * arg, int size);
 
-struct peers* peers_new(struct sockaddr_in * send_addr, struct sockaddr_in * rcv_addr, struct evpaxos_config* config, int id)
+struct peers* peers_new(struct sockaddr_in * send_addr, struct evpaxos_config* config, int id)
 {
 	struct peers* p = kmalloc(sizeof(struct peers), GFP_KERNEL);
 	p->peers_count = 0;
@@ -80,7 +80,7 @@ struct peers* peers_new(struct sockaddr_in * send_addr, struct sockaddr_in * rcv
 	p->peers = NULL;
 	p->clients = NULL;
 	p->me_send = make_peer(p, id, send_addr);
-	p->me_rcv = make_peer(p, id, rcv_addr);
+	// p->me_rcv = make_peer(p, id, rcv_addr);
 	p->config = config;
 	return p;
 }
@@ -91,7 +91,7 @@ peers_free(struct peers* p)
 	free_all_peers(p->peers, p->peers_count);
 	free_all_peers(p->clients, p->clients_count);
 	kfree(p->me_send);
-	kfree(p->me_rcv);
+	// kfree(p->me_rcv);
 	kfree(p);
 }
 
@@ -105,8 +105,9 @@ void
 peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg)
 {
 	int i;
-	for (i = 0; i < p->peers_count; ++i)
+	for (i = 0; i < p->peers_count; ++i){
 		cb(p->peers[i], arg);
+	}
 }
 
 void
@@ -135,7 +136,7 @@ void add_proposers_from_config(int myid, struct peers * p){
 	for(int i = 0; i < n; i++){
 		if(i != myid){
 			addr = evpaxos_proposer_address(p->config, i);
-			p->peers[i] = make_peer(p, i, &addr);
+			p->peers[p->peers_count] = make_peer(p, p->peers_count, &addr);
 			p->peers_count++;
 		}
 	}
@@ -149,9 +150,21 @@ void add_acceptors_from_config(int myid, struct peers * p){
 	for(int i = 0; i < n; i++){
 		if(i != myid){
 			addr = evpaxos_acceptor_address(p->config, i);
-			p->peers[i] = make_peer(p, i, &addr);
+			p->peers[p->peers_count] = make_peer(p, p->peers_count, &addr);
 			p->peers_count++;
 		}
+	}
+}
+
+void printall(struct peers * p){
+	printk(KERN_INFO "PEERS we connect to");
+	for(int i = 0; i < p->peers_count; i++){
+		printk(KERN_INFO "id = %d, ip = %pI4, port = %d", p->peers[i]->id, &(p->peers[i]->addr.sin_addr), ntohs(p->peers[i]->addr.sin_port) );
+	}
+
+	printk(KERN_INFO "CLIENTS we receive connections \n(will be updated as message are received)");
+	for(int i = 0; i < p->clients_count; i++){
+		printk(KERN_INFO "id = %d, ip = %pI4, port = %d", p->clients[i]->id, &(p->clients[i]->addr.sin_addr), ntohs(p->clients[i]->addr.sin_port) );
 	}
 }
 
@@ -159,9 +172,9 @@ struct socket * get_send_socket(struct peer * p){
 	return p->peers->sock_send;
 }
 
-struct socket * get_rcv_socket(struct peer * p){
-	return p->peers->sock_rcv;
-}
+// struct socket * get_rcv_socket(struct peer * p){
+// 	return p->peers->sock_rcv;
+// }
 
 struct sockaddr_in * get_sockaddr(struct peer * p){
 	return &p->addr;
@@ -171,9 +184,9 @@ struct peer * get_me_send(struct peers * p){
 	return p->me_send;
 }
 
-struct peer * get_me_rcv(struct peers * p){
-	return p->me_rcv;
-}
+// struct peer * get_me_rcv(struct peers * p){
+// 	return p->me_rcv;
+// }
 
 int
 peer_get_id(struct peer* p)
@@ -194,12 +207,12 @@ static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
 }
 
 int peers_sock_init(struct peers* p, udp_service * k){
-	int i = udp_server_init(k, &p->sock_rcv, &p->me_rcv->addr, &k->rcv_socket_allocated);
-	int j = udp_server_init(k, &p->sock_send, &p->me_send->addr, &k->send_socket_allocated);
-	if(i == 0 && j == 0){
-		return 0;
-	}
-	return -1;
+	// int i = udp_server_init(k, &p->sock_rcv, &p->me_rcv->addr, &k->rcv_socket_allocated);
+	return udp_server_init(k, &p->sock_send, &p->me_send->addr, &k->send_socket_allocated);
+	// if(i == 0 && j == 0){
+	// 	return 0;
+	// }
+	// return -1;
 }
 
 int
@@ -218,7 +231,7 @@ peers_listen(struct peers* p, udp_service * k)
 
 		if(kthread_should_stop() || signal_pending(current)){
 			printk(KERN_INFO "Stopped!");
-			check_sock_allocation(k, p->sock_rcv, &k->rcv_socket_allocated);
+			// check_sock_allocation(k, p->sock_rcv, &k->rcv_socket_allocated);
       check_sock_allocation(k, p->sock_send, &k->send_socket_allocated);
       kfree(in_buf);
 
@@ -227,19 +240,22 @@ peers_listen(struct peers* p, udp_service * k)
 					kfree(bigger_buff);
 				}
 			#endif
-
       return 0;
     }
 
 		memset(in_buf, '\0', MAX_UDP_SIZE);
     memset(&address, 0, sizeof(struct sockaddr_in));
 		// printk(KERN_INFO "Receiving...");
-		ret = udp_server_receive(p->sock_rcv, &address, in_buf, MSG_WAITALL, k);
+		ret = udp_server_receive(p->sock_send, &address, in_buf, MSG_WAITALL, k);
+		struct peer tmp;
+		memcpy(&tmp.addr, &address, sizeof(struct sockaddr_in));
+		tmp.peers = p;
+
 		// printk(KERN_INFO "End receiving");
 		if(ret > 0){
 			if(first_time == 0){
 				add_or_update_client(&address, p);
-				ret = on_read(in_buf, p->me_rcv, MAX_UDP_SIZE);
+				ret = on_read(in_buf, &tmp, MAX_UDP_SIZE);
 				#if HANDLE_BIG_PKG
 				// 	if(ret != 0){
 				// 		while(ret > 0){
@@ -256,23 +272,37 @@ peers_listen(struct peers* p, udp_service * k)
 				// 	strncat(bigger_buff, in_buf, MAX_UDP_SIZE);
 				// 	n_packet_toget--;
 				// 	if(n_packet_toget == 0){
-						first_time = 0;
-						in_buf = bigger_buff;
-						on_read(bigger_buff, p->me, size_bigger_buf);
-					}
+					// 	first_time = 0;
+					// 	in_buf = bigger_buff;
+					// 	on_read(bigger_buff, p->me, size_bigger_buf);
+					// }
 				#endif
 			}
 		}
 		// printk(KERN_INFO "Listening done, checking for timer callback");
 		for(int i = 0; i < N_TIMER; i++){
 			// k->timer_cb[i] != NULL is a safety check
-			// printk(KERN_INFO "k null? %s k->timer_cb[i] null? %s\n", k == NULL? "Yes" : "no", k->timer_cb[i] == NULL ? "Yes" : "no");
-			// printk(KERN_ERR "atomic_read(&k->called[i]) == 1 ? %s", atomic_read(&k->called[i]) == 1 ? "Yes" : "no");
 			if(k->timer_cb[i] != NULL && atomic_read(&k->called[i]) == 1){
-				printk(KERN_INFO "Calling callback for %d", i);
 				k->timer_cb[i](k->data[i]);
 				atomic_set(&k->called[i], 0);
 			}
+
+			// if(atomic_read(&k->sending[i]) == 0){
+			// 	// printk(KERN_INFO "Sending the queue");
+			// 	atomic_set(&k->sending[i], 1);
+			// 	struct command * tmp = k->to_send[i];
+			// 	struct command * del;
+			// 	while(tmp != NULL){
+			// 		tmp->send_function(tmp->s, tmp->addr, tmp->arg);
+			// 		del = tmp;
+			// 		tmp = tmp->next;
+			// 		k->to_send[i] = tmp;
+			// 		kfree(del);
+			// 	}
+			// 	k->last_send[i] = NULL;
+			// 	// printk(KERN_INFO "Done sending the queue");
+			// 	atomic_set(&k->sending[i], 0);
+			// }
 		}
 	}
 	return 1;
@@ -299,6 +329,9 @@ dispatch_message(struct peer* p, paxos_message* msg)
 			break;
 		}
 	}
+	// if(msg->type == PAXOS_LEARNER_HI){
+	// 	 printk(KERN_INFO "Received Hi");
+	// }
 }
 
 static int

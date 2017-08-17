@@ -72,7 +72,7 @@ peer_send_hi(struct peer* p, void* arg)
 static void
 evlearner_check_holes(unsigned long arg)
 {
-	printk(KERN_INFO "Checking holes");
+	// printk(KERN_INFO "Checking holes");
 	paxos_repeat msg;
 	int chunks = 10;
 	struct evlearner* l = (struct evlearner *) arg;
@@ -80,7 +80,7 @@ evlearner_check_holes(unsigned long arg)
 		if ((msg.to - msg.from) > chunks)
 			msg.to = msg.from + chunks;
 		peers_foreach_acceptor(l->acceptors, peer_send_repeat, &msg);
-		paxos_log_debug("Learner: sent PAXOS_REPEAT to all acceptors, missing %d chunks", chunks);
+		printk(KERN_INFO "Learner: Learner: sent PAXOS_REPEAT to all acceptors, missing %d chunks", chunks);
 	}
 	// mod_timer(&l->hole_timer, jiffies + timeval_to_jiffies(&l->tv));
 
@@ -114,7 +114,6 @@ static void check_timeout(unsigned long data){
 
 }
 
-
 /*
 	Called when an accept_ack is received, the learner will update it's status
     for that instance and afterwards check if the instance is closed
@@ -123,7 +122,7 @@ static void
 evlearner_handle_accepted(struct peer* p, paxos_message* msg, void* arg)
 {
 	struct evlearner* l = arg;
-	paxos_log_debug("Received PAXOS_ACCEPTED, update status and check instance is closed");
+	printk(KERN_INFO "Learner: Received PAXOS_ACCEPTED, update status and check instance is closed");
 	learner_receive_accepted(l->state, &msg->u.accepted);
 	evlearner_deliver_next_closed(l);
 }
@@ -146,7 +145,6 @@ evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
 	printk(KERN_INFO "Learner: Subscribed to PAXOS_ACCEPTED");
 
 	peers_foreach_acceptor(peers, peer_send_hi, NULL);
-	printk(KERN_INFO "Learner: Sent hi to acceptors");
 
 	// setup hole checking timer
 	learner->arr[0] = (unsigned long) learner;
@@ -170,15 +168,16 @@ evlearner_init(const char* config_file, deliver_function f, void* arg,
 	if (c == NULL){
 		return NULL;
 	}else{
-		paxos_log_debug("Learner: read config file");
+		printk(KERN_INFO "Learner: Learner: read config file");
 	}
 
 	struct sockaddr_in addr;
 	addr.sin_port = 0;
 	addr.sin_addr.s_addr = INADDR_ANY;
-	struct peers* peers = peers_new(&addr, &addr, c, -1);
+	struct peers* peers = peers_new(&addr, c, -1);
 	add_acceptors_from_config(-1, peers);
-	paxos_log_debug("Learner: Connected to acceptors");
+	printall(peers);
+	printk(KERN_INFO "Learner: Learner: Connected to acceptors");
 	if(peers_sock_init(peers, k) >= 0){
 		struct evlearner* l = evlearner_init_internal(c, peers, f, arg, k);
 		evpaxos_config_free(c);
@@ -228,6 +227,6 @@ void
 evlearner_send_trim(struct evlearner* l, unsigned iid)
 {
 	paxos_trim trim = {iid};
-	paxos_log_debug("Sent PAXOS_TRIM to all acceptors");
+	printk(KERN_INFO "Learner: Sent PAXOS_TRIM to all acceptors");
 	peers_foreach_acceptor(l->acceptors, peer_send_trim, &trim);
 }

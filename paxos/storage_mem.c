@@ -30,6 +30,16 @@
 #include <linux/slab.h>
 #include "uthash.h"
 
+#ifndef HASH_FIND_IID
+	#define HASH_FIND_IID(head,findint,out)                                          \
+	    HASH_FIND(hh,head,findint,sizeof(iid_t),out)
+#endif
+
+#ifndef HASH_ADD_IID
+	#define HASH_ADD_IID(head,intfield,add)                                          \
+	    HASH_ADD(hh,head,intfield,sizeof(iid_t),add)
+#endif
+
 // KHASH_MAP_INIT_INT(record, paxos_accepted*);
 
 struct hash_item {
@@ -43,6 +53,7 @@ struct mem_storage //db
 	iid_t trim_iid;
 	struct hash_item * record;
 };
+
 
 static void paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src);
 
@@ -97,9 +108,8 @@ static int
 mem_storage_get(void* handle, iid_t iid, paxos_accepted* out)
 {
 	struct mem_storage* s = handle;
-	struct hash_item * h;
-
-  HASH_FIND_INT( s->record, &iid, h);  /* h: output pointer */
+	struct hash_item * h = NULL;
+  HASH_FIND_IID( s->record, &iid, h);  /* h: output pointer */
 	if(h == NULL){
 		return 0;
 	}
@@ -112,19 +122,22 @@ static int
 mem_storage_put(void* handle, paxos_accepted* acc)
 {
 	struct mem_storage* s = handle;
-	struct hash_item * a;
+	struct hash_item * a = NULL;
 
-	HASH_FIND_INT(s->record, &(acc->iid), a);  /* iid already in the hash? */
-	if (a==NULL) {
-		a = kmalloc(sizeof(struct hash_item), GFP_KERNEL);
-	} else{
+	HASH_FIND_IID(s->record, &(acc->iid), a);  /* iid already in the hash? */
+	if (a != NULL) {
 		paxos_accepted_free(a->value);
 	}
+	else {
+		a = kmalloc(sizeof(struct hash_item), GFP_KERNEL);
+		HASH_ADD_IID(s->record, iid, a);
+	}
+
 	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
 	paxos_accepted_copy(val, acc);
 	a->value = val;
 	a->iid = acc->iid;
-	HASH_ADD_INT(s->record, iid, a);
+
 
 	return 0;
 }
@@ -135,7 +148,7 @@ mem_storage_trim(void* handle, iid_t iid)
 	struct mem_storage* s = handle;
 	struct hash_item *hash_el, *tmp;
 	HASH_ITER(hh, s->record, hash_el, tmp) {
-		if(hash_el->iid <= iid){
+		if(hash_el->iid <= (int) iid){
 			HASH_DEL(s->record, hash_el);
 			paxos_accepted_free(hash_el->value);
 			kfree(hash_el);

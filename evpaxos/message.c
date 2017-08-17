@@ -35,11 +35,11 @@
 
 
 void
-send_paxos_message(struct socket * s, struct sockaddr_in * bev, paxos_message* msg)
+send_paxos_message(struct socket * s, struct sockaddr_in * bev, paxos_message* msg, char * name)
 {
 	msgpack_packer * packer;
 	long size_msg = msgpack_pack_paxos_message(&packer, msg);
-	udp_server_send(s, bev, (unsigned char *) packer, size_msg, NULL);
+	udp_server_send(s, bev, (unsigned char *) packer, size_msg, name);
 	kfree(packer);
 }
 
@@ -50,18 +50,19 @@ send_paxos_learner_hi(struct socket * s,struct sockaddr_in* bev, paxos_learner_h
 		.type = PAXOS_LEARNER_HI,
 		.u.learner_hi.value.paxos_value_len=0,
 	 	.u.learner_hi.value.paxos_value_val = NULL};
-	send_paxos_message(s, bev, &msg);
-	// paxos_log_debug("Send hi for iid %d ballot %d", p->iid, p->ballot);
+	send_paxos_message(s, bev, &msg, "Learner:");
+	printk(KERN_INFO "Learner: Send hi to the acceptors");
 }
 
 void
-send_paxos_prepare(struct socket * s,struct sockaddr_in* bev, paxos_prepare* p)
+send_paxos_prepare(struct socket * s,struct sockaddr_in* bev, void * pa)
 {
+	struct paxos_prepare * p = (paxos_prepare *) pa;
 	paxos_message msg = {
 		.type = PAXOS_PREPARE,
 		.u.prepare = *p };
-	send_paxos_message(s, bev, &msg);
-	paxos_log_debug("Send prepare for iid %d ballot %d", p->iid, p->ballot);
+	send_paxos_message(s, bev, &msg, "Proposer:");
+	printk(KERN_INFO "Proposer: Send prepare for iid %d ballot %d", p->iid, p->ballot);
 }
 
 void
@@ -70,28 +71,30 @@ send_paxos_promise(struct socket * s, struct sockaddr_in* bev, paxos_promise* p)
 	paxos_message msg = {
 		.type = PAXOS_PROMISE,
 		.u.promise = *p };
-	send_paxos_message(s, bev, &msg);
-	paxos_log_debug("Send promise for iid %d ballot %d", p->iid, p->ballot);
+	send_paxos_message(s, bev, &msg, "Acceptor:");
+	printk(KERN_INFO "Acceptor: Send promise for iid %d ballot %d", p->iid, p->ballot);
 }
 
 void
-send_paxos_accept(struct socket * s, struct sockaddr_in* bev, paxos_accept* p)
+send_paxos_accept(struct socket * s, struct sockaddr_in* bev, void * pa)
 {
+	struct paxos_accept * p = (paxos_accept *) pa;
 	paxos_message msg = {
 		.type = PAXOS_ACCEPT,
 		.u.accept = *p };
-	send_paxos_message(s, bev, &msg);
-	paxos_log_debug("Send accept for iid %d ballot %d", p->iid, p->ballot);
+	send_paxos_message(s, bev, &msg, "Proposer:");
+	printk(KERN_INFO "Proposer: Send accept for iid %d ballot %d", p->iid, p->ballot);
 }
 
 void
-send_paxos_accepted(struct socket * s, struct sockaddr_in* bev, paxos_accepted* p)
+send_paxos_accepted(struct socket * s, struct sockaddr_in* bev, void * pa)
 {
+	struct paxos_accepted * p = (paxos_accepted *) pa;
 	paxos_message msg = {
 		.type = PAXOS_ACCEPTED,
 		.u.accepted = *p };
-	send_paxos_message(s, bev, &msg);
-	paxos_log_debug("Send accepted for inst %d ballot %d", p->iid, p->ballot);
+	send_paxos_message(s, bev, &msg, "Acceptor:");
+	printk(KERN_INFO "Acceptor: Send accepted for inst %d ballot %d", p->iid, p->ballot);
 }
 
 void
@@ -100,8 +103,8 @@ send_paxos_preempted(struct socket * s, struct sockaddr_in* bev, paxos_preempted
 	paxos_message msg = {
 		.type = PAXOS_PREEMPTED,
 		.u.preempted = *p };
-	send_paxos_message(s,bev, &msg);
-	paxos_log_debug("Send preempted for inst %d ballot %d", p->iid, p->ballot);
+	send_paxos_message(s,bev, &msg, "Acceptor");
+	printk(KERN_INFO "Acceptor Send preempted for inst %d ballot %d", p->iid, p->ballot);
 }
 
 void
@@ -110,8 +113,8 @@ send_paxos_repeat(struct socket * s, struct sockaddr_in* bev, paxos_repeat* p)
 	paxos_message msg = {
 		.type = PAXOS_REPEAT,
 		.u.repeat = *p };
-	send_paxos_message(s,bev, &msg);
-	paxos_log_debug("Send repeat for inst %d-%d", p->from, p->to);
+	send_paxos_message(s,bev, &msg, "Learner:");
+	printk(KERN_INFO "Learner: Send repeat for inst %d-%d", p->from, p->to);
 }
 
 void
@@ -120,8 +123,8 @@ send_paxos_trim(struct socket * s, struct sockaddr_in* bev, paxos_trim* t)
 	paxos_message msg = {
 		.type = PAXOS_TRIM,
 		.u.trim = *t };
-	send_paxos_message(s,bev, &msg);
-	paxos_log_debug("Send trim for inst %d", t->iid);
+	send_paxos_message(s,bev, &msg, "Learner:");
+	printk(KERN_INFO "Learner: Send trim for inst %d", t->iid);
 }
 
 void
@@ -131,7 +134,9 @@ paxos_submit(struct socket * s, struct sockaddr_in* bev, char* data, int size)
 		.type = PAXOS_CLIENT_VALUE,
 		.u.client_value.value.paxos_value_len = size,
 		.u.client_value.value.paxos_value_val = data };
-	send_paxos_message(s, bev, &msg);
+	send_paxos_message(s, bev, &msg, "Client:");
+	printk(KERN_INFO "Client: Sent client value");
+
 }
 
 int recv_paxos_message(char * data, paxos_message* out, int size)

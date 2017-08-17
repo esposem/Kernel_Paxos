@@ -44,7 +44,7 @@ struct peers;
 typedef void (*peer_cb)(struct peer* p, paxos_message* m, void* arg);
 typedef void (*peer_iter_cb)(struct peer* p, void* arg);
 
-struct peers* peers_new(struct sockaddr_in * send_addr, struct sockaddr_in * rcv_addr, struct evpaxos_config* config, int id);
+struct peers* peers_new(struct sockaddr_in * send_addr, struct evpaxos_config* config, int id);
 void peers_free(struct peers* p);
 int peers_count(struct peers* p);
 int peers_sock_init(struct peers* p, udp_service * k);
@@ -56,11 +56,12 @@ struct peer* peers_get_acceptor(struct peers* p, int id);
 void add_proposers_from_config(int myid, struct peers * p);
 void add_acceptors_from_config(int myid, struct peers * p);
 struct socket * get_send_socket(struct peer * p);
-struct socket * get_rcv_socket(struct peer * p);
+// struct socket * get_rcv_socket(struct peer * p);
 struct sockaddr_in * get_sockaddr(struct peer * p);
 struct peer * get_me_send(struct peers * p);
-struct peer * get_me_rcv(struct peers * p);
+// struct peer * get_me_rcv(struct peers * p);
 int peer_get_id(struct peer* p);
+void printall(struct peers * p);
 
 #ifdef __cplusplus
 }
