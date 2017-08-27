@@ -84,7 +84,7 @@ typedef unsigned char uint8_t;
 #endif
 
 #ifndef uthash_fatal
-#define uthash_fatal(msg)         /* fatal error (out of memory,etc) */
+#define uthash_fatal(msg)  // printk(KERN_ERR msg)         /* fatal error (out of memory,etc) */
 #endif
 #ifndef uthash_malloc
 #define uthash_malloc(sz) kmalloc(sz, GFP_KERNEL)      /* malloc fcn                      */
@@ -428,8 +428,8 @@ do {                                                                            
  * This is for uthash developer only; it compiles away if HASH_DEBUG isn't defined.
  */
 #ifdef HASH_DEBUG
-// #define HASH_OOPS(...) do { printk(KERN_ERR __VA_ARGS__); return -1; } while (0)
-#define HASH_OOPS(...) printk(KERN_ERR __VA_ARGS__);
+// #define HASH_OOPS(...) do { // printk(KERN_ERR __VA_ARGS__); return -1; } while (0)
+#define HASH_OOPS(...)  // printk(KERN_ERR __VA_ARGS__);
 #define HASH_FSCK(hh,head,where)                                                 \
 do {                                                                             \
   struct UT_hash_handle *_thh;                                                   \

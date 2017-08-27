@@ -44,7 +44,7 @@ storage_init(struct storage* store, int acceptor_id)
 	// 		break;
 	// 	#endif
 	// 	default:
-	// 	printk(KERN_ERR "Storage backend not available");
+	// 	// printk(KERN_ERR "Storage backend not available");
 	// 	// exit(0);
 	// }
 }

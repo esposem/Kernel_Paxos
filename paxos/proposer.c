@@ -77,9 +77,9 @@ struct timeout_iterator
 static ballot_t proposer_next_ballot(struct proposer* p, ballot_t b);
 static void proposer_preempt(struct proposer* p, struct instance* inst,
 	paxos_prepare* out);
-static void proposer_move_instance(struct instance * f, struct instance * t,
+static void proposer_move_instance(struct instance ** f, struct instance ** t,
 	struct instance* inst);
-static void proposer_trim_instances(struct proposer* p, struct instance * h,
+static void proposer_trim_instances(struct proposer* p, struct instance ** h,
 	iid_t iid);
 static struct instance* instance_new(iid_t iid, ballot_t ballot, int acceptors);
 static void instance_free(struct instance* inst);
@@ -136,7 +136,7 @@ proposer_propose(struct proposer* p, const char* value, size_t size)
 int
 proposer_prepared_count(struct proposer* p)
 {
-	printk(KERN_ERR "count is %d",p->prepare_instances);
+	// // printk(KERN_ERR "count is %d", HASH_COUNT(p->prepare_instances));
 	return HASH_COUNT(p->prepare_instances);
 }
 
@@ -146,9 +146,9 @@ proposer_set_instance_id(struct proposer* p, iid_t iid)
 	if (iid > p->next_prepare_iid) {
 		p->next_prepare_iid = iid;
 		// remove instances older than iid
-		printk(KERN_INFO "Proposer: removing instances older than %d",iid );
-		proposer_trim_instances(p, p->prepare_instances, iid);
-		proposer_trim_instances(p, p->accept_instances, iid);
+		// printk(KERN_INFO "Proposer: removing instances older than %d",iid );
+		proposer_trim_instances(p, &p->prepare_instances, iid);
+		proposer_trim_instances(p, &p->accept_instances, iid);
 	}
 }
 
@@ -158,12 +158,12 @@ proposer_prepare(struct proposer* p, paxos_prepare* out)
 	iid_t id = ++(p->next_prepare_iid);
 	ballot_t bal = proposer_next_ballot(p, 0);
 	struct instance* inst = NULL;
-	HASH_FIND_IID(p->prepare_instances, &id, inst);
-	if(inst != NULL){
-		HASH_DEL(p->prepare_instances, inst);
-		instance_free(inst);
-		inst = NULL;
-	}
+	// HASH_FIND_IID(p->prepare_instances, &id, inst);
+	// if(inst != NULL){
+	// 	HASH_DEL(p->prepare_instances, inst);
+	// 	instance_free(inst);
+	// 	inst = NULL;
+	// }
 	inst = instance_new(id, bal, p->acceptors);
 	HASH_ADD_IID(p->prepare_instances, iid, inst);
 	*out = (paxos_prepare) {inst->iid, inst->ballot};
@@ -178,47 +178,44 @@ proposer_receive_promise(struct proposer* p, paxos_promise* ack,
 	HASH_FIND_IID(p->prepare_instances, &ack->iid, inst);
 
 	if (inst == NULL) {
-		printk(KERN_INFO "Proposer: Promise dropped, instance %u not pending", ack->iid);
+		// printk(KERN_INFO "Proposer: Promise dropped, instance %u not pending", ack->iid);
 		return 0;
 	}
 	// struct instance* inst = kh_value(p->prepare_instances, k);
 
 	if (ack->ballot < inst->ballot) {
-		printk(KERN_INFO "Proposer: Promise dropped, too old");
+		// printk(KERN_INFO "Proposer: Promise dropped, too old");
 		return 0;
 	}
 
 	if (ack->ballot > inst->ballot) {
-		printk(KERN_INFO "Proposer: Instance %u preempted: ballot %d ack ballot %d",
-			inst->iid, inst->ballot, ack->ballot);
+		// printk(KERN_INFO "Proposer: Instance %u preempted: ballot %d ack ballot %d", inst->iid, inst->ballot, ack->ballot);
 		proposer_preempt(p, inst, out);
 		return 1;
 	}
 
 	if (quorum_add(&inst->quorum, ack->aid) == 0) {
-		printk(KERN_INFO "Proposer: Duplicate promise dropped from: %d, iid: %u",
-			ack->aid, inst->iid);
+		// printk(KERN_INFO "Proposer: Duplicate promise dropped from: %d, iid: %u", ack->aid, inst->iid);
 		return 0;
 	}else{
-		printk(KERN_INFO "Proposer: Incremented quorum");
+		// printk(KERN_INFO "Proposer: Incremented quorum");
 	}
 
-	printk(KERN_INFO "Proposer: Received valid promise from: %d, iid: %u",
-		ack->aid, inst->iid);
+	// printk(KERN_INFO "Proposer: Received valid promise from: %d, iid: %u", ack->aid, inst->iid);
 
 	if (ack->value.paxos_value_len > 0) {
-		printk(KERN_INFO "Proposer: Promise has value");
+		// printk(KERN_INFO "Proposer: Promise has value");
 		if (ack->value_ballot > inst->value_ballot) {
 			if (instance_has_promised_value(inst)){
-				printk(KERN_INFO "There was a previous promise, but this value is bigger, so delete old one");
+				// printk(KERN_INFO "There was a previous promise, but this value is bigger, so delete old one");
 				paxos_value_free(inst->promised_value);
 			}
 			inst->value_ballot = ack->value_ballot;
 			inst->promised_value = paxos_value_new(ack->value.paxos_value_val,
 				ack->value.paxos_value_len);
-			printk(KERN_INFO "Proposer: Value in promise saved, removed older value");
-		} else
-			printk(KERN_INFO "Proposer: Value in promise ignored");
+			// printk(KERN_INFO "Proposer: Value in promise saved, removed older value");
+		}
+			// else // printk(KERN_INFO "Proposer: Value in promise ignored");
 	}
 
 	return 0;
@@ -241,18 +238,18 @@ proposer_accept(struct proposer* p, paxos_accept* out)
 	if (inst == NULL || !quorum_reached(&inst->quorum))
 		return 0;
 
-	printk(KERN_INFO "Proposer: Trying to accept iid %u", inst->iid);
+	// printk(KERN_INFO "Proposer: Trying to accept iid %u", inst->iid);
 
 	// Is there a value to accept?
 	if (!instance_has_value(inst))
 		inst->value = carray_pop_front(p->values);
 	if (!instance_has_value(inst) && !instance_has_promised_value(inst)) {
-		printk(KERN_INFO "Proposer: No value to accept");
+		// printk(KERN_INFO "Proposer: No value to accept");
 		return 0;
 	}
 
 	// We have both a prepared instance and a value
-	proposer_move_instance(p->prepare_instances, p->accept_instances, inst);
+	proposer_move_instance(&p->prepare_instances, &p->accept_instances, inst);
 	instance_to_accept(inst, out);
 
 	return 1;
@@ -266,7 +263,7 @@ proposer_receive_accepted(struct proposer* p, paxos_accepted* ack)
 	HASH_FIND_IID(p->accept_instances, &ack->iid, inst);
 
 	if (inst == NULL) {
-		printk(KERN_INFO "Proposer: Accept ack dropped, iid: %u not pending", ack->iid);
+		// printk(KERN_INFO "Proposer: Accept ack dropped, iid: %u not pending", ack->iid);
 		return 0;
 	}
 
@@ -274,13 +271,12 @@ proposer_receive_accepted(struct proposer* p, paxos_accepted* ack)
 
 	if (ack->ballot == inst->ballot) {
 		if (!quorum_add(&inst->quorum, ack->aid)) {
-			printk(KERN_INFO "Proposer: Duplicate accept dropped from: %d, iid: %u",
-				ack->aid, inst->iid);
+			// printk(KERN_INFO "Proposer: Duplicate accept dropped from: %d, iid: %u", ack->aid, inst->iid);
 			return 0;
 		}
 
 		if (quorum_reached(&inst->quorum)) {
-			printk(KERN_INFO "Proposer: Quorum reached for instance %u", inst->iid);
+			// printk(KERN_INFO "Proposer: Quorum reached for instance %u", inst->iid);
 			if (instance_has_promised_value(inst)) {
 				if (inst->value != NULL && paxos_value_cmp(inst->value, inst->promised_value) != 0) {
 					carray_push_back(p->values, inst->value);
@@ -289,7 +285,7 @@ proposer_receive_accepted(struct proposer* p, paxos_accepted* ack)
 			}
 
 			HASH_DEL(p->accept_instances, inst);
-			printk(KERN_INFO "Proposer: Closed instance");
+			// printk(KERN_INFO "Proposer: Closed instance");
 			instance_free(inst);
 		}
 
@@ -308,17 +304,16 @@ proposer_receive_preempted(struct proposer* p, paxos_preempted* ack,
 
 
 	if (inst == NULL) {
-		printk(KERN_INFO "Proposer: Preempted dropped, iid: %u not pending", ack->iid);
+		// printk(KERN_INFO "Proposer: Preempted dropped, iid: %u not pending", ack->iid);
 		return 0;
 	}
 
 
 	if (ack->ballot > inst->ballot) {
-		printk(KERN_INFO "Proposer: Received N < prev_prop, Instance %u preempted: ballot %d ack ballot %d",
-			inst->iid, inst->ballot, ack->ballot);
+		// printk(KERN_INFO "Proposer: Received N < prev_prop, Instance %u preempted: ballot %d ack ballot %d", inst->iid, inst->ballot, ack->ballot);
 		if (instance_has_promised_value(inst))
 			paxos_value_free(inst->promised_value);
-		proposer_move_instance(p->accept_instances, p->prepare_instances, inst);
+		proposer_move_instance(&p->accept_instances, &p->prepare_instances, inst);
 		proposer_preempt(p, inst, out);
 		return  1;
 	} else {
@@ -415,28 +410,29 @@ proposer_preempt(struct proposer* p, struct instance* inst, paxos_prepare* out)
 }
 
 static void
-proposer_move_instance(struct instance * f, struct instance * t,
+proposer_move_instance(struct instance ** f, struct instance ** t,
 	struct instance* inst)
 {
 	struct instance * out;
-	HASH_FIND_IID(f, &inst->iid, out);
-	HASH_DEL(f, out);
-	HASH_ADD_IID(t, iid, inst);
+	HASH_FIND_IID(*f, &inst->iid, out);
+	HASH_DEL(*f, out);
+	HASH_ADD_IID(*t, iid, inst);
 	quorum_clear(&inst->quorum);
 }
 
 static void
-proposer_trim_instances(struct proposer* p, struct instance* h, iid_t iid)
+proposer_trim_instances(struct proposer* p, struct instance** h, iid_t iid)
 {
+	// // printk(KERN_INFO "trimming instances in proposer");
 	struct instance * i;
-	for(i=h; i != NULL; i=i->hh.next) {
+	for(i=*h; i != NULL; i=i->hh.next) {
 		struct instance* inst = i;
 		if (inst->iid <= iid) {
 			if (instance_has_value(inst)) {
 				carray_push_back(p->values, inst->value);
 				inst->value = NULL;
 			}
-			HASH_DEL(h, i);
+			HASH_DEL(*h, i);
 			instance_free(inst);
 		}
   }

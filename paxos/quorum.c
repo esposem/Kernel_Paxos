@@ -35,10 +35,10 @@ void
 quorum_init(struct quorum* q, int acceptors)
 {
 	q->acceptors = acceptors;
-	// printk(KERN_INFO "Acceptors: %d", q->acceptors);
+	// // printk(KERN_INFO "Acceptors: %d", q->acceptors);
 	q->quorum = paxos_quorum(acceptors);
 	q->acceptor_ids = kmalloc(sizeof(int) * q->acceptors, GFP_KERNEL);
-	// printk(KERN_INFO "acceptor_ids == NULL ? %s", q->acceptor_ids == NULL ? "yes" : "no");
+	// // printk(KERN_INFO "acceptor_ids == NULL ? %s", q->acceptor_ids == NULL ? "yes" : "no");
 	quorum_clear(q);
 }
 
