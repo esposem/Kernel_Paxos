@@ -77,14 +77,18 @@ mem_storage_open(void* handle)
 static void
 mem_storage_close(void* handle)
 {
+	// printk(KERN_INFO "Called mem_storage_close");
 	struct mem_storage* s = handle;
-	struct hash_item * current_hash, *tmp;
-
+	struct hash_item * current_hash;
+	struct hash_item * tmp;
+	// printk(KERN_ERR "there are %d in the hash",  HASH_COUNT(s->record));
  HASH_ITER(hh , s->record, current_hash, tmp) {
 	  HASH_DEL(s->record, current_hash);
 	  paxos_accepted_free(current_hash->value);
 		kfree(current_hash);
  }
+ // printk(KERN_ERR "now there are %d in the hash", HASH_COUNT(s->record));
+
  kfree(s);
 
 }
@@ -124,7 +128,7 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 	struct mem_storage* s = handle;
 	struct hash_item * a = NULL;
 
-	HASH_FIND_IID(s->record, &(acc->iid), a);  /* iid already in the hash? */
+	HASH_FIND_IID(s->record, &(acc->iid), a);
 	if (a != NULL) {
 		paxos_accepted_free(a->value);
 	}
@@ -132,19 +136,17 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 		a = kmalloc(sizeof(struct hash_item), GFP_KERNEL);
 		HASH_ADD_IID(s->record, iid, a);
 	}
-
 	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
 	paxos_accepted_copy(val, acc);
 	a->value = val;
 	a->iid = acc->iid;
-
-
 	return 0;
 }
 
 static int
 mem_storage_trim(void* handle, iid_t iid)
 {
+	// printk(KERN_INFO "Trim called");
 	struct mem_storage* s = handle;
 	struct hash_item *hash_el, *tmp;
 	HASH_ITER(hh, s->record, hash_el, tmp) {
@@ -157,6 +159,8 @@ mem_storage_trim(void* handle, iid_t iid)
 	s->trim_iid = iid;
 	return 0;
 }
+// TODO CALL TRIM when learner receives something (send_trim)
+// use circular buffer to send message to user space
 
 static iid_t
 mem_storage_get_trim_instance(void* handle)

@@ -81,15 +81,12 @@ acceptor_receive_prepare(struct acceptor* a,
 	memset(&acc, 0, sizeof(paxos_accepted));
 	if (storage_tx_begin(&a->store) != 0)
 		return 0;
-	printk(KERN_ERR "storage_get_record called in acceptor_receive_prepare");
 	int found = storage_get_record(&a->store, req->iid, &acc);
 	if (!found || acc.ballot <= req->ballot) {
-		printk(KERN_INFO "Acceptor: N (%u) > prev_proposal (%u), preparing iid: %u, ballot: %u", req->ballot, acc.ballot,
-		req->iid, req->ballot);
+		// printk(KERN_INFO "Acceptor: N (%u) > prev_proposal (%u), preparing iid: %u, ballot: %u", req->ballot, acc.ballot, req->iid, req->ballot);
 		acc.aid = a->id;
 		acc.iid = req->iid;
 		acc.ballot = req->ballot;
-		printk(KERN_INFO "Acceptor: Saving in storage the N");
 		if (storage_put_record(&a->store, &acc) != 0) {
 			storage_tx_abort(&a->store);
 			return 0;
@@ -98,7 +95,7 @@ acceptor_receive_prepare(struct acceptor* a,
 	if (storage_tx_commit(&a->store) != 0)
 		return 0;
 	paxos_accepted_to_promise(&acc, out);
-	printk(KERN_INFO "Acceptor: Created promise for iid %u", req->iid);
+	// printk(KERN_INFO "Acceptor: Created promise for iid %u", req->iid);
 	return 1;
 }
 
@@ -112,21 +109,16 @@ acceptor_receive_accept(struct acceptor* a,
 	memset(&acc, 0, sizeof(paxos_accepted));
 	if (storage_tx_begin(&a->store) != 0)
 		return 0;
-	printk(KERN_ERR "storage_get_record called in acceptor_receive_accept");
 	int found = storage_get_record(&a->store, req->iid, &acc);
 	if (!found || acc.ballot <= req->ballot) {
-		printk(KERN_INFO "Acceptor: N (%u) is still > prev_proposal (%u), Accepting iid: %u, ballot: %u",req->ballot, acc.ballot,
-		req->iid, req->ballot);
 		paxos_accept_to_accepted(a->id, req, out);
-		printk(KERN_INFO "Created ACCEPT, Saving new accepted in storage");
+		// // printk(KERN_INFO "Created ACCEPT, Saving new accepted in storage");
 		if (storage_put_record(&a->store, &(out->u.accepted)) != 0) {
 			storage_tx_abort(&a->store);
 			return 0;
-		}else{
-			printk(KERN_INFO "Acceptor: new ballot for iid saved");
 		}
 	} else {
-		printk(KERN_INFO "Preempted request, already processed or N < prev_proposal");
+		// printk(KERN_INFO "Preempted request");
 		paxos_accepted_to_preempted(a->id, &acc, out);
 	}
 	if (storage_tx_commit(&a->store) != 0)

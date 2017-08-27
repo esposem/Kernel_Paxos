@@ -25,7 +25,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "paxos.h"
  // stdlib, string, limits
 #include <linux/time.h>
@@ -136,14 +135,14 @@ paxos_log(int level, const char* format, va_list ap)
 	char msg[1000];
 	struct timeval tv;
 
-	if (level > paxos_config.verbosity)
-		return;
+	// if (level > paxos_config.verbosity)
+	// 	return;
 
 	do_gettimeofday(&tv);
 	// off = strftime(msg, sizeof(msg), "%d %b %H:%M:%S. ", localtime(&tv.tv_sec));
 	vsnprintf(msg+off, sizeof(msg)-off, format, ap);
 	// fprintf(stdout,"%s\n", msg);
-	printk(KERN_INFO "%s", msg);
+	// printk(KERN_ERR "%s", msg);
 
 	// unsigned long get_time;
   // int sec, hr, min, tmp1,tmp2, tmp3;
@@ -158,7 +157,7 @@ paxos_log(int level, const char* format, va_list ap)
   // tmp2 = tmp1 / 60;
   // hr = (tmp2 % 24) - 4;
 	//
-  // printk(KERN_INFO "time ::  %d:%d:%d\n",hr,min,sec);
+  // // printk(KERN_INFO "time ::  %d:%d:%d\n",hr,min,sec);
 }
 
 void

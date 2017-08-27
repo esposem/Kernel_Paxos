@@ -571,43 +571,43 @@ int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size)
 
 	switch (v->type) {
 	case PAXOS_PREPARE:
-		printk(KERN_INFO "\tReceived PAXOS_PREPARE");
+		// // printk(KERN_INFO "\tReceived PAXOS_PREPARE");
 		msgpack_unpack_paxos_prepare(o, &v->u.prepare);
 		break;
 	case PAXOS_PROMISE:
-		printk(KERN_INFO "\tReceived PAXOS_PROMISE");
+		// // printk(KERN_INFO "\tReceived PAXOS_PROMISE");
 		partial_message = msgpack_unpack_paxos_promise(o, &v->u.promise, size);
 		break;
 	case PAXOS_ACCEPT:
-		printk(KERN_INFO "\tReceived PAXOS_ACCEPT");
+		// // printk(KERN_INFO "\tReceived PAXOS_ACCEPT");
 		partial_message = msgpack_unpack_paxos_accept(o, &v->u.accept, size);
 		break;
 	case PAXOS_ACCEPTED:
-		printk(KERN_INFO "\tReceived PAXOS_ACCEPTED");
+		// // printk(KERN_INFO "\tReceived PAXOS_ACCEPTED");
 		partial_message = msgpack_unpack_paxos_accepted(o, &v->u.accepted, size);
 		break;
 	case PAXOS_PREEMPTED:
-		printk(KERN_INFO "\tReceived PAXOS_PREEMPTED");
+		// // printk(KERN_INFO "\tReceived PAXOS_PREEMPTED");
 		msgpack_unpack_paxos_preempted(o, &v->u.preempted);
 		break;
 	case PAXOS_REPEAT:
-		printk(KERN_INFO "\tReceived PAXOS_REPEAT");
+		// // printk(KERN_INFO "\tReceived PAXOS_REPEAT");
 		msgpack_unpack_paxos_repeat(o, &v->u.repeat);
 		break;
 	case PAXOS_TRIM:
-		printk(KERN_INFO "\tReceived PAXOS_TRIM");
+		// // printk(KERN_INFO "\tReceived PAXOS_TRIM");
 		msgpack_unpack_paxos_trim(o, &v->u.trim);
 		break;
 	case PAXOS_ACCEPTOR_STATE:
-		printk(KERN_INFO "\tReceived PAXOS_ACCEPTOR_STATE");
+		// // printk(KERN_INFO "\tReceived PAXOS_ACCEPTOR_STATE");
 		msgpack_unpack_paxos_acceptor_state(o, &v->u.state);
 		break;
 	case PAXOS_CLIENT_VALUE:
-		printk(KERN_INFO "\tReceived PAXOS_CLIENT_VALUE");
+		// // printk(KERN_INFO "\tReceived PAXOS_CLIENT_VALUE");
 		partial_message = msgpack_unpack_paxos_client_value(o, &v->u.client_value, size);
 		break;
 	case PAXOS_LEARNER_HI:
-		printk(KERN_INFO "\tReceived PAXOS_LEARNER_HI");
+		// // printk(KERN_INFO "\tReceived PAXOS_LEARNER_HI");
 		// partial_message = msgpack_unpack_paxos_learner_hi(o, &v->u.learner_hi, size);
 		break;
 	}

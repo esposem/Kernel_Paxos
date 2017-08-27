@@ -3,6 +3,7 @@
 
 #include <asm/atomic.h>
 #include <linux/udp.h>
+#include <linux/time.h>
 
 
 #define MAX_RCV_WAIT 100000 // in microseconds (100 ms)
@@ -13,13 +14,7 @@
 #define ACC_TIM 1
 #define LEA_TIM 2
 
-// struct command{
-//   void (*send_function)(struct socket *, struct sockaddr_in *, void *);
-//   struct socket * s;
-//   struct sockaddr_in * addr;
-//   void * arg;
-//   struct command * next;
-// };
+extern struct timeval sk_timeout_timeval;
 
 struct udp_service
 {
@@ -27,16 +22,11 @@ struct udp_service
   char * name;
   // 1 yes 0 no
   atomic_t thread_running;
-  atomic_t send_socket_allocated;
-  // atomic_t rcv_socket_allocated;
+  atomic_t socket_allocated;
   // 0 proposer   1 acceptor    2 learner
-  atomic_t sending[N_TIMER];
-  atomic_t called[N_TIMER];
   void (*timer_cb[N_TIMER])(unsigned long);
   unsigned long data[N_TIMER];
-
-  // struct command * to_send[N_TIMER];
-  // struct command * last_send[N_TIMER];
+  unsigned long timeout_jiffies[N_TIMER];
 };
 
 typedef struct udp_service udp_service;

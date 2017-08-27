@@ -14,17 +14,19 @@ module_param(id, int, S_IRUGO);
 MODULE_PARM_DESC(id,"The acceptor id, default 0");
 
 static udp_service * kacceptor;
-struct evacceptor* acc = NULL;
+static struct evacceptor* acc = NULL;
+struct timeval sk_timeout_timeval;
 
 static void
 start_acceptor(int id, const char* config)
 {
 	acc = evacceptor_init(id, config, kacceptor);
 	if (acc == NULL) {
-		printk(KERN_INFO "%s Could not start the acceptor", kacceptor->name);
+		// printk(KERN_INFO "%s Could not start the acceptor", kacceptor->name);
 	}else{
 		paxos_acceptor_listen(kacceptor, acc);
 	}
+	// printk(KERN_INFO "Called evacceptor_free");
 	evacceptor_free(acc);
 }
 
@@ -41,21 +43,22 @@ void udp_server_start(void){
   kacceptor->u_thread = kthread_run((void *)udp_server_listen, NULL, kacceptor->name);
   if(kacceptor->u_thread >= 0){
     atomic_set(&kacceptor->thread_running,1);
-    printk(KERN_INFO "%s Thread running [udp_server_start]", kacceptor->name);
+    // printk(KERN_INFO "%s Thread running [udp_server_start]", kacceptor->name);
   }else{
-    printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kacceptor->name);
+    // printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kacceptor->name);
   }
 }
 
 static int __init network_server_init(void)
 {
 	if(id < 0 || id > 10){
-		printk(KERN_INFO "you must give an id!");
+		// printk(KERN_INFO "you must give an id!");
 		return 0;
 	}
+	//  ;
   kacceptor = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kacceptor){
-    printk(KERN_INFO "Failed to initialize ACCEPTOR [network_server_init]");
+    // printk(KERN_INFO "Failed to initialize ACCEPTOR [network_server_init]");
   }else{
     init_service(kacceptor, "Acceptor", id);
     udp_server_start();
@@ -68,7 +71,6 @@ static void __exit network_server_exit(void)
 	if(acc != NULL)
 		stop_acceptor_timer(acc);
   udp_server_quit(kacceptor);
-	// printk(KERN_INFO "thread running : %d \nsocket_allocated : %d", atomic_read(&kacceptor->thread_running), atomic_read(&kacceptor->socket_allocated));
 }
 
 

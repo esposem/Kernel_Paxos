@@ -7,13 +7,29 @@
 #include <linux/random.h>
 #include <net/sock.h>
 #include <linux/time.h>
+#include <linux/fs.h>
+
 
 #include "paxos.h"
 #include "evpaxos.h"
-
 #include "kernel_udp.h"
+// #include "kernel_device.h"
 
-#define MAX_VALUE_SIZE 8192
+static int id = 0;
+module_param(id, int, S_IRUGO);
+MODULE_PARM_DESC(id,"The client id, default 0");
+
+static udp_service * kclient;
+static struct client* c = NULL;
+struct timeval sk_timeout_timeval;
+
+// struct file_operations fops =
+// {
+//   .open = kdev_open,
+//   .read = kdev_read,
+//   .write = kdev_write,
+//   .release = kdev_release,
+// };
 
 struct client_value
 {
@@ -45,8 +61,6 @@ struct client
 	struct evlearner* learner;
 };
 
-static udp_service * kclient;
-struct client* c = NULL;
 
 static void
 random_string(char *s, const int len)
@@ -71,8 +85,9 @@ client_submit_value(struct client* c)
 	v->size = c->value_size;
 	random_string(v->value, v->size);
 	size_t size = sizeof(struct client_value) + v->size;
+  // // printk(KERN_INFO "%s Sending the value...", kclient->name);
 	paxos_submit(get_sock(c->learner), &c->proposeradd, c->send_buffer, size);
-	printk(KERN_INFO "Client: submitted PAXOS_CLIENT_VALUE len %zu value %s",v->size, v->value);
+	// printk(KERN_INFO "%s submitted PAXOS_CLIENT_VALUE len %zu value %s",kclient->name, v->size, v->value);
 }
 
 // Returns t2 - t1 in microseconds.
@@ -102,16 +117,25 @@ update_stats(struct stats* stats, struct client_value* delivered, size_t size)
 		stats->max_latency = lat;
 }
 
+
 static void
 on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 	struct client* c = arg;
 	struct client_value* v = (struct client_value*)value;
+
 	if (v->client_id == c->id) {
 		update_stats(&c->stats, v, size);
-		client_submit_value(c);
+    if(iid % 50000 == 0){
+      // printk(KERN_INFO "client %d Called trim, instance %d ", c->id, iid);
+      evlearner_send_trim(c->learner, iid);
+    }
+    client_submit_value(c);
+    // printk(KERN_INFO "%s On deliver iid:%d value:%.16s",kclient->name, iid, v->value );
+  	// struct timeval timenow;
+  	// do_gettimeofday(&timenow);
+  	// kset_message(timenow, v->value, iid);
 	}
-	printk(KERN_INFO "Client: On deliver iid:%d value:%.16s",iid, v->value );
 }
 
 static void
@@ -119,9 +143,7 @@ on_stats(unsigned long arg)
 {
 	struct client* c = (struct client *) arg;
 	int mbps = (int)(c->stats.delivered_bytes * 8) / (1024*1024);
-	printk(KERN_INFO "%s: %d value/sec, %d Mbps, latency min %ld us max %ld us avg %ld us\n",
-		kclient->name, c->stats.delivered_count, mbps, c->stats.min_latency,
-		c->stats.max_latency, c->stats.avg_latency);
+	printk(KERN_INFO "%s %d value/sec, %d Mbps, latency min %ld us max %ld us avg %ld us\n",kclient->name, c->stats.delivered_count, mbps, c->stats.min_latency, c->stats.max_latency, c->stats.avg_latency);
 	memset(&c->stats, 0, sizeof(struct stats));
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 }
@@ -133,15 +155,16 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 	c = kmalloc(sizeof(struct client), GFP_KERNEL);
 
 	memset(&c->stats, 0, sizeof(struct stats));
-	printk(KERN_INFO "Client: Making client, connecting to proposer...");
+	// printk(KERN_INFO "%s Making client, connecting to proposer...", kclient->name);
   struct evpaxos_config* conf = evpaxos_config_read(config);
 	if (conf == NULL) {
-		printk(KERN_INFO "%s: Failed to read config file %s\n",kclient->name, config);
+		// printk(KERN_INFO "%s: Failed to read config file %s\n",kclient->name, config);
 		return NULL;
 	}
   c->proposeradd = evpaxos_proposer_address(conf, proposer_id);
 
 	get_random_bytes(&c->id, sizeof(int));
+  // printk(KERN_ERR "%s  myid [%d]", kclient->name, c->id);
 	c->value_size = value_size;
 	c->outstanding = outstanding;
 	c->send_buffer = kmalloc(sizeof(struct client_value) + value_size, GFP_KERNEL);
@@ -151,11 +174,11 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 
 	paxos_config.learner_catch_up = 0;
-	printk(KERN_INFO "Client: Creating an internal learner...");
+	// printk(KERN_INFO "%s Creating an internal learner...", kclient->name);
 
 	c->learner = evlearner_init(config, on_deliver, c, kclient);
 	if (c->learner == NULL) {
-		printk(KERN_INFO "%s:Could not start the learner!", kclient->name);
+		// printk(KERN_INFO "%s:Could not start the learner!", kclient->name);
 	}else{
 		for (int i = 0; i < c->outstanding; ++i)
 	    client_submit_value(c);
@@ -168,7 +191,7 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 static void
 client_free(struct client* c)
 {
-	del_timer(&c->stats_ev);
+  del_timer(&c->stats_ev);
 
 	kfree(c->send_buffer);
 	if (c->learner)
@@ -195,23 +218,30 @@ int udp_server_listen(void)
   return 0;
 }
 
+
+
 void udp_server_start(void){
   kclient->u_thread = kthread_run((void *)udp_server_listen, NULL, kclient->name);
   if(kclient->u_thread >= 0){
     atomic_set(&kclient->thread_running,1);
-    printk(KERN_INFO "%s Thread running [udp_server_start]", kclient->name);
+    // printk(KERN_INFO "%s Thread running [udp_server_start]", kclient->name);
+		// kdevchar_init(id, "kclient");
   }else{
-    printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kclient->name);
+    // printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kclient->name);
   }
 }
 
 static int __init network_server_init(void)
 {
+	if(id < 0 || id > 10){
+		// printk(KERN_INFO "you must give an id!");
+		return 0;
+	}
   kclient = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kclient){
-    printk(KERN_INFO "Failed to initialize CLIENT [network_server_init]");
+    // printk(KERN_INFO "Failed to initialize CLIENT [network_server_init]");
   }else{
-    init_service(kclient, "Client" , -1);
+    init_service(kclient, "Client" , id);
     udp_server_start();
   }
   return 0;
@@ -222,10 +252,12 @@ static void __exit network_server_exit(void)
   // clent_free() should have been freed when it's stopped
 	if(c != NULL)
 		del_timer(&c->stats_ev);
+  // printk(KERN_INFO "Ciao");
+	// kdevchar_exit();
   udp_server_quit(kclient);
 }
 
 module_init(network_server_init)
 module_exit(network_server_exit)
-MODULE_LICENSE("MIT");
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

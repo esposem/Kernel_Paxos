@@ -157,14 +157,14 @@ void add_acceptors_from_config(int myid, struct peers * p){
 }
 
 void printall(struct peers * p){
-	printk(KERN_INFO "PEERS we connect to");
+	// printk(KERN_INFO "PEERS we connect to");
 	for(int i = 0; i < p->peers_count; i++){
-		printk(KERN_INFO "id = %d, ip = %pI4, port = %d", p->peers[i]->id, &(p->peers[i]->addr.sin_addr), ntohs(p->peers[i]->addr.sin_port) );
+		// printk(KERN_INFO "id = %d, ip = %pI4, port = %d", p->peers[i]->id, &(p->peers[i]->addr.sin_addr), ntohs(p->peers[i]->addr.sin_port) );
 	}
 
-	printk(KERN_INFO "CLIENTS we receive connections \n(will be updated as message are received)");
+	// printk(KERN_INFO "CLIENTS we receive connections \n(will be updated as message are received)");
 	for(int i = 0; i < p->clients_count; i++){
-		printk(KERN_INFO "id = %d, ip = %pI4, port = %d", p->clients[i]->id, &(p->clients[i]->addr.sin_addr), ntohs(p->clients[i]->addr.sin_port) );
+		// printk(KERN_INFO "id = %d, ip = %pI4, port = %d", p->clients[i]->id, &(p->clients[i]->addr.sin_addr), ntohs(p->clients[i]->addr.sin_port) );
 	}
 }
 
@@ -207,12 +207,7 @@ static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
 }
 
 int peers_sock_init(struct peers* p, udp_service * k){
-	// int i = udp_server_init(k, &p->sock_rcv, &p->me_rcv->addr, &k->rcv_socket_allocated);
-	return udp_server_init(k, &p->sock_send, &p->me_send->addr, &k->send_socket_allocated);
-	// if(i == 0 && j == 0){
-	// 	return 0;
-	// }
-	// return -1;
+	return udp_server_init(k, &p->sock_send, &p->me_send->addr, &k->socket_allocated);
 }
 
 int
@@ -226,13 +221,14 @@ peers_listen(struct peers* p, udp_service * k)
 		unsigned char * bigger_buff = NULL;
 		int n_packet_toget =0, size_bigger_buf = 0;
 	#endif
-	printk(KERN_INFO "%s Listening", k->name);
+	// printk(KERN_INFO "%s Listening", k->name);
+	struct peer tmp;
+	unsigned long long time_passed[3] = {0,0,0};
 	while(1){
 
 		if(kthread_should_stop() || signal_pending(current)){
-			printk(KERN_INFO "Stopped!");
-			// check_sock_allocation(k, p->sock_rcv, &k->rcv_socket_allocated);
-      check_sock_allocation(k, p->sock_send, &k->send_socket_allocated);
+			// printk(KERN_INFO "Stopped!");
+      check_sock_allocation(k, p->sock_send, &k->socket_allocated);
       kfree(in_buf);
 
 			#if HANDLE_BIG_PKG
@@ -245,64 +241,50 @@ peers_listen(struct peers* p, udp_service * k)
 
 		memset(in_buf, '\0', MAX_UDP_SIZE);
     memset(&address, 0, sizeof(struct sockaddr_in));
-		// printk(KERN_INFO "Receiving...");
+		// // printk(KERN_INFO "Receiving...");
 		ret = udp_server_receive(p->sock_send, &address, in_buf, MSG_WAITALL, k);
-		struct peer tmp;
-		memcpy(&tmp.addr, &address, sizeof(struct sockaddr_in));
-		tmp.peers = p;
-
-		// printk(KERN_INFO "End receiving");
+		// // printk(KERN_INFO "End receiving");
 		if(ret > 0){
 			if(first_time == 0){
+				memcpy(&tmp.addr, &address, sizeof(struct sockaddr_in));
+				tmp.peers = p;
 				add_or_update_client(&address, p);
 				ret = on_read(in_buf, &tmp, MAX_UDP_SIZE);
 				#if HANDLE_BIG_PKG
-				// 	if(ret != 0){
-				// 		while(ret > 0){
-				// 			ret -= MAX_UDP_SIZE;
-				// 			n_packet_toget++;
-				// 		}
-				// 		size_bigger_buf = MAX_UDP_SIZE * (n_packet_toget +1);
-				// 		bigger_buff = krealloc(in_buf, size_bigger_buf, GFP_KERNEL);
-				// 		in_buf+=MAX_UDP_SIZE;
-				// 		memset(in_buf, '\0', MAX_UDP_SIZE * n_packet_toget);
-				// 		first_time = 1;
-				// 	}
-				// }else{
-				// 	strncat(bigger_buff, in_buf, MAX_UDP_SIZE);
-				// 	n_packet_toget--;
-				// 	if(n_packet_toget == 0){
-					// 	first_time = 0;
-					// 	in_buf = bigger_buff;
-					// 	on_read(bigger_buff, p->me, size_bigger_buf);
-					// }
+					if(ret != 0){
+						while(ret > 0){
+							ret -= MAX_UDP_SIZE;
+							n_packet_toget++;
+						}
+						size_bigger_buf = MAX_UDP_SIZE * (n_packet_toget +1);
+						bigger_buff = krealloc(in_buf, size_bigger_buf, GFP_KERNEL);
+						in_buf+=MAX_UDP_SIZE;
+						memset(in_buf, '\0', MAX_UDP_SIZE * n_packet_toget);
+						first_time = 1;
+					}
+				}else{
+					strncat(bigger_buff, in_buf, MAX_UDP_SIZE);
+					n_packet_toget--;
+					if(n_packet_toget == 0){
+						first_time = 0;
+						in_buf = bigger_buff;
+						on_read(bigger_buff, p->me, size_bigger_buf);
+					}
 				#endif
 			}
-		}
-		// printk(KERN_INFO "Listening done, checking for timer callback");
-		for(int i = 0; i < N_TIMER; i++){
-			// k->timer_cb[i] != NULL is a safety check
-			if(k->timer_cb[i] != NULL && atomic_read(&k->called[i]) == 1){
-				k->timer_cb[i](k->data[i]);
-				atomic_set(&k->called[i], 0);
+		}else{
+			unsigned long temp = timeval_to_jiffies(&sk_timeout_timeval);
+			time_passed[0] += temp;
+			time_passed[1] += temp;
+			time_passed[2] += temp;
+			// // printk(KERN_INFO "Not received anything, calling callback");
+			for(int i = 0; i < N_TIMER; i++){
+				// k->timer_cb[i] != NULL is a safety check
+				if(k->timer_cb[i] != NULL && time_passed[i] >= k->timeout_jiffies[i]){
+					time_passed[i] = 0;
+					k->timer_cb[i](k->data[i]);
+				}
 			}
-
-			// if(atomic_read(&k->sending[i]) == 0){
-			// 	// printk(KERN_INFO "Sending the queue");
-			// 	atomic_set(&k->sending[i], 1);
-			// 	struct command * tmp = k->to_send[i];
-			// 	struct command * del;
-			// 	while(tmp != NULL){
-			// 		tmp->send_function(tmp->s, tmp->addr, tmp->arg);
-			// 		del = tmp;
-			// 		tmp = tmp->next;
-			// 		k->to_send[i] = tmp;
-			// 		kfree(del);
-			// 	}
-			// 	k->last_send[i] = NULL;
-			// 	// printk(KERN_INFO "Done sending the queue");
-			// 	atomic_set(&k->sending[i], 0);
-			// }
 		}
 	}
 	return 1;
@@ -330,7 +312,7 @@ dispatch_message(struct peer* p, paxos_message* msg)
 		}
 	}
 	// if(msg->type == PAXOS_LEARNER_HI){
-	// 	 printk(KERN_INFO "Received Hi");
+	// 	 // printk(KERN_INFO "Received Hi");
 	// }
 }
 

@@ -114,8 +114,7 @@ learner_receive_accepted(struct learner* l, paxos_accepted* ack)
 	}
 
 	if (ack->iid < l->current_iid) {
-		printk(KERN_INFO "Learner: Dropped paxos_accepted for iid %u. Already delivered.",
-			ack->iid);
+		// printk(KERN_INFO "Learner: Dropped paxos_accepted for iid %u. Already delivered.", ack->iid);
 		return;
 	}
 
@@ -126,7 +125,7 @@ learner_receive_accepted(struct learner* l, paxos_accepted* ack)
 
 	if (instance_has_quorum(inst, l->acceptors) && (inst->iid > l->highest_iid_closed)){
 		l->highest_iid_closed = inst->iid;
-		printk(KERN_INFO "Learner: Instance %u has a quorum and it's > highest iid closed, closing it...", inst->iid);
+		// printk(KERN_INFO "Learner: Instance %u has a quorum and it's > highest iid closed, closing it...", inst->iid);
 	}
 }
 
@@ -135,10 +134,11 @@ learner_deliver_next(struct learner* l, paxos_accepted* out)
 {
 	struct instance* inst = learner_get_current_instance(l);
 
-	if (inst == NULL || !instance_has_quorum(inst, l->acceptors))
+	if (inst == NULL || !instance_has_quorum(inst, l->acceptors)){
 		return 0;
+	}
 
-	printk(KERN_INFO "Learner: Deleted instance %u", inst->iid );
+	// printk(KERN_INFO "Learner: Deleted instance %u", inst->iid );
 	memcpy(out, inst->final_value, sizeof(paxos_accepted));
 	paxos_value_copy(&out->value, &inst->final_value->value);
 	learner_delete_instance(l, inst);
@@ -158,10 +158,11 @@ learner_has_holes(struct learner* l, iid_t* from, iid_t* to)
 }
 
 static struct instance*
-learner_get_instance(struct learner* l, iid_t iid)
+learner_get_instance(struct learner* l, iid_t iids)
 {
-	struct instance * h;
-  HASH_FIND_IID( l->instances, &iid, h);  /* h: output pointer */
+	// // printk(KERN_INFO "Searching for %d", iids);
+	struct instance * h = NULL;
+  HASH_FIND_IID( l->instances, &iids, h);  /* h: output pointer */
 	return h;
 }
 
@@ -172,13 +173,26 @@ learner_get_current_instance(struct learner* l)
 }
 
 static struct instance*
-learner_get_instance_or_create(struct learner* l, iid_t iid)
+learner_get_instance_or_create(struct learner* l, iid_t iids)
 {
-	struct instance* inst = learner_get_instance(l, iid);
+	struct instance* inst = learner_get_instance(l, iids);
 	if (inst == NULL) {
+		// // printk(KERN_ERR "Instance is null, creating new one");
 		inst = instance_new(l->acceptors);
+		// // printk(KERN_ERR "address ad id of created value %p %d\n", inst, inst->iid);
+		inst->iid = iids;
 		HASH_ADD_IID(l->instances, iid, inst);
+		// // printk(KERN_ERR "there are %d in hashtable", (int)HASH_COUNT(l->instances));
+		struct instance * h = NULL;
+		HASH_FIND_IID( l->instances, &iids, h);
+		// // printk(KERN_ERR "found %p %d\n", h, iids);
+		// if(h == NULL){
+		// 	// printk(KERN_ERR "Instance is null, YOU HAVE A PROBLEM");
+		// }
 	}
+	// else{
+	// 	// printk(KERN_ERR "Instance is NOT null");
+	// }
 	return inst;
 }
 
@@ -217,21 +231,19 @@ static void
 instance_update(struct instance* inst, paxos_accepted* accepted, int acceptors)
 {
 	if (inst->iid == 0) {
-		printk(KERN_INFO "Learner: Received first message for iid: %u", accepted->iid);
+		// printk(KERN_ERR "Learner: Received first message for iid: %u", accepted->iid);
 		inst->iid = accepted->iid;
 		inst->last_update_ballot = accepted->ballot;
 	}
 
 	if (instance_has_quorum(inst, acceptors)) {
-		printk(KERN_INFO "Learner: Dropped paxos_accepted iid %u. Already closed.",
-			accepted->iid);
+		// printk(KERN_INFO "Learner: Dropped paxos_accepted iid %u. Already closed.",accepted->iid);
 		return;
 	}
 
 	paxos_accepted* prev_accepted = inst->acks[accepted->aid];
 	if (prev_accepted != NULL && prev_accepted->ballot >= accepted->ballot) {
-		printk(KERN_INFO " Learner: Dropped paxos_accepted for iid %u."
-			"Previous ballot is newer or equal.", accepted->iid);
+		// printk(KERN_INFO " Learner: Dropped paxos_accepted for iid %u." "Previous ballot is newer or equal.", accepted->iid);
 		return;
 	}
 
@@ -266,7 +278,7 @@ instance_has_quorum(struct instance* inst, int acceptors)
 	}
 
 	if (count >= paxos_quorum(acceptors)) {
-		printk(KERN_INFO "Learner: Reached quorum, iid: %u is closed!", inst->iid);
+		// printk(KERN_INFO "Learner: Reached quorum, iid: %u is closed!", inst->iid);
 		inst->final_value = inst->acks[a_valid_index];
 		return 1;
 	}

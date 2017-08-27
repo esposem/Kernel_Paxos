@@ -49,10 +49,8 @@ struct evpaxos_config
 {
 	int proposers_count;
 	int acceptors_count;
-	// int learners_count;
 	struct address proposers[MAX_N_OF_PROPOSERS];
 	struct address acceptors[MAX_N_OF_PROPOSERS];
-	// struct address learners[MAX_N_OF_LEARNERS];
 };
 
 enum option_type
@@ -187,12 +185,6 @@ evpaxos_acceptor_address(struct evpaxos_config* config, int i)
 	return address_to_sockaddr(&config->acceptors[i]);
 }
 
-// struct sockaddr_in
-// evpaxos_learner_address(struct evpaxos_config* config, int i)
-// {
-// 	return address_to_sockaddr(&config->learners[i]);
-// }
-
 int
 evpaxos_acceptor_listen_port(struct evpaxos_config* config, int i)
 {
@@ -213,23 +205,6 @@ strtrim(char* string)
 	*++t = '\0';
 	return s;
 }
-
-// static int
-// parse_bytes(char* str, size_t* bytes)
-// {
-// 	char* end;
-// 	int errno = 0; /* To distinguish strtoll's return value 0 */
-// 	*bytes = kstrtoull(str, 10, end);
-// 	if (errno != 0) return 0;
-// 	while (isspace(*end)) end++;
-// 	if (*end != '\0') {
-// 		if (strcasecmp(end, "kb") == 0) *bytes *= 1024;
-// 		else if (strcasecmp(end, "mb") == 0) *bytes *= 1024 * 1024;
-// 		else if (strcasecmp(end, "gb") == 0) *bytes *= 1024 * 1024 * 1024;
-// 		else return 0;
-// 	}
-// 	return 1;
-// }
 
 static int
 parse_boolean(char* str, int* boolean)
@@ -263,7 +238,6 @@ parse_string(char* str, char** string)
 		return 0;
 	*string = kmalloc(strlen(str) + 1, GFP_KERNEL);
 	strcpy(*string, str);
-	// *string = strdup(str);
 	return 1;
 }
 
@@ -292,15 +266,6 @@ parse_verbosity(char* str, paxos_log_level* verbosity)
 	return 1;
 }
 
-// static int
-// parse_backend(char* str, paxos_storage_backend* backend)
-// {
-// 	if (strcasecmp(str, "memory") == 0) *backend = PAXOS_MEM_STORAGE;
-// 	else if (strcasecmp(str, "lmdb") == 0) *backend = PAXOS_LMDB_STORAGE;
-// 	else return 0;
-// 	return 1;
-// }
-
 static struct option*
 lookup_option(char* opt)
 {
@@ -326,8 +291,7 @@ parse_line(struct evpaxos_config* c, char* line)
 
 	if (strcasecmp(tok, "a") == 0 || strcasecmp(tok, "acceptor") == 0) {
 		if (c->acceptors_count >= MAX_N_OF_PROPOSERS) {
-			printk(KERN_ERR "Number of acceptors exceded maximum of: %d\n",
-				MAX_N_OF_PROPOSERS);
+			// printk(KERN_ERR "Number of acceptors exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
 			return 0;
 		}
 		struct address* addr = &c->acceptors[c->acceptors_count++];
@@ -336,29 +300,17 @@ parse_line(struct evpaxos_config* c, char* line)
 
 	if (strcasecmp(tok, "p") == 0 || strcasecmp(tok, "proposer") == 0) {
 		if (c->proposers_count >= MAX_N_OF_PROPOSERS) {
-			printk(KERN_ERR "Number of proposers exceded maximum of: %d\n",
-				MAX_N_OF_PROPOSERS);
+			// printk(KERN_ERR "Number of proposers exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
 			return 0;
 		}
 		struct address* addr = &c->proposers[c->proposers_count++];
 		return parse_address(line, addr);
 	}
 
-	// if (strcasecmp(tok, "l") == 0 || strcasecmp(tok, "learner") == 0) {
-	// 	if (c->learners_count >= MAX_N_OF_LEARNERS) {
-	// 		printk(KERN_ERR "Number of learners exceded maximum of: %d\n",
-	// 			MAX_N_OF_LEARNERS);
-	// 		return 0;
-	// 	}
-	// 	struct address* addr = &c->learners[c->learners_count++];
-	// 	return parse_address(line, addr);
-	// }
-
 	if (strcasecmp(tok, "r") == 0 || strcasecmp(tok, "replica") == 0) {
 		if (c->proposers_count >= MAX_N_OF_PROPOSERS ||
 			c->acceptors_count >= MAX_N_OF_PROPOSERS ) {
-				printk(KERN_ERR "Number of replicas exceded maximum of: %d\n",
-					MAX_N_OF_PROPOSERS);
+				// printk(KERN_ERR "Number of replicas exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
 				return 0;
 		}
 		struct address* pro_addr = &c->proposers[c->proposers_count++];
@@ -376,27 +328,27 @@ parse_line(struct evpaxos_config* c, char* line)
 	switch (opt->type) {
 		case option_boolean:
 			rv = parse_boolean(line, opt->value);
-			if (rv == 0) printk(KERN_ERR "Expected 'yes' or 'no'\n");
+			if (rv == 0) // printk(KERN_ERR "Expected 'yes' or 'no'\n");
 			break;
 		case option_integer:
 			rv = parse_integer(line, opt->value);
-			if (rv == 0) printk(KERN_ERR "Expected number\n");
+			if (rv == 0) // printk(KERN_ERR "Expected number\n");
 			break;
 		case option_string:
 			rv = parse_string(line, opt->value);
-			if (rv == 0) printk(KERN_ERR "Expected string\n");
+			if (rv == 0) // printk(KERN_ERR "Expected string\n");
 			break;
 		case option_verbosity:
 			rv = parse_verbosity(line, opt->value);
-			if (rv == 0) printk(KERN_ERR "Expected quiet, error, info, or debug\n");
+			if (rv == 0) // printk(KERN_ERR "Expected quiet, error, info, or debug\n");
 			break;
 		// case option_backend:
 		// 	rv = parse_backend(line, opt->value);
-		// 	if (rv == 0) printk(KERN_ERR "Expected memory or lmdb\n");
+		// 	if (rv == 0) // printk(KERN_ERR "Expected memory or lmdb\n");
 		// 	break;
 		// case option_bytes:
 		// 	rv = parse_bytes(line, opt->value);
-		// 	if (rv == 0) printk(KERN_ERR "Expected number of bytes.\n");
+		// 	if (rv == 0) // printk(KERN_ERR "Expected number of bytes.\n");
 	}
 
 	return rv;
