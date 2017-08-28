@@ -13,5 +13,6 @@ extern ssize_t kdev_write(struct file *, const char *, size_t, loff_t *);
 extern int kdevchar_init(int id, char * name);
 extern void kdevchar_exit(void);
 extern void kset_message(struct timeval timenow, char * msg, unsigned int iid);
+extern void kstop_device(void);
 
 #endif

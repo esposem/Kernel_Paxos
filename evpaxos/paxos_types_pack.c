@@ -29,8 +29,6 @@
 #include "paxos_types_pack.h"
 #include <linux/slab.h>
 
-// #define MSGPACK_OBJECT_AT(obj, i) (obj->via.array.ptr[i].via)
-
 void serialize_int_to_big(unsigned int * n, unsigned char ** buffer){
 	(*buffer)[0] = *n >> 24;
   (*buffer)[1] = *n >> 16;

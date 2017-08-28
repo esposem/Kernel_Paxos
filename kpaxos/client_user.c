@@ -15,10 +15,12 @@
 
 #define PORT 3002
 #define PROP_IP "127.0.0.2"
+#define BUFFER_LENGTH 3000
+#define MAX_VALUE_SIZE 8192
 
-int isaclient = 0;
-atomic_int received = 0;
-struct client * cl;
+static char receive[BUFFER_LENGTH];
+static int isaclient = 0;
+static struct client * cl;
 
 enum paxos_message_type
 {
@@ -33,15 +35,6 @@ enum paxos_message_type
 	PAXOS_CLIENT_VALUE,
 	PAXOS_LEARNER_HI
 };
-
-// TODO
-/*
-- implement send udp_service
-client will just send values and read from learner the values
-- learner will have special option to calculate the deliver and trim
-*/
-
-#define MAX_VALUE_SIZE 8192
 
 struct client_value
 {
@@ -69,19 +62,17 @@ struct client
 	int value_size;
 	int outstanding;
 	char* send_buffer;
-	struct stats stats;
 	struct event_base* base;
-	struct event* stats_ev;
-	struct timeval stats_interval;
 	struct event* sig;
 };
 
+struct user_msg{
+  struct timeval timenow;
+  char msg[16]; //copy just the first 16 char of 64
+  int iid;
+};
 
-void diep(char *s)
-{
-  perror(s);
-  // exit(1);
-}
+static void client_free(struct client* c);
 
 void serialize_int_to_big(unsigned int * n, unsigned char ** buffer){
 	(*buffer)[0] = *n >> 24;
@@ -96,11 +87,7 @@ void cp_int_packet(unsigned int * n, unsigned char ** buffer){
 	*buffer+=sizeof(unsigned int);
 }
 
-/*
-   Function check_for_endianness() returns 1, if architecture
-   is little endian, 0 in case of big endian.
- */
-
+// returns 1 if architecture is little endian, 0 in case of big endian.
 int check_for_endianness()
 {
   unsigned int x = 1;
@@ -119,7 +106,8 @@ void udp_send_msg(struct client_value * clv, size_t size)
   char * value = (char *)clv;
 
   if(check_for_endianness()){
-    // Machine is little endian, transform the packet data from little to big endian
+    // Machine is little endian, transform the packet data from little
+		// to big endian
     serialize_int_to_big(&type, &tmp);
     serialize_int_to_big(&len, &tmp);
   }else{
@@ -131,7 +119,7 @@ void udp_send_msg(struct client_value * clv, size_t size)
   printf("Sending packet\n");
   if(cl->socket != -1){
     if (sendto(cl->socket, packer, size2, 0,(struct sockaddr *) &cl->si_other, sizeof(cl->si_other))==-1)
-      diep("sendto()");
+      perror("sendto()");
     else
     printf("Sent packet\n");
   }
@@ -168,98 +156,31 @@ client_submit_value(struct client* c)
 	random_string(v->value, v->size);
 	size_t size = sizeof(struct client_value) + v->size;
 	udp_send_msg(v, size);
-	//make struct, pack package, udp send
-	printf("Client: submitted PAXOS_CLIENT_VALUE %s\n", v->value);
-}
-
-// Returns t2 - t1 in microseconds.
-static long
-timeval_diff(struct timeval* t1, struct timeval* t2)
-{
-	long us;
-	us = (t2->tv_sec - t1->tv_sec) * 1e6;
-	if (us < 0) return 0;
-	us += (t2->tv_usec - t1->tv_usec);
-	return us;
-}
-
-static void
-update_stats(struct stats* stats, struct client_value* delivered, size_t size)
-{
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	long lat = timeval_diff(&delivered->t, &tv);
-	stats->delivered_count++;
-	stats->delivered_bytes += size;
-	stats->avg_latency = stats->avg_latency +
-		((lat - stats->avg_latency) / stats->delivered_count);
-	if (stats->min_latency == 0 || lat < stats->min_latency)
-		stats->min_latency = lat;
-	if (lat > stats->max_latency)
-		stats->max_latency = lat;
-}
-
-static void
-on_deliver(unsigned iid, char* value, size_t size)
-{
-  struct client_value* v = (struct client_value*)value;
-	update_stats(&cl->stats, v, size);
-	client_submit_value(cl);
-	printf("Client: On deliver iid:%d value:%.16s \n",iid, v->value );
+	printf("Client: submitted PAXOS_CLIENT_VALUE %.16s\n", v->value);
 }
 
 void unpack_message(char * msg){
-  struct timeval * t = (struct timeval *) msg;
-  msg += sizeof(struct timeval);
-  int iid = *msg;
-  msg += sizeof(int);
-  char * mess = msg;
-  // printf("time %ld : %ld, iid %d, message %s\n",t->tv_sec, t->tv_usec, iid, mess);
-	on_deliver(iid, mess, strlen(mess));
+  struct user_msg * t = (struct user_msg *) msg;
+  printf("time %ld : %ld, iid %d, message %s\n",t->timenow.tv_sec, t->timenow.tv_usec, t->iid, t->msg);
+	client_submit_value(cl);
 }
-
-#define BUFFER_LENGTH 3000
-static char receive[BUFFER_LENGTH];
 
 void client_listen(){
-	//read
   int ret;
 	while(1){
-    ret = read(cl->fd, receive, BUFFER_LENGTH);        // Read the response from the LKM, start reading from offset not beginning
-    if (ret >= 0){
-			received = 1;
+    ret = read(cl->fd, receive, BUFFER_LENGTH);
+		if (ret >= 0){
+			struct user_msg * t = (struct user_msg *) receive;
+			if(t->timenow.tv_sec == 0 && t->timenow.tv_usec == 0 && t->msg[0] == '\0' && t->iid == -1){
+				printf("STOP\n");
+				return;
+			}
       unpack_message(receive);
-      // printf("read %s %d\n", receive, i);
-    }
+    }else{
+			//timeout has expired, means nothing has been received. Resend
+			// client_submit_value(cl);
+		}
   }
-}
-
-static void
-on_stats(evutil_socket_t fd, short event, void *arg)
-{
-	struct client* c = arg;
-	double mbps = (double)(c->stats.delivered_bytes * 8) / (1024*1024);
-	printf("Client: %d value/sec, %.2f Mbps, latency min %ld us max %ld us avg %ld us\n",
-		c->stats.delivered_count, mbps, c->stats.min_latency,
-		c->stats.max_latency, c->stats.avg_latency);
-	memset(&c->stats, 0, sizeof(struct stats));
-	if(isaclient && !received){
-		//submit another random value
-		client_submit_value(c);
-	}
-	received = 0;
-	event_add(c->stats_ev, &c->stats_interval);
-}
-
-static void
-client_free(struct client* c)
-{
-  close(cl->socket);
-	free(c->send_buffer);
-	event_free(c->stats_ev);
-	event_free(c->sig);
-	event_base_free(c->base);
-	free(c);
 }
 
 static struct client*
@@ -270,23 +191,20 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 	cl = c;
 	c->base = event_base_new();
 
-	memset(&c->stats, 0, sizeof(struct stats));
 	printf("Client: Making client, connecting to proposer...\n");
-
-
   memset((char *) &cl->si_other, 0, sizeof(cl->si_other));
   cl->si_other.sin_family = AF_INET;
   cl->si_other.sin_port = htons(PORT);
 
   if (inet_aton(PROP_IP, &cl->si_other.sin_addr)==0) {
     fprintf(stderr, "inet_aton() failed\n");
-    // exit(1);
+		exit(1);
   }
-	// c->proposeradd = evpaxos_proposer_address(conf, proposer_id);
 
-  c->fd = open("/dev/chardevice/klearner0", O_RDWR);             // Open the device with read/write access
+  c->fd = open("/dev/chardevice/klearner0", O_RDWR);
    if (c->fd < 0){
-    perror("Failed to open the device...\n");
+    perror("Failed to open the device");
+		exit(1);
   }
 
   c->id = rand();
@@ -294,12 +212,11 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
   if(c->fd >= 0){
     int ret = write(c->fd, (char *) &c->id, sizeof(int));
     if (ret < 0){
-      perror("Failed to write the message to the device.\n");
+      perror("Failed to write the message to the device");
     }else{
       printf("Sent id to learner");
     }
   }
-
 
 	c->value_size = value_size;
 	c->outstanding = outstanding;
@@ -308,20 +225,17 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 	c->sig = evsignal_new(c->base, SIGINT, handle_sigint, c->base);
 	evsignal_add(c->sig, NULL);
 
-	// start socket
-	if ((c->socket=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
-    printf("Socket not working");
-
-  c->stats_interval = (struct timeval){1, 0};
-  c->stats_ev = evtimer_new(c->base, on_stats, c);
-  event_add(c->stats_ev, &c->stats_interval);
+	if ((c->socket=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1){
+		printf("Socket not working");
+		exit(1);
+	}
 
 	if(isaclient){
 		for (int i = 0; i < c->outstanding; ++i)
 			client_submit_value(c);
 	}
 
-	client_listen();  //maybe another thread?
+	client_listen();
 	return c;
 }
 
@@ -332,10 +246,19 @@ start_client(const char* config, int proposer_id, int outstanding, int value_siz
 	client = make_client(config, proposer_id, outstanding, value_size);
 	signal(SIGPIPE, SIG_IGN);
   if(client){
-    event_base_dispatch(client->base);
-  	close(client->fd);
+    // event_base_dispatch(client->base);
   	client_free(client);
   }
+}
+
+static void
+client_free(struct client* c)
+{
+  close(cl->socket);
+	free(c->send_buffer);
+	event_free(c->sig);
+	event_base_free(c->base);
+	free(c);
 }
 
 static void

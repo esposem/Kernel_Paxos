@@ -27,8 +27,3 @@
 
  #include "evpaxos/paxos.h"
  #include "evpaxos/config.h"
-
-void stop_learner_timer(struct evlearner * l);
-void stop_proposer_timer(struct evproposer * p);
-void stop_acceptor_timer(struct evacceptor * a);
-void stop_replica_timer(struct evpaxos_replica * r);

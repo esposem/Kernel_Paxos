@@ -186,11 +186,6 @@ evacceptor_init(int id, const char* config_file, udp_service * k)
 	return NULL;
 }
 
-void stop_acceptor_timer(struct evacceptor * a){
-	// // printk("Acceptor Timer stopped");
-	// printall(a->peers);
-}
-
 void
 evacceptor_free_internal(struct evacceptor* a)
 {

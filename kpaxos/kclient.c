@@ -13,7 +13,6 @@
 #include "paxos.h"
 #include "evpaxos.h"
 #include "kernel_udp.h"
-// #include "kernel_device.h"
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
@@ -22,14 +21,6 @@ MODULE_PARM_DESC(id,"The client id, default 0");
 static udp_service * kclient;
 static struct client* c = NULL;
 struct timeval sk_timeout_timeval;
-
-// struct file_operations fops =
-// {
-//   .open = kdev_open,
-//   .read = kdev_read,
-//   .write = kdev_write,
-//   .release = kdev_release,
-// };
 
 struct client_value
 {
@@ -225,7 +216,6 @@ void udp_server_start(void){
   if(kclient->u_thread >= 0){
     atomic_set(&kclient->thread_running,1);
     // printk(KERN_INFO "%s Thread running [udp_server_start]", kclient->name);
-		// kdevchar_init(id, "kclient");
   }else{
     // printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kclient->name);
   }
@@ -252,8 +242,6 @@ static void __exit network_server_exit(void)
   // clent_free() should have been freed when it's stopped
 	if(c != NULL)
 		del_timer(&c->stats_ev);
-  // printk(KERN_INFO "Ciao");
-	// kdevchar_exit();
   udp_server_quit(kclient);
 }
 

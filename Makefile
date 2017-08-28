@@ -297,11 +297,14 @@ kreplica2-objs:= \
 	evpaxos/evreplica.o
 
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
-ccflags-y := -std=gnu99 -Wno-declaration-after-statement -O2 #-DHASH_DEBUG=1
+ccflags-y:= -std=gnu99 -Wno-declaration-after-statement -O2
+
+# $(PWD)/paxos/include/paxos_types.h
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-	# $(CC) kpaxos/clientuser.c -o client
-	gcc -Wall kpaxos/client_user.c -L. -levent -levent_core
+	$(CC) -Wall kpaxos/client_user.c  -L. -levent -levent_core -o client_user
+
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	rm client_user

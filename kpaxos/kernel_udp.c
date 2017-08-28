@@ -185,7 +185,7 @@ void udp_server_quit(udp_service * k){
     if(atomic_read(&k->thread_running) == 1){
       atomic_set(&k->thread_running, 0);
       if((ret = kthread_stop(k->u_thread)) == 0){
-        // printk(KERN_INFO "%s Terminated thread", k->name);
+        printk(KERN_INFO "%s Terminated thread", k->name);
       }else{
         // printk(KERN_INFO "%s Error %d in terminating thread", k->name, ret);
       }
@@ -198,7 +198,7 @@ void udp_server_quit(udp_service * k){
     //   sock_release(s);
     //   // printk(KERN_INFO "%s Released socket", k->name);
     // }
-    // printk(KERN_INFO "%s Module unloaded", k->name);
+    printk(KERN_INFO "%s Module unloaded", k->name);
     kfree(k->name);
     kfree(k);
   }else{
