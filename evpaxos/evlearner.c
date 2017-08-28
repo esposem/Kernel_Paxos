@@ -174,10 +174,6 @@ evlearner_free_internal(struct evlearner* l)
 	kfree(l);
 }
 
-void stop_learner_timer(struct evlearner * l){
-	// printk("Learner Timer stopped");
-}
-
 void
 evlearner_free(struct evlearner* l)
 {

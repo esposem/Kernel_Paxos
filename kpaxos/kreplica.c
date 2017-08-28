@@ -96,9 +96,6 @@ static int __init network_server_init(void)
 
 static void __exit network_server_exit(void)
 {
-	if(replica != NULL)
-		stop_replica_timer(replica);
-
   udp_server_quit(kreplica);
 }
 

@@ -90,13 +90,6 @@ void paxos_replica_listen(udp_service * k, struct evpaxos_replica * ev){
 	peers_listen(ev->peers, k);
 }
 
-void stop_replica_timer(struct evpaxos_replica * r){
-	// printk("Replica Timer stopped");
-	stop_acceptor_timer(r->acceptor);
-	stop_proposer_timer(r->proposer);
-	stop_learner_timer(r->learner);
-}
-
 void
 evpaxos_replica_free(struct evpaxos_replica* r)
 {

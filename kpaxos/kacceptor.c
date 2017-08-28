@@ -68,8 +68,6 @@ static int __init network_server_init(void)
 
 static void __exit network_server_exit(void)
 {
-	if(acc != NULL)
-		stop_acceptor_timer(acc);
   udp_server_quit(kacceptor);
 }
 

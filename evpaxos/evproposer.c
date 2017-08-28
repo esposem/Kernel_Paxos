@@ -249,11 +249,6 @@ void paxos_proposer_listen(udp_service * k, struct evproposer * ev){
 	peers_listen(ev->peers, k);
 }
 
-void stop_proposer_timer(struct evproposer * p){
-	// printk("Proposer Timer stopped");
-	// printall(p->peers);
-}
-
 void
 evproposer_free_internal(struct evproposer* p)
 {

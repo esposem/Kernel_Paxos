@@ -68,8 +68,6 @@ static int __init network_server_init(void)
 
 static void __exit network_server_exit(void)
 {
-	if(prop != NULL)
-		stop_proposer_timer(prop);
   udp_server_quit(kproposer);
 }
 

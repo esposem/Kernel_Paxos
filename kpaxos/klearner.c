@@ -52,7 +52,7 @@ static udp_service * klearner;
 static struct evlearner* lea = NULL;
 struct timeval sk_timeout_timeval;
 static struct client * c;
-// Returns t2 - t1 in microseconds.
+
 static long
 timeval_diff(struct timeval* t1, struct timeval* t2)
 {
@@ -91,17 +91,16 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 	struct client* c = arg;
 	struct client_value* v = (struct client_value*)value;
-
 	if (v->client_id == *clid) {
 		update_stats(&c->stats, v, size);
     if(iid % 50000 == 0){
       // printk(KERN_INFO "client %d Called trim, instance %d ", *clid, iid);
       evlearner_send_trim(c->learner, iid);
     }
-    // printk(KERN_INFO "%s On deliver iid:%d value:%.16s",kclient->name, iid, v->value );
-  	// struct timeval timenow;
-  	// do_gettimeofday(&timenow);
-  	// kset_message(timenow, v->value, iid);
+    printk(KERN_INFO "%s On deliver iid:%d value:%.16s",klearner->name, iid, v->value );
+  	struct timeval timenow;
+  	do_gettimeofday(&timenow);
+  	kset_message(timenow, v->value, iid);
 	}
 }
 
@@ -119,16 +118,15 @@ on_stats(unsigned long arg)
 static void
 start_learner(const char* config)
 {
-	// struct evlearner* lea;
 	if(isaclient){
 		c = kmalloc(sizeof(struct client), GFP_KERNEL);
 		memset(c, 0, sizeof(struct client));
-		c->learner = lea;
 		setup_timer( &c->stats_ev,  on_stats, (unsigned long) c);
 		c->stats_interval = (struct timeval){1, 0};
 	  mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 		paxos_config.learner_catch_up = 0;
 		lea = evlearner_init(config, on_deliver, c, klearner);
+		c->learner = lea;
 	}else{
 		lea = evlearner_init(config, deliver, NULL, klearner);
 	}
@@ -164,7 +162,6 @@ void udp_server_start(void){
 
 static int __init network_server_init(void)
 {
-	//  ;
   klearner = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!klearner){
     // printk(KERN_INFO "Failed to initialize server [network_server_init]");
@@ -179,10 +176,9 @@ static void __exit network_server_exit(void)
 {
 	if(isaclient){
 		del_timer(&c->stats_ev);
+		kstop_device();
 		kdevchar_exit();
 	}
-	if(lea != NULL)
-		stop_learner_timer(lea);
   udp_server_quit(klearner);
 }
 
