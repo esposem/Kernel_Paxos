@@ -9,7 +9,6 @@
 #include <linux/time.h>
 #include <linux/fs.h>
 
-
 #include "paxos.h"
 #include "evpaxos.h"
 #include "kernel_udp.h"

@@ -477,44 +477,23 @@ int msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v, 
 	return 0;
 }
 
-long msgpack_pack_paxos_learner_hi(msgpack_packer** p, paxos_learner_hi * v){
-	// int len = v->value.paxos_value_len;
-	long size = (sizeof(unsigned int) * 1);
+long msgpack_pack_paxos_learner(msgpack_packer** p, void  * v, int enum_type){
+	long size = sizeof(unsigned int);
 	*p = kmalloc(size , GFP_KERNEL);
 	unsigned char * tmp = (unsigned char *) *p;
 
-	unsigned int type = PAXOS_LEARNER_HI;
-	// char * value = v->value.paxos_value_val;
+	unsigned int type = enum_type;
 
 	#ifndef _BIG_ENDIAN
 		// Machine is little endian, transform the packet data from little to big endian
 		serialize_int_to_big(&type, &tmp);
-		// serialize_int_to_big(&len, &tmp);
 	#else
 		cp_int_packet(&type, &tmp);
-		// cp_int_packet(&len, &tmp);
 	#endif
-	// memcpy(tmp, value, len);
 	return size;
 }
 
-int msgpack_unpack_paxos_learner_hi(msgpack_packer* o, paxos_learner_hi* v, int packet_len){
-	// unsigned char * buffer = (unsigned char *) o;
-	// int size;
-	// #ifndef _BIG_ENDIAN
-	// // Machine is little endian, transform the packet from big to little endian
-	// 	deserialize_int_to_big(&size, &buffer);
-	// #else
-	// 	dcp_int_packet(&size, &buffer);
-	// #endif
-	// // buffer now is pointing to the beginning of value.
-	// // check with the len if match
-	// packet_len -= (sizeof (unsigned int));
-	// if(size > packet_len){
-	// 	memcpy(v->value.paxos_value_val, buffer,packet_len);
-	// 	return size-packet_len;
-	// }
-	// memcpy(v->value.paxos_value_val, buffer,size);
+int msgpack_unpack_paxos_learner(msgpack_packer* o, void * v, int packet_len){
 	return 0;
 }
 
@@ -550,8 +529,10 @@ long msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v)
 		ret = msgpack_pack_paxos_client_value(p, &v->u.client_value);
 		break;
 	case PAXOS_LEARNER_HI:
-		ret = msgpack_pack_paxos_learner_hi(p, &v->u.learner_hi);
+		ret = msgpack_pack_paxos_learner(p, &v->u.learner_hi, PAXOS_LEARNER_HI);
 		break;
+	case PAXOS_LEARNER_DEL:
+		ret = msgpack_pack_paxos_learner(p, &v->u.learner_del, PAXOS_LEARNER_DEL);
 	}
 	return ret;
 }
@@ -606,7 +587,11 @@ int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size)
 		break;
 	case PAXOS_LEARNER_HI:
 		// // printk(KERN_INFO "\tReceived PAXOS_LEARNER_HI");
-		// partial_message = msgpack_unpack_paxos_learner_hi(o, &v->u.learner_hi, size);
+		// partial_message = msgpack_unpack_paxos_learner(o, &v->u.learner_hi, size, PAXOS_LEARNER_HI);
+		break;
+	case PAXOS_LEARNER_DEL:
+		// printk(KERN_INFO "Received PAXOS_LEARNER_DEL");
+		// partial_message = msgpack_unpack_paxos_learner(o, &v->u.learner_del, size, PAXOS_LEARNER_DEL);
 		break;
 	}
 	return partial_message;

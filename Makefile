@@ -1,8 +1,10 @@
 # 1 client, 3 proposer 3 acceptor 2 learner
 
-#obj-m += kclient0.o
+# PAX_OBJ=
 
-#kclient0-objs:= \
+obj-m += kclient0.o
+
+kclient0-objs:= \
   kpaxos/kclient.o \
 	evpaxos/evlearner.o \
 	kpaxos/kernel_udp.o \
@@ -22,9 +24,10 @@
  	evpaxos/evproposer.o \
 	evpaxos/evacceptor.o
 
-#obj-m += kclient1.o
+obj-m += kclient1.o
 
-#  kpaxos/kclient.o \
+kclient1-objs:= \
+  kpaxos/kclient.o \
 	evpaxos/evlearner.o \
 	kpaxos/kernel_udp.o \
 	paxos/acceptor.o \
@@ -43,9 +46,9 @@
  	evpaxos/evproposer.o \
 	evpaxos/evacceptor.o
 
-#obj-m += kclient2.o
+obj-m += kclient2.o
 
-#kclient2-objs:= \
+kclient2-objs:= \
   kpaxos/kclient.o \
 	evpaxos/evlearner.o \
 	kpaxos/kernel_udp.o \
@@ -187,11 +190,17 @@ kacceptor2-objs:= \
 
 obj-m += klearner0.o
 obj-m += klearner1.o
+obj-m += klearner2.o
+obj-m += klearner3.o
+obj-m += klearner4.o
+obj-m += klearner5.o
+obj-m += klearner6.o
+obj-m += klearner7.o
+obj-m += klearner8.o
 
 klearner0-objs:= \
 	kpaxos/klearner.o \
 	kpaxos/kernel_udp.o \
-	kpaxos/kernel_device.o \
 	paxos/acceptor.o \
 	paxos/carray.o \
 	paxos/learner.o \
@@ -210,7 +219,6 @@ klearner0-objs:= \
 klearner1-objs:= \
 	kpaxos/klearner.o \
 	kpaxos/kernel_udp.o \
-	kpaxos/kernel_device.o \
 	paxos/acceptor.o \
 	paxos/carray.o \
 	paxos/learner.o \
@@ -226,39 +234,9 @@ klearner1-objs:= \
 	evpaxos/peers.o \
 	evpaxos/evlearner.o
 
-obj-m += kreplica0.o
-obj-m += kreplica1.o
-obj-m += kreplica2.o
-
-kreplica0-objs:= \
-  kpaxos/kreplica.o \
-	evpaxos/evlearner.o \
-	kpaxos/kernel_device.o \
-	evpaxos/evproposer.o \
-	evpaxos/evacceptor.o \
-	evpaxos/evreplica.o \
+klearner2-objs:= \
+	kpaxos/klearner.o \
 	kpaxos/kernel_udp.o \
-	paxos/acceptor.o \
-	paxos/carray.o \
-	paxos/learner.o \
-	paxos/paxos.o \
-	paxos/proposer.o \
-	paxos/quorum.o \
-	paxos/storage_mem.o \
-	paxos/storage_utils.o \
-	paxos/storage.o \
-	evpaxos/message.o \
-	evpaxos/paxos_types_pack.o \
-	evpaxos/config.o \
-	evpaxos/peers.o
-
-kreplica1-objs:= \
-  kpaxos/kreplica.o \
-	evpaxos/evlearner.o \
-	evpaxos/evproposer.o \
-	evpaxos/evacceptor.o \
-	kpaxos/kernel_udp.o \
-	kpaxos/kernel_device.o \
 	paxos/acceptor.o \
 	paxos/carray.o \
 	paxos/learner.o \
@@ -272,15 +250,11 @@ kreplica1-objs:= \
 	evpaxos/paxos_types_pack.o \
 	evpaxos/config.o \
 	evpaxos/peers.o \
-	evpaxos/evreplica.o
+	evpaxos/evlearner.o
 
-kreplica2-objs:= \
-  kpaxos/kreplica.o \
-	evpaxos/evlearner.o \
-	evpaxos/evproposer.o \
-	evpaxos/evacceptor.o \
+klearner3-objs:= \
+	kpaxos/klearner.o \
 	kpaxos/kernel_udp.o \
-	kpaxos/kernel_device.o \
 	paxos/acceptor.o \
 	paxos/carray.o \
 	paxos/learner.o \
@@ -294,7 +268,166 @@ kreplica2-objs:= \
 	evpaxos/paxos_types_pack.o \
 	evpaxos/config.o \
 	evpaxos/peers.o \
-	evpaxos/evreplica.o
+	evpaxos/evlearner.o
+
+klearner4-objs:= \
+	kpaxos/klearner.o \
+	kpaxos/kernel_udp.o \
+	paxos/acceptor.o \
+	paxos/carray.o \
+	paxos/learner.o \
+	paxos/paxos.o \
+	paxos/proposer.o \
+	paxos/quorum.o \
+	paxos/storage_mem.o \
+	paxos/storage_utils.o \
+	paxos/storage.o \
+	evpaxos/message.o \
+	evpaxos/paxos_types_pack.o \
+	evpaxos/config.o \
+	evpaxos/peers.o \
+	evpaxos/evlearner.o
+
+klearner5-objs:= \
+	kpaxos/klearner.o \
+	kpaxos/kernel_udp.o \
+	paxos/acceptor.o \
+	paxos/carray.o \
+	paxos/learner.o \
+	paxos/paxos.o \
+	paxos/proposer.o \
+	paxos/quorum.o \
+	paxos/storage_mem.o \
+	paxos/storage_utils.o \
+	paxos/storage.o \
+	evpaxos/message.o \
+	evpaxos/paxos_types_pack.o \
+	evpaxos/config.o \
+	evpaxos/peers.o \
+	evpaxos/evlearner.o
+
+klearner6-objs:= \
+	kpaxos/klearner.o \
+	kpaxos/kernel_udp.o \
+	paxos/acceptor.o \
+	paxos/carray.o \
+	paxos/learner.o \
+	paxos/paxos.o \
+	paxos/proposer.o \
+	paxos/quorum.o \
+	paxos/storage_mem.o \
+	paxos/storage_utils.o \
+	paxos/storage.o \
+	evpaxos/message.o \
+	evpaxos/paxos_types_pack.o \
+	evpaxos/config.o \
+	evpaxos/peers.o \
+	evpaxos/evlearner.o
+klearner7-objs:= \
+	kpaxos/klearner.o \
+	kpaxos/kernel_udp.o \
+	paxos/acceptor.o \
+	paxos/carray.o \
+	paxos/learner.o \
+	paxos/paxos.o \
+	paxos/proposer.o \
+	paxos/quorum.o \
+	paxos/storage_mem.o \
+	paxos/storage_utils.o \
+	paxos/storage.o \
+	evpaxos/message.o \
+	evpaxos/paxos_types_pack.o \
+	evpaxos/config.o \
+	evpaxos/peers.o \
+	evpaxos/evlearner.o
+
+klearner8-objs:= \
+	kpaxos/klearner.o \
+	kpaxos/kernel_udp.o \
+	paxos/acceptor.o \
+	paxos/carray.o \
+	paxos/learner.o \
+	paxos/paxos.o \
+	paxos/proposer.o \
+	paxos/quorum.o \
+	paxos/storage_mem.o \
+	paxos/storage_utils.o \
+	paxos/storage.o \
+	evpaxos/message.o \
+	evpaxos/paxos_types_pack.o \
+	evpaxos/config.o \
+	evpaxos/peers.o \
+	evpaxos/evlearner.o
+
+# obj-m += kreplica0.o
+# obj-m += kreplica1.o
+# obj-m += kreplica2.o
+#
+# kreplica0-objs:= \
+#   kpaxos/kreplica.o \
+# 	evpaxos/evlearner.o \
+# 	kpaxos/kernel_device.o \
+# 	evpaxos/evproposer.o \
+# 	evpaxos/evacceptor.o \
+# 	evpaxos/evreplica.o \
+# 	kpaxos/kernel_udp.o \
+# 	paxos/acceptor.o \
+# 	paxos/carray.o \
+# 	paxos/learner.o \
+# 	paxos/paxos.o \
+# 	paxos/proposer.o \
+# 	paxos/quorum.o \
+# 	paxos/storage_mem.o \
+# 	paxos/storage_utils.o \
+# 	paxos/storage.o \
+# 	evpaxos/message.o \
+# 	evpaxos/paxos_types_pack.o \
+# 	evpaxos/config.o \
+# 	evpaxos/peers.o
+#
+# kreplica1-objs:= \
+#   kpaxos/kreplica.o \
+# 	evpaxos/evlearner.o \
+# 	evpaxos/evproposer.o \
+# 	evpaxos/evacceptor.o \
+# 	kpaxos/kernel_udp.o \
+# 	kpaxos/kernel_device.o \
+# 	paxos/acceptor.o \
+# 	paxos/carray.o \
+# 	paxos/learner.o \
+# 	paxos/paxos.o \
+# 	paxos/proposer.o \
+# 	paxos/quorum.o \
+# 	paxos/storage_mem.o \
+# 	paxos/storage_utils.o \
+# 	paxos/storage.o \
+# 	evpaxos/message.o \
+# 	evpaxos/paxos_types_pack.o \
+# 	evpaxos/config.o \
+# 	evpaxos/peers.o \
+# 	evpaxos/evreplica.o
+#
+# kreplica2-objs:= \
+#   kpaxos/kreplica.o \
+# 	evpaxos/evlearner.o \
+# 	evpaxos/evproposer.o \
+# 	evpaxos/evacceptor.o \
+# 	kpaxos/kernel_udp.o \
+# 	kpaxos/kernel_device.o \
+# 	paxos/acceptor.o \
+# 	paxos/carray.o \
+# 	paxos/learner.o \
+# 	paxos/paxos.o \
+# 	paxos/proposer.o \
+# 	paxos/quorum.o \
+# 	paxos/storage_mem.o \
+# 	paxos/storage_utils.o \
+# 	paxos/storage.o \
+# 	evpaxos/message.o \
+# 	evpaxos/paxos_types_pack.o \
+# 	evpaxos/config.o \
+# 	evpaxos/peers.o \
+# 	evpaxos/evreplica.o
 
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
 ccflags-y:= -std=gnu99 -Wno-declaration-after-statement -O2
@@ -303,8 +436,10 @@ ccflags-y:= -std=gnu99 -Wno-declaration-after-statement -O2
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-	$(CC) -Wall kpaxos/client_user.c  -L. -levent -levent_core -o client_user
+	$(CC) -o client_user0 kpaxos/client_user.c -levent -I /usr/local/include -L /usr/local/lib
+	$(CC) -o client_user1 kpaxos/client_user.c -levent -I /usr/local/include -L /usr/local/lib
+	$(CC) -o client_user2 kpaxos/client_user.c -levent -I /usr/local/include -L /usr/local/lib
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
-	rm client_user
+	rm client_user0 client_user1 client_user2

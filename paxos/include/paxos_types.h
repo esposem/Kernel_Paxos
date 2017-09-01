@@ -117,6 +117,13 @@ struct paxos_learner_hi
 };
 typedef struct paxos_learner_hi paxos_learner_hi;
 
+struct paxos_learner_del
+{
+	paxos_value value;
+};
+typedef struct paxos_learner_del paxos_learner_del;
+
+
 enum paxos_message_type
 {
 	PAXOS_PREPARE,
@@ -128,7 +135,8 @@ enum paxos_message_type
 	PAXOS_TRIM,
 	PAXOS_ACCEPTOR_STATE,
 	PAXOS_CLIENT_VALUE,
-	PAXOS_LEARNER_HI
+	PAXOS_LEARNER_HI,
+	PAXOS_LEARNER_DEL
 };
 typedef enum paxos_message_type paxos_message_type;
 
@@ -147,6 +155,7 @@ struct paxos_message
 		paxos_acceptor_state state;
 		paxos_client_value client_value;
 		paxos_learner_hi learner_hi;
+		paxos_learner_del learner_del;
 	} u;
 };
 typedef struct paxos_message paxos_message;

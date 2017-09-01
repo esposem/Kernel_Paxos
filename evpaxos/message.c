@@ -55,6 +55,17 @@ send_paxos_learner_hi(struct socket * s,struct sockaddr_in* bev, paxos_learner_h
 }
 
 void
+send_paxos_learner_del(struct socket * s,struct sockaddr_in* bev, paxos_learner_del* p)
+{
+	paxos_message msg = {
+		.type = PAXOS_LEARNER_DEL,
+		.u.learner_del.value.paxos_value_len=0,
+	 	.u.learner_del.value.paxos_value_val = NULL};
+	send_paxos_message(s, bev, &msg, "Learner:");
+	// printk(KERN_INFO "Learner: Send del to the acceptors");
+}
+
+void
 send_paxos_prepare(struct socket * s,struct sockaddr_in* bev, void * pa)
 {
 	struct paxos_prepare * p = (paxos_prepare *) pa;

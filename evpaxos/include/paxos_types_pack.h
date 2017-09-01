@@ -53,6 +53,8 @@ long msgpack_pack_paxos_acceptor_state(msgpack_packer** p, paxos_acceptor_state*
 void msgpack_unpack_paxos_acceptor_state(msgpack_packer* o, paxos_acceptor_state* v);
 long msgpack_pack_paxos_client_value(msgpack_packer** p, paxos_client_value* v);
 int msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v, int size);
+long msgpack_pack_paxos_learner(msgpack_packer** p, void * v, int enum_type);
+int msgpack_unpack_paxos_learner(msgpack_packer* o, void * v, int packet_len);
 long msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v);
 int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size);
 

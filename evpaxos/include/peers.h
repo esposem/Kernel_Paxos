@@ -53,7 +53,6 @@ void peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void*
 void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);
 void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
 struct peer* peers_get_acceptor(struct peers* p, int id);
-void add_proposers_from_config(int myid, struct peers * p);
 void add_acceptors_from_config(int myid, struct peers * p);
 struct socket * get_send_socket(struct peer * p);
 // struct socket * get_rcv_socket(struct peer * p);

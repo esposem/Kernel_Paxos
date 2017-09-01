@@ -46,6 +46,7 @@ void send_paxos_repeat(struct socket * s, struct sockaddr_in* bev, paxos_repeat*
 void send_paxos_trim(struct socket * s, struct sockaddr_in* bev, paxos_trim* msg);
 int recv_paxos_message(char * data, paxos_message* out, int size);
 void send_paxos_learner_hi(struct socket * s,struct sockaddr_in* bev, paxos_learner_hi* p);
+void send_paxos_learner_del(struct socket * s,struct sockaddr_in* bev, paxos_learner_del* p);
 
 #ifdef __cplusplus
 }
