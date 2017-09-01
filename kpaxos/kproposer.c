@@ -27,9 +27,10 @@ start_proposer(const char* config, int id)
 		// printk(KERN_INFO "%s: Could not start the proposer!", kproposer->name);
 	}else{
 		paxos_proposer_listen(kproposer, prop);
+		// printk(KERN_INFO "Called evproposer_free");
+		evproposer_free(prop);
+
 	}
-	// printk(KERN_INFO "Called evproposer_free");
-	evproposer_free(prop);
 }
 
 int udp_server_listen(void)

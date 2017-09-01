@@ -6,33 +6,26 @@
 #include <linux/time.h>
 #include <asm/atomic.h>
 #include "kernel_device.h"
+#include "kernel_client.h"
 #include "paxos.h"
 
 #define BUFFER_SIZE 100
 static DEFINE_MUTEX(char_mutex);
-static int majorNumber;                    //< Stores the device number -- determined automatically
+static DEFINE_MUTEX(buffer_mutex);
+static DEFINE_MUTEX(read_mutex);
 static struct class * charClass  = NULL;   //< The device-driver class struct pointer
 static struct device * charDevice = NULL;  //< The device-driver device struct pointer
-static char * de_name;
-static char * clas_name;
-static int working;
+static char * de_name, * clas_name;
+static int majorNumber, working, current_buf = 0, first_buf = 0;
+static struct user_msg msg_buf[BUFFER_SIZE];
+static struct timer_list release_lock;
+static struct timeval interval;
 int * clid;
-static int must_stop = 0;
-
-struct user_msg{
-  struct timeval timenow;
-  char msg[16]; //copy just the first 16 char of 64
-  int iid;
-};
-
-struct user_msg msg_buf[BUFFER_SIZE];
-int current_buf = 0;
-int first_buf = 0;
-atomic_t used_buf;
+static atomic_t must_stop, used_buf;
 
 int kdev_open(struct inode *inodep, struct file *filep){
   if(!mutex_trylock(&char_mutex) || working == 0){
-    printk(KERN_ALERT "Device char: Device used by another process");
+    // printk(KERN_ALERT "Device char: Device used by another process");
     return -EBUSY;
     working = 0;
   }
@@ -40,22 +33,31 @@ int kdev_open(struct inode *inodep, struct file *filep){
 }
 
 void kstop_device(){
-  must_stop = 1;
+  atomic_set(&must_stop,1);
 }
 
-void kset_message(struct timeval timenow, char * msg, unsigned int iid){
+static void rel_lock(unsigned long arg){
+  // printk(KERN_INFO "Too much time passed, released lock");
+  mutex_unlock(&read_mutex);
+}
+
+void kset_message(struct timeval * timenow, char * msg, int client_id, unsigned int iid){
   if(atomic_read(&used_buf) > BUFFER_SIZE){
     printk(KERN_ERR "Buffer is full! Lost a value");
     return;
   }
+  mutex_lock(&buffer_mutex);
   atomic_inc(&used_buf);
   // memset((msg_buf[current_buf], 0, sizeof(struct user_msg)); //check
   memcpy(&msg_buf[current_buf].iid, &iid, sizeof(int));
-  memcpy(&msg_buf[current_buf].timenow, &timenow, sizeof(struct timeval));
-  memcpy(&msg_buf[current_buf].msg, msg, 15);
-  msg_buf[current_buf].msg[15] = '\0';
+  memcpy(&msg_buf[current_buf].client_id, &client_id, sizeof(int));
+  memcpy(&msg_buf[current_buf].timenow, timenow, sizeof(struct timeval));
+  memcpy(&msg_buf[current_buf].msg, msg, 63);
+  msg_buf[current_buf].msg[63] = '\0';
   current_buf = (current_buf + 1) % BUFFER_SIZE;
-  printk(KERN_INFO "Set message %d, occupied %d/100, first one is %d", current_buf, atomic_read(&used_buf), first_buf);
+  mutex_unlock(&buffer_mutex);
+  mutex_unlock(&read_mutex);
+  // printk(KERN_INFO "Set message %d, occupied %d/100, first one is %d", current_buf, atomic_read(&used_buf), first_buf);
 }
 
 ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
@@ -64,28 +66,33 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
   }
   int error_count = -1;
   // WARNING! assume that the buffer has size > size_of_message
-  if(must_stop){
-    struct user_msg mess;
-    mess.iid = -1;
-    mess.timenow.tv_sec = 0;
-    mess.timenow.tv_usec = 0;
-    mess.msg[0] = '\0';
-    error_count = copy_to_user(buffer, (char *) &mess, sizeof(struct user_msg));
+  if(atomic_read(&must_stop) == 1){
+    return -2;
   }
-
+  // printk(KERN_INFO"Gaining lock...");
+  mod_timer(&release_lock, jiffies + timeval_to_jiffies(&interval));
+  mutex_lock(&read_mutex);
+  // printk(KERN_INFO"Lock gained");
+  del_timer(&release_lock);
+  setup_timer( &release_lock,  rel_lock, 0);
   if(atomic_read(&used_buf) > 0){
+    mutex_lock(&buffer_mutex);
     error_count = copy_to_user(buffer, (char *) &msg_buf[first_buf], sizeof(struct user_msg));
     if (error_count != 0){
+      mutex_unlock(&buffer_mutex);
       working = 0;
   		printk(KERN_INFO "Device Char: Failed to send %d characters to the user\n", error_count);
   		return -EFAULT;
   	}else{
       first_buf = (first_buf + 1) % BUFFER_SIZE;
       atomic_dec(&used_buf);
-      printk(KERN_INFO "Read message %d, occupied %d/100, first one is %d, last one is %d", first_buf -1, atomic_read(&used_buf), first_buf, current_buf);
+      // printk(KERN_INFO "Read message %d, occupied %d/100, first one is %d, last one is %d", first_buf -1, atomic_read(&used_buf), first_buf, current_buf);
     }
+    mutex_unlock(&buffer_mutex);
   }
 
+  if(atomic_read(&used_buf) != 0)
+    mutex_unlock(&read_mutex);
 
   return error_count;
 }
@@ -103,6 +110,8 @@ int kdev_release(struct inode *inodep, struct file *filep){
   // if(working == 0)
     // printk(KERN_INFO "Device Char: Device already closed\n");
   mutex_unlock(&char_mutex);
+  mutex_unlock(&read_mutex);
+  mutex_unlock(&buffer_mutex);
    // printk(KERN_INFO "Device Char: Device successfully closed\n");
    return 0;
 }
@@ -162,19 +171,28 @@ int kdevchar_init(int id, char * name){
    }
 
    mutex_init(&char_mutex);
+   mutex_init(&buffer_mutex);
+   mutex_init(&read_mutex);
    clid = kmalloc(sizeof(int), GFP_KERNEL);
    atomic_set(&used_buf, 0);
+   atomic_set(&must_stop, 0);
+   setup_timer( &release_lock,  rel_lock, 0);
+   interval = (struct timeval){0, 100};
+
   //  printk(KERN_INFO "Device Char: device class created correctly\n");
    return 0;
 }
 
 void kdevchar_exit(void){
-  printk(KERN_INFO "Called kdevchar_exit");
+  // printk(KERN_INFO "Called kdevchar_exit");
   if(working == 0){
     return;
   }
   working = 0;
+  del_timer(&release_lock);
   mutex_destroy(&char_mutex);
+  mutex_destroy(&buffer_mutex);
+  mutex_destroy(&read_mutex);
   device_destroy(charClass, MKDEV(majorNumber, 0));     // remove the device
   class_unregister(charClass);                          // unregister the device class
   class_destroy(charClass);                             // remove the device class

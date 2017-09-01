@@ -52,14 +52,18 @@ carray_new(int size)
 	struct carray* a;
 	a = kmalloc(sizeof(struct carray), GFP_KERNEL);
 	// assert(a != NULL);
-	WARN_ON(a == NULL);
+	// WARN_ON(a == NULL);
+	if(a == NULL)
+		printk(KERN_ALERT "A IS NULL");
 	a->head = 0;
 	a->tail = 0;
 	a->size = size;
 	a->count = 0;
 	a->array = kmalloc(sizeof(void*)*a->size, GFP_KERNEL);
+	if(a == NULL)
+		printk(KERN_ALERT "ARRAY IS NULL");
 	// assert(a->array != NULL);
-	WARN_ON(a->array == NULL);
+	// WARN_ON(a->array == NULL);
 	return a;
 }
 

@@ -146,12 +146,24 @@ learner_deliver_next(struct learner* l, paxos_accepted* out)
 	return 1;
 }
 
+void trim_old_learn(struct learner * l, iid_t iid){
+	struct instance * inst, *tmp;
+
+ 	HASH_ITER(hh , l->instances, inst, tmp) {
+	 	if(inst->iid < iid){
+			HASH_DEL(l->instances, inst);
+ 	  	instance_free(inst, l->acceptors);
+	 	}
+ 	}
+}
+
 int
 learner_has_holes(struct learner* l, iid_t* from, iid_t* to)
 {
 	if (l->highest_iid_closed > l->current_iid) {
 		*from = l->current_iid;
 		*to = l->highest_iid_closed;
+		// printk(KERN_INFO "Hole");
 		return 1;
 	}
 	return 0;
@@ -162,7 +174,7 @@ learner_get_instance(struct learner* l, iid_t iids)
 {
 	// // printk(KERN_INFO "Searching for %d", iids);
 	struct instance * h = NULL;
-  HASH_FIND_IID( l->instances, &iids, h);  /* h: output pointer */
+  HASH_FIND_IID( l->instances, &iids, h);
 	return h;
 }
 
@@ -177,22 +189,12 @@ learner_get_instance_or_create(struct learner* l, iid_t iids)
 {
 	struct instance* inst = learner_get_instance(l, iids);
 	if (inst == NULL) {
-		// // printk(KERN_ERR "Instance is null, creating new one");
 		inst = instance_new(l->acceptors);
-		// // printk(KERN_ERR "address ad id of created value %p %d\n", inst, inst->iid);
 		inst->iid = iids;
 		HASH_ADD_IID(l->instances, iid, inst);
-		// // printk(KERN_ERR "there are %d in hashtable", (int)HASH_COUNT(l->instances));
 		struct instance * h = NULL;
 		HASH_FIND_IID( l->instances, &iids, h);
-		// // printk(KERN_ERR "found %p %d\n", h, iids);
-		// if(h == NULL){
-		// 	// printk(KERN_ERR "Instance is null, YOU HAVE A PROBLEM");
-		// }
 	}
-	// else{
-	// 	// printk(KERN_ERR "Instance is NOT null");
-	// }
 	return inst;
 }
 
@@ -209,11 +211,17 @@ instance_new(int acceptors)
 	int i;
 	struct instance* inst;
 	inst = kmalloc(sizeof(struct instance), GFP_KERNEL);
-	memset(inst, 0, sizeof(struct instance));
-	inst->acks = kmalloc(sizeof(paxos_accepted*) * acceptors, GFP_KERNEL);
-	for (i = 0; i < acceptors; ++i)
-		inst->acks[i] = NULL;
+	if(inst){
+		memset(inst, 0, sizeof(struct instance));
+		inst->acks = kmalloc(sizeof(paxos_accepted*) * acceptors, GFP_KERNEL);
+		for (i = 0; i < acceptors; ++i)
+			inst->acks[i] = NULL;
+	}else{
+		printk(KERN_ALERT "The instance allocated is null!");
+	}
 	return inst;
+
+
 }
 
 static void

@@ -11,7 +11,8 @@ struct client_value
 
 struct user_msg{
   struct timeval timenow;
-  struct client_value msg;
+	int client_id;
+  char msg[64];
   int iid;
 };
 

@@ -109,15 +109,17 @@ static void
 mem_storage_tx_abort(void* handle) { }
 
 static int
-mem_storage_get(void* handle, iid_t iid, paxos_accepted* out)
+mem_storage_get(void* handle, iid_t iids, paxos_accepted* out)
 {
 	struct mem_storage* s = handle;
-	struct hash_item * h = NULL;
-  HASH_FIND_IID( s->record, &iid, h);  /* h: output pointer */
+	struct hash_item * h;
+  HASH_FIND_IID( s->record, &iids, h);
 	if(h == NULL){
+		// printk(KERN_ERR "%d NOT FOUND", iids);
 		return 0;
 	}
 	paxos_accepted_copy(out, h->value);
+	// printk(KERN_ALERT "%d FOUND", iids);
 
   return 1;
 }
@@ -126,21 +128,35 @@ static int
 mem_storage_put(void* handle, paxos_accepted* acc)
 {
 	struct mem_storage* s = handle;
-	struct hash_item * a = NULL;
+	struct hash_item * a;
+
+	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
+	paxos_accepted_copy(val, acc);
 
 	HASH_FIND_IID(s->record, &(acc->iid), a);
 	if (a != NULL) {
 		paxos_accepted_free(a->value);
+		a->value = val;
+		a->iid = acc->iid;
+		// printk(KERN_INFO "%d replaced", acc->iid);
 	}
 	else {
 		a = kmalloc(sizeof(struct hash_item), GFP_KERNEL);
+		a->value = val;
+		a->iid = acc->iid;
 		HASH_ADD_IID(s->record, iid, a);
+		// printk(KERN_INFO "%d new", acc->iid);
 	}
-	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
-	paxos_accepted_copy(val, acc);
-	a->value = val;
-	a->iid = acc->iid;
+
+
+	// printk(KERN_ERR "Added %d", acc->iid);
+	paxos_accepted p;
+	// printk(KERN_INFO "REGETTING...");
+	mem_storage_get(handle, a->iid, &p);
+	// printk(KERN_INFO "--------------");
+
 	return 0;
+
 }
 
 static int
@@ -159,8 +175,6 @@ mem_storage_trim(void* handle, iid_t iid)
 	s->trim_iid = iid;
 	return 0;
 }
-// TODO CALL TRIM when learner receives something (send_trim)
-// use circular buffer to send message to user space
 
 static iid_t
 mem_storage_get_trim_instance(void* handle)

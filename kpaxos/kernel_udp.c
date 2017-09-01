@@ -147,6 +147,8 @@ int udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * ad
     inet_getname(conn_socket, (struct sockaddr *) address, &i , 0);
     // printk(KERN_INFO "%s Socket is bind to %pI4 : %hu",k->name, &address->sin_addr, ntohs(address->sin_port));
     kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&sk_timeout_timeval, sizeof(struct timeval));
+    int k = INT_MAX;
+    kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVBUF, (char * )&k, sizeof(int));
   }
   return 0;
 
@@ -185,7 +187,7 @@ void udp_server_quit(udp_service * k){
     if(atomic_read(&k->thread_running) == 1){
       atomic_set(&k->thread_running, 0);
       if((ret = kthread_stop(k->u_thread)) == 0){
-        printk(KERN_INFO "%s Terminated thread", k->name);
+        // printk(KERN_INFO "%s Terminated thread", k->name);
       }else{
         // printk(KERN_INFO "%s Error %d in terminating thread", k->name, ret);
       }
@@ -198,7 +200,7 @@ void udp_server_quit(udp_service * k){
     //   sock_release(s);
     //   // printk(KERN_INFO "%s Released socket", k->name);
     // }
-    printk(KERN_INFO "%s Module unloaded", k->name);
+    // printk(KERN_INFO "%s Module unloaded", k->name);
     kfree(k->name);
     kfree(k);
   }else{

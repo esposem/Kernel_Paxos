@@ -73,6 +73,13 @@ evacceptor_handle_prepare(struct peer* p, paxos_message* msg, void* arg)
 	}
 }
 
+// struct client_value
+// {
+// 	int client_id;
+// 	struct timeval t;
+// 	size_t size;
+// 	char value[0];
+// };
 /*
 	Received a accept request (phase 2a).
 */
@@ -87,6 +94,9 @@ evacceptor_handle_accept(struct peer* p, paxos_message* msg, void* arg)
 		if (out.type == PAXOS_ACCEPTED) {
 			// printk(KERN_INFO "Acceptor: Sent ACCEPTED to all proposers and learners");
 			peers_foreach_client(a->peers, peer_send_paxos_message, &out);
+			// struct client_value * clv = (struct client_value *) out.u.accepted.value.paxos_value_val;
+			// printk(KERN_INFO "Acceptor: sending a CLIENT VALUE %d", clv->client_id );
+
 		} else if (out.type == PAXOS_PREEMPTED) {
 			// printk(KERN_INFO "Acceptor: Sent PREEMPTED to all proposers ");
 			send_acceptor_paxos_message(get_send_socket(p), get_sockaddr(p), &out);
@@ -105,7 +115,7 @@ evacceptor_handle_repeat(struct peer* p, paxos_message* msg, void* arg)
 	// printk(KERN_INFO "Acceptor: Handle repeat for iids %d-%d", repeat->from, repeat->to);
 	for (iid = repeat->from; iid <= repeat->to; ++iid) {
 		if (acceptor_receive_repeat(a->state, iid, &accepted)) {
-			// printk(KERN_INFO "Acceptor: sent a repeated PAXOS_ACCEPTED to proposer");
+			// printk(KERN_INFO "Acceptor: sent a repeated PAXOS_ACCEPTED %d to learner", iid);
 			send_paxos_accepted(get_send_socket(p), get_sockaddr(p), &accepted);
 			paxos_accepted_destroy(&accepted);
 		}
@@ -124,7 +134,7 @@ evacceptor_handle_trim(struct peer* p, paxos_message* msg, void* arg)
 static void
 send_acceptor_state(unsigned long arg)
 {
-	// // printk(KERN_INFO "Acceptor: send_acceptor_state");
+	// printk(KERN_INFO "Acceptor: send_acceptor_state");
 	struct evacceptor* a = (struct evacceptor*)arg;
 	paxos_message msg = {.type = PAXOS_ACCEPTOR_STATE};
 	acceptor_set_current_state(a->state, &msg.u.state);
@@ -138,6 +148,7 @@ evacceptor_init_internal(int id, struct evpaxos_config* c, struct peers* p, udp_
 	struct evacceptor* acceptor;
 
 	acceptor = kmalloc(sizeof(struct evacceptor), GFP_KERNEL);
+	memset(acceptor, 0, sizeof(struct evacceptor));
 	acceptor->state = acceptor_new(id);
 	acceptor->peers = p;
 	acceptor->k = k;
@@ -164,17 +175,13 @@ evacceptor_init(int id, const char* config_file, udp_service * k)
 
 	int acceptor_count = evpaxos_acceptor_count(config);
 	if (id < 0 || id >= acceptor_count) {
-		// printk(KERN_INFO "Acceptor: Invalid acceptor id: %d.", id);
-		// printk(KERN_INFO "Acceptor: Should be between 0 and %d", acceptor_count);
+		// printk(KERN_ERR "Acceptor: Invalid acceptor id: %d.", id);
+		// printk(KERN_ERR "Acceptor: Should be between 0 and %d", acceptor_count);
 		evpaxos_config_free(config);
 		return NULL;
 	}
 	struct sockaddr_in send_add = evpaxos_acceptor_address(config,id);
-	// struct sockaddr_in send_add;
-	// memcpy(&send_add, &rcv_add, sizeof(struct sockaddr_in));
-	// send_add.sin_port = 0; // random port for sending
 	struct peers* peers = peers_new(&send_add, config, id);
-	// printall(peers);
 	sk_timeout_timeval.tv_sec = 1;
   sk_timeout_timeval.tv_usec = 0;
 	if(peers_sock_init(peers,k) >= 0){
@@ -196,6 +203,8 @@ evacceptor_free_internal(struct evacceptor* a)
 void
 evacceptor_free(struct evacceptor* a)
 {
+	printk(KERN_INFO "ACCEPTOR");
+	printall(a->peers);
 	peers_free(a->peers);
 	evacceptor_free_internal(a);
 }
