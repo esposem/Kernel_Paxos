@@ -22,16 +22,15 @@ start_acceptor(int id, const char* config)
 {
 	acc = evacceptor_init(id, config, kacceptor);
 	if (acc == NULL) {
-		// printk(KERN_INFO "%s Could not start the acceptor", kacceptor->name);
+		printk(KERN_ERR "%s Could not start the acceptor", kacceptor->name);
 	}else{
 		paxos_acceptor_listen(kacceptor, acc);
+		evacceptor_free(acc);
 	}
-	// printk(KERN_INFO "Called evacceptor_free");
-	evacceptor_free(acc);
 }
 
 
-int udp_server_listen(void)
+static int run_acceptor(void)
 {
   const char* config = "../paxos.conf";
 	start_acceptor(id, config);
@@ -39,40 +38,35 @@ int udp_server_listen(void)
   return 0;
 }
 
-void udp_server_start(void){
-  kacceptor->u_thread = kthread_run((void *)udp_server_listen, NULL, kacceptor->name);
+static void start_acc_thread(void){
+  kacceptor->u_thread = kthread_run((void *)run_acceptor, NULL, kacceptor->name);
   if(kacceptor->u_thread >= 0){
     atomic_set(&kacceptor->thread_running,1);
-    // printk(KERN_INFO "%s Thread running [udp_server_start]", kacceptor->name);
+    // printk(KERN_INFO "%s Thread running", kacceptor->name);
   }else{
-    // printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kacceptor->name);
+    // printk(KERN_ERR "%s Error in starting thread", kacceptor->name);
   }
 }
 
-static int __init network_server_init(void)
+static int __init init_acceptor(void)
 {
-	if(id < 0 || id > 10){
-		// printk(KERN_INFO "you must give an id!");
-		return 0;
-	}
-	//  ;
   kacceptor = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kacceptor){
-    // printk(KERN_INFO "Failed to initialize ACCEPTOR [network_server_init]");
+    // printk(KERN_ERR "Failed to initialize ACCEPTOR");
   }else{
     init_service(kacceptor, "Acceptor", id);
-    udp_server_start();
+    start_acc_thread();
   }
   return 0;
 }
 
-static void __exit network_server_exit(void)
+static void __exit acceptor_exit(void)
 {
   udp_server_quit(kacceptor);
 }
 
 
-module_init(network_server_init)
-module_exit(network_server_exit)
+module_init(init_acceptor)
+module_exit(acceptor_exit)
 MODULE_LICENSE("MIT");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

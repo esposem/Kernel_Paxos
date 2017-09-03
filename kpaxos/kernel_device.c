@@ -20,7 +20,7 @@ static int majorNumber, working, current_buf = 0, first_buf = 0;
 static struct user_msg msg_buf[BUFFER_SIZE];
 static struct timer_list release_lock;
 static struct timeval interval;
-int * clid;
+int value_size = 0;
 static atomic_t must_stop, used_buf;
 
 int kdev_open(struct inode *inodep, struct file *filep){
@@ -48,12 +48,11 @@ void kset_message(struct timeval * timenow, char * msg, int client_id, unsigned 
   }
   mutex_lock(&buffer_mutex);
   atomic_inc(&used_buf);
-  // memset((msg_buf[current_buf], 0, sizeof(struct user_msg)); //check
   memcpy(&msg_buf[current_buf].iid, &iid, sizeof(int));
   memcpy(&msg_buf[current_buf].client_id, &client_id, sizeof(int));
   memcpy(&msg_buf[current_buf].timenow, timenow, sizeof(struct timeval));
-  memcpy(&msg_buf[current_buf].msg, msg, 63);
-  msg_buf[current_buf].msg[63] = '\0';
+  memcpy(&msg_buf[current_buf].msg, msg, value_size);
+  // msg_buf[current_buf].msg[value_size-1] = '\0';
   current_buf = (current_buf + 1) % BUFFER_SIZE;
   mutex_unlock(&buffer_mutex);
   mutex_unlock(&read_mutex);
@@ -102,7 +101,7 @@ ssize_t kdev_write(struct file *filep, const char *buffer, size_t len, loff_t *o
     return -1;
   }
   // printk(KERN_INFO "Device: Received id %d", *((int *) buffer));
-  memcpy(clid,buffer, sizeof(int));
+  memcpy(value_size,buffer, sizeof(int));
   return len;
 }
 
@@ -173,7 +172,6 @@ int kdevchar_init(int id, char * name){
    mutex_init(&char_mutex);
    mutex_init(&buffer_mutex);
    mutex_init(&read_mutex);
-   clid = kmalloc(sizeof(int), GFP_KERNEL);
    atomic_set(&used_buf, 0);
    atomic_set(&must_stop, 0);
    setup_timer( &release_lock,  rel_lock, 0);
@@ -198,7 +196,6 @@ void kdevchar_exit(void){
   class_destroy(charClass);                             // remove the device class
   kfree(de_name);
   kfree(clas_name);
-  kfree(clid);
   unregister_chrdev(majorNumber, de_name);             // unregister the major number
  	// printk(KERN_INFO "Device Char: Unloaded\n");
 }

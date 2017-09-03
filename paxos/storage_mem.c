@@ -115,12 +115,9 @@ mem_storage_get(void* handle, iid_t iids, paxos_accepted* out)
 	struct hash_item * h;
   HASH_FIND_IID( s->record, &iids, h);
 	if(h == NULL){
-		// printk(KERN_ERR "%d NOT FOUND", iids);
 		return 0;
 	}
 	paxos_accepted_copy(out, h->value);
-	// printk(KERN_ALERT "%d FOUND", iids);
-
   return 1;
 }
 
@@ -150,9 +147,9 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 
 
 	// printk(KERN_ERR "Added %d", acc->iid);
-	paxos_accepted p;
+	// paxos_accepted p;
 	// printk(KERN_INFO "REGETTING...");
-	mem_storage_get(handle, a->iid, &p);
+	// mem_storage_get(handle, a->iid, &p);
 	// printk(KERN_INFO "--------------");
 
 	return 0;
@@ -162,7 +159,6 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 static int
 mem_storage_trim(void* handle, iid_t iid)
 {
-	// printk(KERN_INFO "Trim called");
 	struct mem_storage* s = handle;
 	struct hash_item *hash_el, *tmp;
 	HASH_ITER(hh, s->record, hash_el, tmp) {

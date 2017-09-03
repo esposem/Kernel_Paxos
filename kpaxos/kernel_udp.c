@@ -105,15 +105,15 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
   vec.iov_base = buf;
 
   // lenm = -EAGAIN;
-  if(kthread_should_stop() || signal_pending(current)){
-    return 0;
-  }else{
+  // if(kthread_should_stop() || signal_pending(current)){
+  //   return 0;
+  // }else{
     lenm = kernel_recvmsg(sock, &msg, &vec, MAX_UDP_SIZE, MAX_UDP_SIZE, flags);
     if(lenm > 0){
       address = (struct sockaddr_in *) msg.msg_name;
       // // printk(KERN_INFO "%s Received message from %pI4 : %hu , size %d",k->name,&address->sin_addr, ntohs(address->sin_port), lenm);
     }
-  }
+  // }
 
   return lenm;
 }
@@ -139,7 +139,7 @@ int udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * ad
   if(server_err < 0) {
     atomic_set(allocated, 0);
     sock_release(conn_socket);
-    // printk(KERN_INFO "%s Error %d (%s) while binding socket with address %pI4",k->name, server_err, analyze_error(server_err), &server.sin_addr);
+    printk(KERN_INFO "%s Error %d (%s) while binding socket with address %pI4",k->name, server_err, analyze_error(server_err), &server.sin_addr);
     return -1;
   }else{
     // update the port (might be given as 0, that is random)

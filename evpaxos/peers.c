@@ -179,7 +179,7 @@ static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
 			return;
 		}
 	}
-	// printk(KERN_ALERT "%s Added a new client, now %d clients",la->name, p->clients_count + 1);
+	printk(KERN_ALERT "%s Added a new client, now %d clients",la->name, p->clients_count + 1);
 	p->clients = krealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1), GFP_KERNEL);
 	p->clients[p->clients_count] = make_peer(p, p->clients_count, addr);
 	p->clients_count++;
@@ -288,7 +288,8 @@ peers_listen(struct peers* p, udp_service * k)
 			struct timeval t2;
 			do_gettimeofday(&t2);
 
-			temp = timeval_to_jiffies(&t2) - timeval_to_jiffies(&t1);
+			// temp = timeval_to_jiffies(&t2) - timeval_to_jiffies(&t1);
+			temp = HZ/10;
 		}else{
 			temp = timeval_to_jiffies(&sk_timeout_timeval);
 		}

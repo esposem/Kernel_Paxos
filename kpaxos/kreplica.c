@@ -8,23 +8,16 @@
 
 #include "evpaxos.h"
 #include "kernel_udp.h"
-#include "kernel_device.h"
+#include "kernel_client.h"
+// #include "kernel_device.h"
 
-struct client_value
-{
-	int client_id;
-	struct timeval t;
-	size_t size;
-	char value[0];
-};
-
-struct file_operations fops =
-{
-  .open = kdev_open,
-  .read = kdev_read,
-  .write = kdev_write,
-  .release = kdev_release,
-};
+// struct file_operations fops =
+// {
+//   .open = kdev_open,
+//   .read = kdev_read,
+//   .write = kdev_write,
+//   .release = kdev_release,
+// };
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
@@ -45,22 +38,17 @@ static void
 start_replica(int id, const char* config)
 {
 	deliver_function cb = NULL;
-
-	// if (verbose)
-	// 	cb = deliver;
-
 	replica = evpaxos_replica_init(id, config, cb, deliver, kreplica);
 
 	if (replica == NULL) {
-		// printk(KERN_INFO "Could not start the replica!");
+		printk(KERN_ERR "Could not start the replica!");
 	}else{
 		paxos_replica_listen(kreplica, replica);
 	}
-	// printk(KERN_INFO "Called evpaxos_replica_free");
 	evpaxos_replica_free(replica);
 }
 
-int udp_server_listen(void)
+static int run_replica(void)
 {
   const char* config = "../paxos.conf";
   start_replica(id, config);
@@ -68,38 +56,38 @@ int udp_server_listen(void)
   return 0;
 }
 
-void udp_server_start(void){
-  kreplica->u_thread = kthread_run((void *)udp_server_listen, NULL, kreplica->name);
+static void start_replica_thread(void){
+  kreplica->u_thread = kthread_run((void *)run_replica, NULL, kreplica->name);
   if(kreplica->u_thread >= 0){
     atomic_set(&kreplica->thread_running,1);
-    // printk(KERN_INFO "%s Thread running [udp_server_start]", kreplica->name);
+    // printk(KERN_INFO "%s Thread running", kreplica->name);
   }else{
-    // printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kreplica->name);
+    // printk(KERN_ERR "%s Error in starting thread.", kreplica->name);
   }
 }
 
-static int __init network_server_init(void)
+static int __init init_replica(void)
 {
 	if(id < 0 || id > 10){
-		// printk(KERN_INFO "you must give an id!");
+		// printk(KERN_ERR "you must give a valid id!");
 		return 0;
 	}
   kreplica = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kreplica){
-    // printk(KERN_INFO "Failed to initialize server [network_server_init]");
+    // printk(KERN_ERR "Failed to initialize replica");
   }else{
     init_service(kreplica, "Replica", id);
-    udp_server_start();
+    start_replica_thread();
   }
   return 0;
 }
 
-static void __exit network_server_exit(void)
+static void __exit replica_exit(void)
 {
   udp_server_quit(kreplica);
 }
 
-module_init(network_server_init)
-module_exit(network_server_exit)
+module_init(init_replica)
+module_exit(replica_exit)
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

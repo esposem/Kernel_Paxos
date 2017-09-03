@@ -13,13 +13,15 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "paxos_types.h"
+#include "kernel_client.h"
+
 #define PORT 3002
 #define PROP_IP "127.0.0.2"
-#define BUFFER_LENGTH 3000
-#define MAX_VALUE_SIZE 8192
+#define BUFFER_LENGTH 1000
 
 #define CCHAR_OP 0
-#define RESEND_TIMER 1
+#define RESEND_TIMER 0
 
 static char receive[BUFFER_LENGTH];
 static int cansend = 0;
@@ -27,52 +29,6 @@ static struct client * cl;
 static int learner_id = -1;
 static atomic_int sent = 0;
 static atomic_int sent_sec = 0;
-
-
-#if 0
-#include "paxos_types.h"
-#include "kernel_client.h"
-#else
-enum paxos_message_type
-{
-	PAXOS_PREPARE,
-	PAXOS_PROMISE,
-	PAXOS_ACCEPT,
-	PAXOS_ACCEPTED,
-	PAXOS_PREEMPTED,
-	PAXOS_REPEAT,
-	PAXOS_TRIM,
-	PAXOS_ACCEPTOR_STATE,
-	PAXOS_CLIENT_VALUE,
-	PAXOS_LEARNER_HI
-};
-
-struct client_value
-{
-	int client_id;
-	struct timeval t;
-	size_t size;
-	char value[0];
-};
-
-struct stats
-{
-	long min_latency;
-	long max_latency;
-	long avg_latency;
-	int delivered_count;
-	size_t delivered_bytes;
-};
-
-struct user_msg{
-  struct timeval timenow;
-	int client_id;
-  char msg[64];
-  int iid;
-};
-
-#endif
-
 
 struct client
 {
@@ -172,7 +128,12 @@ client_submit_value(struct client* c)
 	v->client_id = c->id;
 	gettimeofday(&v->t, NULL);
 	v->size = c->value_size;
+
+	/* ############################################
+	   HERE YOU SET THE VALUE TO SEND, YOU HAVE V->SIZE BYTES*/
 	random_string(v->value, v->size);
+	/* ############################################ */
+
 	size_t size = sizeof(struct client_value) + v->size;
 	udp_send_msg(v, size);
 	// printf("Client: submitted PAXOS_CLIENT_VALUE %.16s\n", v->value);
@@ -209,14 +170,14 @@ update_stats(struct stats* stats, struct timeval* delivered, size_t size)
 void unpack_message(char * msg){
   struct user_msg * t = (struct user_msg *) msg;
 	// printf("my id %d, its id %d\n", cl->id, t->client_id );
-	// if(t->client_id == cl->id){
-		update_stats(&cl->stats, &t->timenow, 64); // TODO check 64 is correct3
+	if(t->client_id == cl->id){
+		update_stats(&cl->stats, &t->timenow, cl->value_size);
 		// printf("Client: On deliver iid:%d value:%.16s\n",t->iid, t->msg );
 		client_submit_value(cl);
-		#if RESEND_TIMER
-		event_add(cl->resend_ev, &cl->reset_interval);
-		#endif
-	// }
+	}
+	#if RESEND_TIMER
+	event_add(cl->resend_ev, &cl->reset_interval);
+	#endif
 }
 
 #if CCHAR_OP
@@ -313,13 +274,10 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 
 	#if CCHAR_OP
 	  if(c->fd >= 0){
-	    int ret = write(c->fd, (char *) &c->id, sizeof(int));
+	    int ret = write(c->fd, (char *) &c->value_size, sizeof(int));
 	    if (ret < 0){
 	      perror("Failed to write the message to the device");
 	    }
-			// else{
-	    //   printf("Sent id to learner\n");
-	    // }
 	  }
 
 		c->evread = event_new(c->base, c->fd, EV_READ | EV_PERSIST, client_read,

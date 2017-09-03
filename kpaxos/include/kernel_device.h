@@ -5,7 +5,6 @@
 #include <linux/time.h>
 
 extern struct file_operations fops;
-extern int * clid;
 extern int     kdev_open(struct inode *, struct file *);
 extern int     kdev_release(struct inode *, struct file *);
 extern ssize_t kdev_read(struct file *, char *, size_t, loff_t *);

@@ -89,7 +89,7 @@ evacceptor_handle_accept(struct peer* p, paxos_message* msg, void* arg)
 	paxos_message out;
 	paxos_accept* accept = &msg->u.accept;
 	struct evacceptor* a = (struct evacceptor*)arg;
-	// printk(KERN_INFO "Acceptor: Received ACCEPT REQUEST");
+	printk(KERN_INFO "Acceptor: Received ACCEPT REQUEST");
 	if (acceptor_receive_accept(a->state, accept, &out) != 0) {
 		if (out.type == PAXOS_ACCEPTED) {
 			// printk(KERN_INFO "Acceptor: Sent ACCEPTED to all proposers and learners");
@@ -158,7 +158,6 @@ evacceptor_init_internal(int id, struct evpaxos_config* c, struct peers* p, udp_
 	peers_subscribe(p, PAXOS_ACCEPT, evacceptor_handle_accept, acceptor);
 	peers_subscribe(p, PAXOS_REPEAT, evacceptor_handle_repeat, acceptor);
 	peers_subscribe(p, PAXOS_TRIM, evacceptor_handle_trim, acceptor);
-	// printk(KERN_INFO "Acceptor: Subscribed to PAXOS_PREPARE, PAXOS_ACCEPT, PAXOS_TRIM, PAXOS_REPEAT");
 
 	k->timer_cb[ACC_TIM] = send_acceptor_state;
 	k->data[ACC_TIM] = (unsigned long) acceptor;
@@ -203,8 +202,8 @@ evacceptor_free_internal(struct evacceptor* a)
 void
 evacceptor_free(struct evacceptor* a)
 {
-	printk(KERN_INFO "ACCEPTOR");
-	printall(a->peers);
+	// printk(KERN_INFO "ACCEPTOR");
+	// printall(a->peers);
 	peers_free(a->peers);
 	evacceptor_free_internal(a);
 }
