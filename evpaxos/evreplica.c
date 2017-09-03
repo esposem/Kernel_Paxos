@@ -44,7 +44,6 @@ static void
 evpaxos_replica_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 	struct evpaxos_replica* r = arg;
-	// printk(KERN_INFO "Replica: Learner: asking the proposer to remove old instances");
 	evproposer_set_instance_id(r->proposer, iid);
 	if (r->deliver)
 		r->deliver(iid, value, size, r->arg);
@@ -59,16 +58,11 @@ evpaxos_replica_init(int id, const char* config_file, deliver_function f,
 	r = kmalloc(sizeof(struct evpaxos_replica), GFP_KERNEL);
 
 	config = evpaxos_config_read(config_file);
-	// printk(KERN_INFO "Replica: Read config file");
 
 	struct sockaddr_in send_addr = evpaxos_acceptor_address(config,id);
-	// struct sockaddr_in send_addr;
-	// memcpy(&send_addr, &rcv_addr, sizeof(struct sockaddr_in));
-	// send_addr.sin_port = 0;
 	r->peers = peers_new(&send_addr, config, id);
 	add_acceptors_from_config(-1, r->peers);
-	// printk(KERN_INFO "Replica: Connected to other acceptors, starting acceptor, proposer and learner");
-	printall(r->peers);
+	// printall(r->peers);
 	sk_timeout_timeval.tv_sec = 0;
 	sk_timeout_timeval.tv_usec = 100000;
 	if(peers_sock_init(r->peers, k) == 0){

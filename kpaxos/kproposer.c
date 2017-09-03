@@ -17,23 +17,19 @@ static int id = 0;
 module_param(id, int, S_IRUGO);
 MODULE_PARM_DESC(id,"The proposer id, default 0");
 
-
 static void
 start_proposer(const char* config, int id)
 {
-
 	prop = evproposer_init(id, config, kproposer);
 	if (prop == NULL) {
-		// printk(KERN_INFO "%s: Could not start the proposer!", kproposer->name);
+		printk(KERN_ERR "%s: Could not start the proposer!", kproposer->name);
 	}else{
 		paxos_proposer_listen(kproposer, prop);
-		// printk(KERN_INFO "Called evproposer_free");
 		evproposer_free(prop);
-
 	}
 }
 
-int udp_server_listen(void)
+static int run_proposer(void)
 {
   const char* config = "../paxos.conf";
   start_proposer(config, id);
@@ -41,38 +37,34 @@ int udp_server_listen(void)
   return 0;
 }
 
-void udp_server_start(void){
-  kproposer->u_thread = kthread_run((void *)udp_server_listen, NULL, kproposer->name);
+static void start_prop_thread(void){
+  kproposer->u_thread = kthread_run((void *)run_proposer, NULL, kproposer->name);
   if(kproposer->u_thread >= 0){
     atomic_set(&kproposer->thread_running,1);
-    // printk(KERN_INFO "%s Thread running [udp_server_start]", kproposer->name);
+    // printk(KERN_INFO "%s Thread running", kproposer->name);
   }else{
-    // printk(KERN_INFO "%s Error in starting thread. Terminated [udp_server_start]", kproposer->name);
+    // printk(KERN_ERR "%s Error in starting thread", kproposer->name);
   }
 }
 
-static int __init network_server_init(void)
+static int __init init_prop(void)
 {
-	if(id < 0 || id > 10){
-		// printk(KERN_INFO "you must give an id!");
-		return 0;
-	}
   kproposer = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kproposer){
-    // printk(KERN_INFO "Failed to initialize server [network_server_init]");
+    // printk(KERN_ERR "Failed to initialize server");
   }else{
     init_service(kproposer, "Proposer", id);
-    udp_server_start();
+    start_prop_thread();
   }
   return 0;
 }
 
-static void __exit network_server_exit(void)
+static void __exit prop_exit(void)
 {
   udp_server_quit(kproposer);
 }
 
-module_init(network_server_init)
-module_exit(network_server_exit)
+module_init(init_prop)
+module_exit(prop_exit)
 MODULE_LICENSE("MIT");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

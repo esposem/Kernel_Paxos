@@ -94,7 +94,6 @@ evproposer_handle_promise(struct peer* p, paxos_message* msg, void* arg)
 	paxos_promise* pro = &msg->u.promise;
 	int preempted = proposer_receive_promise(proposer->state, pro, &prepare);
 	if (preempted){
-		// // printk(KERN_INFO "Proposer: received PREEMPTED\nSending prepare to all acceptors and preexecuting");
 		peers_foreach_acceptor(proposer->peers, peer_send_prepare, &prepare);
 	}
 	try_accept(proposer);
@@ -106,7 +105,7 @@ evproposer_handle_accepted(struct peer* p, paxos_message* msg, void* arg)
 	struct evproposer* proposer = arg;
 	paxos_accepted* acc = &msg->u.accepted;
 	if (proposer_receive_accepted(proposer->state, acc)){
-		// printk(KERN_INFO "Proposer: received ACCEPT REQUEST");
+		// printk(KERN_INFO "Proposer: received ACCEPTED");
 		try_accept(proposer);
 	}
 }
@@ -120,7 +119,6 @@ evproposer_handle_preempted(struct peer* p, paxos_message* msg, void* arg)
 	int preempted = proposer_receive_preempted(proposer->state,
 		&msg->u.preempted, &prepare);
 	if (preempted) {
-		// // printk(KERN_INFO "Proposer: received PREEMPTED\nSending prepare to all acceptors and preexecuting");
 		peers_foreach_acceptor(proposer->peers, peer_send_prepare, &prepare);
 		try_accept(proposer);
 	}
@@ -145,7 +143,7 @@ evproposer_handle_client_value(struct peer* p, paxos_message* msg, void* arg)
 		v->value.paxos_value_len);
 
 	// struct client_value * clv = (struct client_value *) v->value.paxos_value_val;
-	// printk(KERN_INFO "Proposer: received a CLIENT VALUE from %d", clv->client_id );
+	// printk(KERN_INFO "Proposer: received a CLIENT VALUE from %d", 0 );
 	try_accept(proposer);
 }
 
@@ -204,16 +202,13 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers, 
 	peers_subscribe(peers, PAXOS_ACCEPTED, evproposer_handle_accepted, p);
 	peers_subscribe(peers, PAXOS_PREEMPTED, evproposer_handle_preempted, p);
 	peers_subscribe(peers, PAXOS_CLIENT_VALUE, evproposer_handle_client_value, p);
-	peers_subscribe(peers, PAXOS_ACCEPTOR_STATE,
-		evproposer_handle_acceptor_state, p);
-	// printk(KERN_INFO "Proposer: Subscribed to PAXOS_PROMISE, PAXOS_ACCEPTED, PAXOS_PREEMPTED, PAXOS_CLIENT_VALUE");
+	peers_subscribe(peers, PAXOS_ACCEPTOR_STATE, evproposer_handle_acceptor_state, p);
 
 	k->timer_cb[PROP_TIM] = evproposer_check_timeouts;
 	k->data[PROP_TIM] = (unsigned long) p;
 	k->timeout_jiffies[PROP_TIM] = timeval_to_jiffies(&sk_timeout_timeval);
 
 	p->state = proposer_new(p->id, acceptor_count);
-	// printk(KERN_INFO "Proposer: Created an internal proposer");
 	p->peers = peers;
 
 	evproposer_preexec_once(p);
@@ -262,8 +257,8 @@ evproposer_free_internal(struct evproposer* p)
 void
 evproposer_free(struct evproposer* p)
 {
-	printk(KERN_INFO "PROPOSER");
-	printall(p->peers);
+	// printk(KERN_INFO "PROPOSER");
+	// printall(p->peers);
 	peers_free(p->peers);
 	evproposer_free_internal(p);
 }

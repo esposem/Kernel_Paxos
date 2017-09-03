@@ -28,9 +28,9 @@
 
 #include "acceptor.h"
 #include "storage.h"
-#include <linux/types.h> //stdint, stdarg
+#include <linux/types.h>
 #include <linux/module.h>
-#include <linux/slab.h> //kmalloc
+#include <linux/slab.h>
 
 
 struct acceptor
@@ -83,7 +83,6 @@ acceptor_receive_prepare(struct acceptor* a,
 		return 0;
 	int found = storage_get_record(&a->store, req->iid, &acc);
 	if (!found || acc.ballot <= req->ballot) {
-		// printk(KERN_INFO "Acceptor: N (%u) > prev_proposal (%u), preparing iid: %u, ballot: %u", req->ballot, acc.ballot, req->iid, req->ballot);
 		acc.aid = a->id;
 		acc.iid = req->iid;
 		acc.ballot = req->ballot;

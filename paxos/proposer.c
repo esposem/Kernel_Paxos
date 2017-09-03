@@ -173,49 +173,41 @@ int
 proposer_receive_promise(struct proposer* p, paxos_promise* ack,
 	paxos_prepare* out)
 {
-	// khiter_t k = kh_get_instance(p->prepare_instances, ack->iid);
 	struct instance * inst = NULL;
 	HASH_FIND_IID(p->prepare_instances, &ack->iid, inst);
 
 	if (inst == NULL) {
-		// printk(KERN_INFO "Proposer: Promise dropped, instance %u not pending", ack->iid);
+		printk(KERN_INFO "Proposer: Promise dropped, instance %u not pending", ack->iid);
 		return 0;
 	}
-	// struct instance* inst = kh_value(p->prepare_instances, k);
 
 	if (ack->ballot < inst->ballot) {
-		// printk(KERN_INFO "Proposer: Promise dropped, too old");
+		printk(KERN_INFO "Proposer: Promise dropped, too old");
 		return 0;
 	}
 
 	if (ack->ballot > inst->ballot) {
-		// printk(KERN_INFO "Proposer: Instance %u preempted: ballot %d ack ballot %d", inst->iid, inst->ballot, ack->ballot);
+		printk(KERN_INFO "Proposer: Instance %u preempted: ballot %d ack ballot %d", inst->iid, inst->ballot, ack->ballot);
 		proposer_preempt(p, inst, out);
 		return 1;
 	}
 
 	if (quorum_add(&inst->quorum, ack->aid) == 0) {
-		// printk(KERN_INFO "Proposer: Duplicate promise dropped from: %d, iid: %u", ack->aid, inst->iid);
+		printk(KERN_INFO "Proposer: Duplicate promise dropped from: %d, iid: %u", ack->aid, inst->iid);
 		return 0;
-	}else{
-		// printk(KERN_INFO "Proposer: Incremented quorum");
 	}
 
-	// printk(KERN_INFO "Proposer: Received valid promise from: %d, iid: %u", ack->aid, inst->iid);
+	printk(KERN_INFO "Proposer: Received valid promise from: %d, iid: %u", ack->aid, inst->iid);
 
 	if (ack->value.paxos_value_len > 0) {
-		// printk(KERN_INFO "Proposer: Promise has value");
 		if (ack->value_ballot > inst->value_ballot) {
 			if (instance_has_promised_value(inst)){
-				// printk(KERN_INFO "There was a previous promise, but this value is bigger, so delete old one");
 				paxos_value_free(inst->promised_value);
 			}
 			inst->value_ballot = ack->value_ballot;
 			inst->promised_value = paxos_value_new(ack->value.paxos_value_val,
 				ack->value.paxos_value_len);
-			// printk(KERN_INFO "Proposer: Value in promise saved, removed older value");
 		}
-			// else // printk(KERN_INFO "Proposer: Value in promise ignored");
 	}
 
 	return 0;
@@ -259,15 +251,12 @@ int
 proposer_receive_accepted(struct proposer* p, paxos_accepted* ack)
 {
 	struct instance * inst;
-	// khiter_t k = kh_get_instance(p->accept_instances, ack->iid);
 	HASH_FIND_IID(p->accept_instances, &ack->iid, inst);
 
 	if (inst == NULL) {
 		// printk(KERN_INFO "Proposer: Accept ack dropped, iid: %u not pending", ack->iid);
 		return 0;
 	}
-
-	// struct instance* inst = kh_value(p->accept_instances, k);
 
 	if (ack->ballot == inst->ballot) {
 		if (!quorum_add(&inst->quorum, ack->aid)) {
@@ -423,7 +412,6 @@ proposer_move_instance(struct instance ** f, struct instance ** t,
 static void
 proposer_trim_instances(struct proposer* p, struct instance** h, iid_t iid)
 {
-	// // printk(KERN_INFO "trimming instances in proposer");
 	struct instance * i;
 	for(i=*h; i != NULL; i=i->hh.next) {
 		struct instance* inst = i;
@@ -450,8 +438,6 @@ instance_new(iid_t iid, ballot_t ballot, int acceptors)
 	inst->promised_value = NULL;
 	do_gettimeofday(&inst->created_at);
 	quorum_init(&inst->quorum, acceptors);
-	// assert(inst->iid > 0);
-	// WARN_ON(inst->iid <= 0);
 	return inst;
 }
 

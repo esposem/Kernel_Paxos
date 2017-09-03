@@ -163,7 +163,6 @@ learner_has_holes(struct learner* l, iid_t* from, iid_t* to)
 	if (l->highest_iid_closed > l->current_iid) {
 		*from = l->current_iid;
 		*to = l->highest_iid_closed;
-		// printk(KERN_INFO "Hole");
 		return 1;
 	}
 	return 0;
@@ -172,7 +171,6 @@ learner_has_holes(struct learner* l, iid_t* from, iid_t* to)
 static struct instance*
 learner_get_instance(struct learner* l, iid_t iids)
 {
-	// // printk(KERN_INFO "Searching for %d", iids);
 	struct instance * h = NULL;
   HASH_FIND_IID( l->instances, &iids, h);
 	return h;

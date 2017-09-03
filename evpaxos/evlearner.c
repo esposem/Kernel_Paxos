@@ -84,7 +84,6 @@ evlearner_deliver_next_closed(struct evlearner* l)
 {
 	paxos_accepted deliver;
 	while (learner_deliver_next(l->state, &deliver)) {
-		// // printk(KERN_INFO "Delivered %d", deliver.iid);
 		l->delfun(
 			deliver.iid,
 			deliver.value.paxos_value_val,
@@ -102,7 +101,7 @@ static void
 evlearner_handle_accepted(struct peer* p, paxos_message* msg, void* arg)
 {
 	struct evlearner* l = arg;
-	// printk(KERN_INFO "Learner: Received PAXOS_ACCEPTED");
+	printk(KERN_INFO "Learner: Received PAXOS_ACCEPTED");
 	learner_receive_accepted(l->state, &msg->u.accepted);
 	evlearner_deliver_next_closed(l);
 }
@@ -117,13 +116,9 @@ evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
 	learner->delfun = f;
 	learner->delarg = arg;
 	learner->state = learner_new(acceptor_count);
-	// printk(KERN_INFO "Learner: allocated a new learner");
 	learner->acceptors = peers;
 
-
 	peers_subscribe(peers, PAXOS_ACCEPTED, evlearner_handle_accepted, learner);
-	// printk(KERN_INFO "Learner: Subscribed to PAXOS_ACCEPTED");
-
 	peers_foreach_acceptor(peers, peer_send_hi, NULL);
 
 	k->timer_cb[LEA_TIM] = evlearner_check_holes;
@@ -140,22 +135,16 @@ evlearner_init(const char* config_file, deliver_function f, void* arg,
 	struct evpaxos_config* c = evpaxos_config_read(config_file);
 	if (c == NULL){
 		return NULL;
-	}else{
-		// printk(KERN_INFO "Learner: Learner: read config file");
 	}
 
 	struct sockaddr_in addr;
 	addr.sin_port = 0;
-	// addr.sin_addr.s_addr = INADDR_ANY;
-	unsigned char serverip[5] = {127,0,0,4,'\0'};
-	addr.sin_addr.s_addr = htonl(create_address(serverip));
+	addr.sin_addr.s_addr = INADDR_ANY;
 	struct peers* peers = peers_new(&addr, c, -1);
 	add_acceptors_from_config(-1, peers);
 	// printall(peers);
 	sk_timeout_timeval.tv_sec = 0;
 	sk_timeout_timeval.tv_usec = 100000;
-	// sk_timeout_timeval.tv_sec = 1;
-	// sk_timeout_timeval.tv_usec = 0;
 
 	if(peers_sock_init(peers, k) >= 0){
 		struct evlearner* l = evlearner_init_internal(c, peers, f, arg, k);
