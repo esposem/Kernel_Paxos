@@ -35,7 +35,7 @@ static char * analyze_error(int err){
 
 void check_sock_allocation(udp_service * k, struct socket * s, atomic_t * allocated){
   if(atomic_read(allocated) == 1){
-    // printk(KERN_INFO "%s Released socket",k->name);
+    printk(KERN_INFO "%s Released socket",k->name);
     atomic_set(allocated, 0);
     sock_release(s);
   }
@@ -61,7 +61,7 @@ int udp_server_send(struct socket *sock, struct sockaddr_in * address, const cha
 
     oldmm = get_fs(); set_fs(KERNEL_DS);
 
-    // while(l > 0){
+    while(l > 0){
       if(l < MAX_UDP_SIZE){
         min = l;
       }else{
@@ -69,13 +69,13 @@ int udp_server_send(struct socket *sock, struct sockaddr_in * address, const cha
       }
       vec.iov_len = min;
       vec.iov_base = (char *)buf;
-      // l -= min;
-      // buf += min;
+      l -= min;
+      buf += min;
       npacket++;
 
       lenn = kernel_sendmsg(sock, &msg, &vec, min, min);
-      // // printk(KERN_INFO "%s Sent message to %pI4 : %hu, size %d",module_name, &address->sin_addr, ntohs(address->sin_port), lenn);
-    // }
+      // printk(KERN_INFO "%s Sent message to %pI4 : %hu, size %d",module_name, &address->sin_addr, ntohs(address->sin_port), lenn);
+    }
 
     set_fs(oldmm);
 
@@ -104,16 +104,11 @@ int udp_server_receive(struct socket *sock, struct sockaddr_in *address, unsigne
   vec.iov_len = MAX_UDP_SIZE;
   vec.iov_base = buf;
 
-  // lenm = -EAGAIN;
-  // if(kthread_should_stop() || signal_pending(current)){
-  //   return 0;
-  // }else{
-    lenm = kernel_recvmsg(sock, &msg, &vec, MAX_UDP_SIZE, MAX_UDP_SIZE, flags);
-    if(lenm > 0){
-      address = (struct sockaddr_in *) msg.msg_name;
-      // // printk(KERN_INFO "%s Received message from %pI4 : %hu , size %d",k->name,&address->sin_addr, ntohs(address->sin_port), lenm);
-    }
-  // }
+  lenm = kernel_recvmsg(sock, &msg, &vec, MAX_UDP_SIZE, MAX_UDP_SIZE, flags);
+  if(lenm > 0){
+    address = (struct sockaddr_in *) msg.msg_name;
+    // printk(KERN_INFO "%s Received message from %pI4 : %hu , size %d",k->name,&address->sin_addr, ntohs(address->sin_port), lenm);
+  }
 
   return lenm;
 }
@@ -125,11 +120,11 @@ int udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * ad
 
   server_err = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, s);
   if(server_err < 0){
-    // printk(KERN_INFO "%s Error %d while creating socket",k->name, server_err);
+    printk(KERN_INFO "%s Error %d while creating socket",k->name, server_err);
     return -1;
   }else{
     atomic_set(allocated, 1);
-    // printk(KERN_INFO "%s Created socket",k->name);
+    printk(KERN_INFO "%s Created socket",k->name);
   }
 
   conn_socket = *s;
@@ -145,7 +140,7 @@ int udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * ad
     // update the port (might be given as 0, that is random)
     int i = (int) sizeof(struct sockaddr_in);
     inet_getname(conn_socket, (struct sockaddr *) address, &i , 0);
-    // printk(KERN_INFO "%s Socket is bind to %pI4 : %hu",k->name, &address->sin_addr, ntohs(address->sin_port));
+    printk(KERN_INFO "%s Socket is bind to %pI4 : %hu",k->name, &address->sin_addr, ntohs(address->sin_port));
     kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&sk_timeout_timeval, sizeof(struct timeval));
     int k = INT_MAX;
     kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVBUF, (char * )&k, sizeof(int));
@@ -178,7 +173,6 @@ void init_service(udp_service * k, char * name, int id){
   memcpy(k->name, name, namelen);
   k->name[stlen -2] = ':';
   k->name[stlen -1] = '\0';
-  // printk(KERN_INFO "%s Initialized", k->name);
 }
 
 void udp_server_quit(udp_service * k){
@@ -187,23 +181,18 @@ void udp_server_quit(udp_service * k){
     if(atomic_read(&k->thread_running) == 1){
       atomic_set(&k->thread_running, 0);
       if((ret = kthread_stop(k->u_thread)) == 0){
-        // printk(KERN_INFO "%s Terminated thread", k->name);
+        printk(KERN_INFO "%s Terminated thread", k->name);
       }else{
-        // printk(KERN_INFO "%s Error %d in terminating thread", k->name, ret);
+        printk(KERN_ERR "%s Error %d in terminating thread", k->name, ret);
       }
     }else{
-      // printk(KERN_INFO "%s Thread was not running", k->name);
+      printk(KERN_INFO "%s Thread was not running", k->name);
     }
 
-    // if(atomic_read(&k->socket_allocated) == 1){
-    //   atomic_set(&k->socket_allocated, 0);
-    //   sock_release(s);
-    //   // printk(KERN_INFO "%s Released socket", k->name);
-    // }
-    // printk(KERN_INFO "%s Module unloaded", k->name);
+    printk(KERN_INFO "%s Module unloaded", k->name);
     kfree(k->name);
     kfree(k);
   }else{
-    // printk(KERN_INFO "Module was NULL, terminated");
+    printk(KERN_ERR "Module was NULL, terminated");
   }
 }

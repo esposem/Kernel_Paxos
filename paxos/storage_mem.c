@@ -77,17 +77,14 @@ mem_storage_open(void* handle)
 static void
 mem_storage_close(void* handle)
 {
-	// printk(KERN_INFO "Called mem_storage_close");
 	struct mem_storage* s = handle;
 	struct hash_item * current_hash;
 	struct hash_item * tmp;
-	// printk(KERN_ERR "there are %d in the hash",  HASH_COUNT(s->record));
  HASH_ITER(hh , s->record, current_hash, tmp) {
 	  HASH_DEL(s->record, current_hash);
 	  paxos_accepted_free(current_hash->value);
 		kfree(current_hash);
  }
- // printk(KERN_ERR "now there are %d in the hash", HASH_COUNT(s->record));
 
  kfree(s);
 
@@ -135,22 +132,13 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 		paxos_accepted_free(a->value);
 		a->value = val;
 		a->iid = acc->iid;
-		// printk(KERN_INFO "%d replaced", acc->iid);
 	}
 	else {
 		a = kmalloc(sizeof(struct hash_item), GFP_KERNEL);
 		a->value = val;
 		a->iid = acc->iid;
 		HASH_ADD_IID(s->record, iid, a);
-		// printk(KERN_INFO "%d new", acc->iid);
 	}
-
-
-	// printk(KERN_ERR "Added %d", acc->iid);
-	// paxos_accepted p;
-	// printk(KERN_INFO "REGETTING...");
-	// mem_storage_get(handle, a->iid, &p);
-	// printk(KERN_INFO "--------------");
 
 	return 0;
 

@@ -42,9 +42,9 @@ static void start_acc_thread(void){
   kacceptor->u_thread = kthread_run((void *)run_acceptor, NULL, kacceptor->name);
   if(kacceptor->u_thread >= 0){
     atomic_set(&kacceptor->thread_running,1);
-    // printk(KERN_INFO "%s Thread running", kacceptor->name);
+    printk(KERN_INFO "%s Thread running", kacceptor->name);
   }else{
-    // printk(KERN_ERR "%s Error in starting thread", kacceptor->name);
+    printk(KERN_ERR "%s Error in starting thread", kacceptor->name);
   }
 }
 
@@ -52,7 +52,7 @@ static int __init init_acceptor(void)
 {
   kacceptor = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kacceptor){
-    // printk(KERN_ERR "Failed to initialize ACCEPTOR");
+    printk(KERN_ERR "Failed to initialize ACCEPTOR");
   }else{
     init_service(kacceptor, "Acceptor", id);
     start_acc_thread();
@@ -68,5 +68,5 @@ static void __exit acceptor_exit(void)
 
 module_init(init_acceptor)
 module_exit(acceptor_exit)
-MODULE_LICENSE("MIT");
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

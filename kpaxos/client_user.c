@@ -16,8 +16,14 @@
 #include "paxos_types.h"
 #include "kernel_client.h"
 
-#define PORT 3002
-#define PROP_IP "127.0.0.2"
+#if 0
+	#define PORT 3003
+	#define PROP_IP "127.0.0.3"
+#else
+	#define PORT 3002
+	#define PROP_IP "127.0.0.2"
+#endif
+
 #define BUFFER_LENGTH 1000
 
 #define CCHAR_OP 0
@@ -339,7 +345,7 @@ start_client(const char* config, int proposer_id, int outstanding, int value_siz
 {
 	make_client(config, proposer_id, outstanding, value_size);
 	// signal(SIGPIPE, SIG_IGN);
-	libevent_global_shutdown();
+	// libevent_global_shutdown();
 }
 
 static void

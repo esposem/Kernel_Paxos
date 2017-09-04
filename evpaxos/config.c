@@ -59,8 +59,6 @@ enum option_type
 	option_integer,
 	option_string,
 	option_verbosity,
-	// option_backend,
-	// option_bytes
 };
 
 struct option
@@ -77,11 +75,7 @@ struct option options[] =
 	{ "learner-catch-up", &paxos_config.learner_catch_up, option_boolean },
 	{ "proposer-timeout", &paxos_config.proposer_timeout, option_integer },
 	{ "proposer-preexec-window", &paxos_config.proposer_preexec_window, option_integer },
-	// { "storage-backend", &paxos_config.storage_backend, option_backend },
 	{ "acceptor-trash-files", &paxos_config.trash_files, option_boolean },
-	// { "lmdb-sync", &paxos_config.lmdb_sync, option_boolean },
-	// { "lmdb-env-path", &paxos_config.lmdb_env_path, option_string },
-	// { "lmdb-mapsize", &paxos_config.lmdb_mapsize, option_bytes },
 	{ 0 }
 };
 
@@ -103,22 +97,24 @@ unsigned int inet_addr(char *str)
 struct evpaxos_config*
 evpaxos_config_read(const char* path)
 {
-	#if 1
-	int size_config = 6;
+	#if 0
+	int size_config = 7;
 	char * config_file[] = {
 		"acceptor 0 127.0.0.3 3003",
 		"acceptor 1 127.0.0.3 4003",
 		"acceptor 2 127.0.0.3 5003",
 		"proposer 0 127.0.0.2 3002",
 		"proposer 1 127.0.0.2 4002",
-		"proposer 2 127.0.0.2 5002"
+		"proposer 2 127.0.0.2 5002",
+		"verbosity debug"
 	};
 	#else
-	int size_config = 3;
+	int size_config = 4;
 	char * config_file[] = {
 		"replica 0 127.0.0.3 3003",
 		"replica 1 127.0.0.3 4003",
-		"replica 2 127.0.0.3 5003"
+		"replica 2 127.0.0.3 5003",
+		"verbosity quiet"
 	};
 	#endif
 
@@ -291,7 +287,7 @@ parse_line(struct evpaxos_config* c, char* line)
 
 	if (strcasecmp(tok, "a") == 0 || strcasecmp(tok, "acceptor") == 0) {
 		if (c->acceptors_count >= MAX_N_OF_PROPOSERS) {
-			// printk(KERN_ERR "Number of acceptors exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
+			paxos_log_error("Number of acceptors exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
 			return 0;
 		}
 		struct address* addr = &c->acceptors[c->acceptors_count++];
@@ -300,7 +296,7 @@ parse_line(struct evpaxos_config* c, char* line)
 
 	if (strcasecmp(tok, "p") == 0 || strcasecmp(tok, "proposer") == 0) {
 		if (c->proposers_count >= MAX_N_OF_PROPOSERS) {
-			// printk(KERN_ERR "Number of proposers exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
+			paxos_log_error("Number of proposers exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
 			return 0;
 		}
 		struct address* addr = &c->proposers[c->proposers_count++];
@@ -310,7 +306,7 @@ parse_line(struct evpaxos_config* c, char* line)
 	if (strcasecmp(tok, "r") == 0 || strcasecmp(tok, "replica") == 0) {
 		if (c->proposers_count >= MAX_N_OF_PROPOSERS ||
 			c->acceptors_count >= MAX_N_OF_PROPOSERS ) {
-				// printk(KERN_ERR "Number of replicas exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
+				paxos_log_error("Number of replicas exceded maximum of: %d\n", MAX_N_OF_PROPOSERS);
 				return 0;
 		}
 		struct address* pro_addr = &c->proposers[c->proposers_count++];
@@ -328,27 +324,20 @@ parse_line(struct evpaxos_config* c, char* line)
 	switch (opt->type) {
 		case option_boolean:
 			rv = parse_boolean(line, opt->value);
-			if (rv == 0) // printk(KERN_ERR "Expected 'yes' or 'no'\n");
+			if (rv == 0) paxos_log_error("Expected 'yes' or 'no'\n");
 			break;
 		case option_integer:
 			rv = parse_integer(line, opt->value);
-			if (rv == 0) // printk(KERN_ERR "Expected number\n");
+			if (rv == 0) paxos_log_error("Expected number\n");
 			break;
 		case option_string:
 			rv = parse_string(line, opt->value);
-			if (rv == 0) // printk(KERN_ERR "Expected string\n");
+			if (rv == 0) paxos_log_error("Expected string\n");
 			break;
 		case option_verbosity:
 			rv = parse_verbosity(line, opt->value);
-			if (rv == 0) // printk(KERN_ERR "Expected quiet, error, info, or debug\n");
+			if (rv == 0) paxos_log_error("Expected quiet, error, info, or debug\n");
 			break;
-		// case option_backend:
-		// 	rv = parse_backend(line, opt->value);
-		// 	if (rv == 0) // printk(KERN_ERR "Expected memory or lmdb\n");
-		// 	break;
-		// case option_bytes:
-		// 	rv = parse_bytes(line, opt->value);
-		// 	if (rv == 0) // printk(KERN_ERR "Expected number of bytes.\n");
 	}
 
 	return rv;
@@ -359,7 +348,6 @@ address_init(struct address* a, char* addr, int port)
 {
 	a->addr = kmalloc(strlen(addr) + 1, GFP_KERNEL);
 	strcpy(a->addr, addr);
-	// a->addr = strdup(addr);
 	a->port = port;
 }
 

@@ -88,7 +88,6 @@ peers_free(struct peers* p)
 	free_all_peers(p->peers, p->peers_count);
 	free_all_peers(p->clients, p->clients_count);
 	kfree(p->me_send);
-	// kfree(p->me_rcv);
 	kfree(p);
 }
 
@@ -139,15 +138,16 @@ void add_acceptors_from_config(int myid, struct peers * p){
 	}
 }
 
-void printall(struct peers * p){
-	printk(KERN_INFO "PEERS we connect to");
+void printall(struct peers * p, char * name){
+	paxos_log_info("%s", name);
+	paxos_log_info("PEERS we connect to");
 	for(int i = 0; i < p->peers_count; i++){
-		printk(KERN_INFO "id = %d, ip = %pI4, port = %d", p->peers[i]->id, &(p->peers[i]->addr.sin_addr), ntohs(p->peers[i]->addr.sin_port) );
+		paxos_log_info("id = %d, ip = %pI4, port = %d", p->peers[i]->id, &(p->peers[i]->addr.sin_addr), ntohs(p->peers[i]->addr.sin_port) );
 	}
 
-	printk(KERN_INFO "CLIENTS we receive connections \n(will be updated as message are received)");
+	paxos_log_info("CLIENTS we receive connections \n(will be updated as message are received)");
 	for(int i = 0; i < p->clients_count; i++){
-		printk(KERN_INFO "id = %d, ip = %pI4, port = %d", p->clients[i]->id, &(p->clients[i]->addr.sin_addr), ntohs(p->clients[i]->addr.sin_port) );
+		paxos_log_info("id = %d, ip = %pI4, port = %d", p->clients[i]->id, &(p->clients[i]->addr.sin_addr), ntohs(p->clients[i]->addr.sin_port) );
 	}
 }
 
@@ -175,15 +175,13 @@ static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
 	for (int i = 0; i < p->clients_count; ++i){
 		if(memcmp(&(addr->sin_port), &(p->clients[i]->addr.sin_port), sizeof(unsigned short)) == 0
 		&& memcmp(&(addr->sin_addr), &(p->clients[i]->addr.sin_addr), sizeof(struct in_addr)) == 0){
-			// printk(KERN_ALERT "%s Client was already in the list",la->name);
 			return;
 		}
 	}
-	printk(KERN_ALERT "%s Added a new client, now %d clients",la->name, p->clients_count + 1);
+	paxos_log_info( "%s Added a new client, now %d clients",la->name, p->clients_count + 1);
 	p->clients = krealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1), GFP_KERNEL);
 	p->clients[p->clients_count] = make_peer(p, p->clients_count, addr);
 	p->clients_count++;
-	// printall(p);
 }
 
 int peers_sock_init(struct peers* p, udp_service * k){
@@ -224,14 +222,18 @@ peers_listen(struct peers* p, udp_service * k)
 		unsigned char * bigger_buff = NULL;
 		int n_packet_toget =0, size_bigger_buf = 0;
 	#endif
-	// printk(KERN_INFO "%s Listening", k->name);
+	paxos_log_debug("%s Listening", k->name);
 	struct peer tmp;
 	unsigned long long time_passed[3] = {0,0,0};
-
+	struct timeval t1, t2;
+	struct timeval * p1, *p2, * swap;
+	p1 = &t1;
+	p2 = &t2;
+	do_gettimeofday(&t1);
 	while(1){
 
 		if(kthread_should_stop() || signal_pending(current)){
-			// printk(KERN_INFO "Stopped!");
+			paxos_log_debug("Stopped!");
 			if(k->timer_cb[LEA_TIM] != NULL)
 				peers_foreach_acceptor(p, peer_send_del, NULL);
 
@@ -249,12 +251,8 @@ peers_listen(struct peers* p, udp_service * k)
 		unsigned long temp;
 		memset(in_buf, '\0', MAX_UDP_SIZE);
     memset(&address, 0, sizeof(struct sockaddr_in));
-		// // printk(KERN_INFO "Receiving...");
 		ret = udp_server_receive(p->sock_send, &address, in_buf, MSG_WAITALL, k);
-		// // printk(KERN_INFO "End receiving");
 		if(ret > 0){
-			struct timeval t1;
-			do_gettimeofday(&t1);
 			if(first_time == 0){
 				memcpy(&tmp.addr, &address, sizeof(struct sockaddr_in));
 				tmp.peers = p;
@@ -285,26 +283,25 @@ peers_listen(struct peers* p, udp_service * k)
 					}
 				#endif
 			}
-			struct timeval t2;
-			do_gettimeofday(&t2);
-
-			// temp = timeval_to_jiffies(&t2) - timeval_to_jiffies(&t1);
-			temp = HZ/10;
-		}else{
-			temp = timeval_to_jiffies(&sk_timeout_timeval);
 		}
-			time_passed[0] += temp;
-			time_passed[1] += temp;
-			time_passed[2] += temp;
-			// // printk(KERN_INFO "Not received anything, calling callback");
-			for(int i = 0; i < N_TIMER; i++){
-				// k->timer_cb[i] != NULL is a safety check
-				if(k->timer_cb[i] != NULL && time_passed[i] >= k->timeout_jiffies[i]){
-					time_passed[i] = 0;
-					k->timer_cb[i](k->data[i]);
-				}
+
+		do_gettimeofday(p2);
+		temp = timeval_to_jiffies(p2) - timeval_to_jiffies(p1);
+		swap = p2;
+		p2 = p1;
+		p1 = swap;
+
+		time_passed[0] += temp;
+		time_passed[1] += temp;
+		time_passed[2] += temp;
+		paxos_log_debug("Not received anything, calling callback");
+		for(int i = 0; i < N_TIMER; i++){
+			// k->timer_cb[i] != NULL is a safety check
+			if(k->timer_cb[i] != NULL && time_passed[i] >= k->timeout_jiffies[i]){
+				time_passed[i] = 0;
+				k->timer_cb[i](k->data[i]);
 			}
-		// }
+		}
 	}
 	return 1;
 }

@@ -135,29 +135,23 @@ paxos_log(int level, const char* format, va_list ap)
 	char msg[1000];
 	struct timeval tv;
 
-	// if (level > paxos_config.verbosity)
-	// 	return;
+	if (level > paxos_config.verbosity){
+		return;
+	}
 
 	do_gettimeofday(&tv);
-	// off = strftime(msg, sizeof(msg), "%d %b %H:%M:%S. ", localtime(&tv.tv_sec));
 	vsnprintf(msg+off, sizeof(msg)-off, format, ap);
-	// fprintf(stdout,"%s\n", msg);
-	// printk(KERN_ERR "%s", msg);
-
-	// unsigned long get_time;
-  // int sec, hr, min, tmp1,tmp2, tmp3;
-  // struct timeval tv;
-  // struct tm tv2;
-	//
-  // do_gettimeofday(&tv);
-  // get_time = tv.tv_sec;
-  // sec = get_time % 60;
-  // tmp1 = get_time / 60;
-  // min = tmp1 % 60;
-  // tmp2 = tmp1 / 60;
-  // hr = (tmp2 % 24) - 4;
-	//
-  // // printk(KERN_INFO "time ::  %d:%d:%d\n",hr,min,sec);
+	switch (level) {
+		case PAXOS_LOG_ERROR:
+			printk(KERN_ERR "%s", msg);
+			break;
+		case PAXOS_LOG_INFO:
+			printk(KERN_INFO "%s", msg);
+			break;
+		case PAXOS_LOG_DEBUG:
+			printk(KERN_INFO "%s", msg);
+			break;
+	}
 }
 
 void

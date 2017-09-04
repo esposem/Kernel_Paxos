@@ -60,7 +60,7 @@ struct sockaddr_in * get_sockaddr(struct peer * p);
 struct peer * get_me_send(struct peers * p);
 // struct peer * get_me_rcv(struct peers * p);
 int peer_get_id(struct peer* p);
-void printall(struct peers * p);
+void printall(struct peers * p, char * name);
 
 #ifdef __cplusplus
 }
