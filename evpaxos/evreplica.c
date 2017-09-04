@@ -62,7 +62,7 @@ evpaxos_replica_init(int id, const char* config_file, deliver_function f,
 	struct sockaddr_in send_addr = evpaxos_acceptor_address(config,id);
 	r->peers = peers_new(&send_addr, config, id);
 	add_acceptors_from_config(-1, r->peers);
-	// printall(r->peers);
+	printall(r->peers, k->name);
 	sk_timeout_timeval.tv_sec = 0;
 	sk_timeout_timeval.tv_usec = 100000;
 	if(peers_sock_init(r->peers, k) == 0){
@@ -87,6 +87,7 @@ void paxos_replica_listen(udp_service * k, struct evpaxos_replica * ev){
 void
 evpaxos_replica_free(struct evpaxos_replica* r)
 {
+	printall(r->peers, "REPLICA");
 	if (r->learner)
 		evlearner_free_internal(r->learner);
 	if(r->proposer)
@@ -126,10 +127,8 @@ evpaxos_replica_submit(struct evpaxos_replica* r, char* value, int size)
 	struct peer* p;
 	for (i = 0; i < peers_count(r->peers); ++i) {
 		p = peers_get_acceptor(r->peers, i);
-		// if (peer_connected(p)) {
-			paxos_submit(get_send_socket(p), get_sockaddr(p), value, size);
-			return;
-		// }
+		paxos_submit(get_send_socket(p), get_sockaddr(p), value, size);
+		return;
 	}
 }
 

@@ -41,9 +41,9 @@ static void start_prop_thread(void){
   kproposer->u_thread = kthread_run((void *)run_proposer, NULL, kproposer->name);
   if(kproposer->u_thread >= 0){
     atomic_set(&kproposer->thread_running,1);
-    // printk(KERN_INFO "%s Thread running", kproposer->name);
+    printk(KERN_INFO "%s Thread running", kproposer->name);
   }else{
-    // printk(KERN_ERR "%s Error in starting thread", kproposer->name);
+    printk(KERN_ERR "%s Error in starting thread", kproposer->name);
   }
 }
 
@@ -51,7 +51,7 @@ static int __init init_prop(void)
 {
   kproposer = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kproposer){
-    // printk(KERN_ERR "Failed to initialize server");
+    printk(KERN_ERR "Failed to initialize server");
   }else{
     init_service(kproposer, "Proposer", id);
     start_prop_thread();
@@ -66,5 +66,5 @@ static void __exit prop_exit(void)
 
 module_init(init_prop)
 module_exit(prop_exit)
-MODULE_LICENSE("MIT");
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

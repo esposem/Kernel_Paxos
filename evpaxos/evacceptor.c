@@ -65,21 +65,14 @@ evacceptor_handle_prepare(struct peer* p, paxos_message* msg, void* arg)
 	paxos_message out;
 	paxos_prepare* prepare = &msg->u.prepare;
 	struct evacceptor* a = (struct evacceptor*)arg;
-	// printk(KERN_INFO "Acceptor: Received PREPARE");
+	paxos_log_debug("Acceptor: Received PREPARE");
 	if (acceptor_receive_prepare(a->state, prepare, &out) != 0) {
 		send_acceptor_paxos_message( get_send_socket(p),get_sockaddr(p), &out);
 		paxos_message_destroy(&out);
-		// printk(KERN_INFO "Acceptor: sent promise for iid %d", prepare->iid);
+		paxos_log_info("Acceptor: sent promise for iid %d", prepare->iid);
 	}
 }
 
-// struct client_value
-// {
-// 	int client_id;
-// 	struct timeval t;
-// 	size_t size;
-// 	char value[0];
-// };
 /*
 	Received a accept request (phase 2a).
 */
@@ -89,16 +82,13 @@ evacceptor_handle_accept(struct peer* p, paxos_message* msg, void* arg)
 	paxos_message out;
 	paxos_accept* accept = &msg->u.accept;
 	struct evacceptor* a = (struct evacceptor*)arg;
-	printk(KERN_INFO "Acceptor: Received ACCEPT REQUEST");
+	paxos_log_info("Acceptor: Received ACCEPT REQUEST");
 	if (acceptor_receive_accept(a->state, accept, &out) != 0) {
 		if (out.type == PAXOS_ACCEPTED) {
-			// printk(KERN_INFO "Acceptor: Sent ACCEPTED to all proposers and learners");
+			paxos_log_debug("Acceptor: Sent ACCEPTED to all proposers and learners");
 			peers_foreach_client(a->peers, peer_send_paxos_message, &out);
-			// struct client_value * clv = (struct client_value *) out.u.accepted.value.paxos_value_val;
-			// printk(KERN_INFO "Acceptor: sending a CLIENT VALUE %d", clv->client_id );
-
 		} else if (out.type == PAXOS_PREEMPTED) {
-			// printk(KERN_INFO "Acceptor: Sent PREEMPTED to all proposers ");
+			paxos_log_debug("Acceptor: Sent PREEMPTED to all proposers ");
 			send_acceptor_paxos_message(get_send_socket(p), get_sockaddr(p), &out);
 		}
 		paxos_message_destroy(&out);
@@ -112,10 +102,10 @@ evacceptor_handle_repeat(struct peer* p, paxos_message* msg, void* arg)
 	paxos_accepted accepted;
 	paxos_repeat* repeat = &msg->u.repeat;
 	struct evacceptor* a = (struct evacceptor*)arg;
-	// printk(KERN_INFO "Acceptor: Handle repeat for iids %d-%d", repeat->from, repeat->to);
+	paxos_log_info("Acceptor: Handle repeat for iids %d-%d", repeat->from, repeat->to);
 	for (iid = repeat->from; iid <= repeat->to; ++iid) {
 		if (acceptor_receive_repeat(a->state, iid, &accepted)) {
-			// printk(KERN_INFO "Acceptor: sent a repeated PAXOS_ACCEPTED %d to learner", iid);
+			paxos_log_debug("Acceptor: sent a repeated PAXOS_ACCEPTED %d to learner", iid);
 			send_paxos_accepted(get_send_socket(p), get_sockaddr(p), &accepted);
 			paxos_accepted_destroy(&accepted);
 		}
@@ -125,7 +115,7 @@ evacceptor_handle_repeat(struct peer* p, paxos_message* msg, void* arg)
 static void
 evacceptor_handle_trim(struct peer* p, paxos_message* msg, void* arg)
 {
-	// printk(KERN_INFO "Acceptor: Received PAXOS_TRIM. Deleting the old instances");
+	paxos_log_debug("Acceptor: Received PAXOS_TRIM. Deleting the old instances");
 	paxos_trim* trim = &msg->u.trim;
 	struct evacceptor* a = (struct evacceptor*)arg;
 	acceptor_receive_trim(a->state, trim);
@@ -134,7 +124,7 @@ evacceptor_handle_trim(struct peer* p, paxos_message* msg, void* arg)
 static void
 send_acceptor_state(unsigned long arg)
 {
-	// printk(KERN_INFO "Acceptor: send_acceptor_state");
+	paxos_log_debug("Acceptor: send_acceptor_state");
 	struct evacceptor* a = (struct evacceptor*)arg;
 	paxos_message msg = {.type = PAXOS_ACCEPTOR_STATE};
 	acceptor_set_current_state(a->state, &msg.u.state);
@@ -174,8 +164,8 @@ evacceptor_init(int id, const char* config_file, udp_service * k)
 
 	int acceptor_count = evpaxos_acceptor_count(config);
 	if (id < 0 || id >= acceptor_count) {
-		// printk(KERN_ERR "Acceptor: Invalid acceptor id: %d.", id);
-		// printk(KERN_ERR "Acceptor: Should be between 0 and %d", acceptor_count);
+		paxos_log_error("Acceptor: Invalid acceptor id: %d.", id);
+		paxos_log_error("Acceptor: Should be between 0 and %d", acceptor_count);
 		evpaxos_config_free(config);
 		return NULL;
 	}
@@ -202,8 +192,7 @@ evacceptor_free_internal(struct evacceptor* a)
 void
 evacceptor_free(struct evacceptor* a)
 {
-	// printk(KERN_INFO "ACCEPTOR");
-	// printall(a->peers);
+	printall(a->peers, "ACCEPTOR");
 	peers_free(a->peers);
 	evacceptor_free_internal(a);
 }

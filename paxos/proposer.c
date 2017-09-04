@@ -136,7 +136,6 @@ proposer_propose(struct proposer* p, const char* value, size_t size)
 int
 proposer_prepared_count(struct proposer* p)
 {
-	// // printk(KERN_ERR "count is %d", HASH_COUNT(p->prepare_instances));
 	return HASH_COUNT(p->prepare_instances);
 }
 
@@ -146,7 +145,7 @@ proposer_set_instance_id(struct proposer* p, iid_t iid)
 	if (iid > p->next_prepare_iid) {
 		p->next_prepare_iid = iid;
 		// remove instances older than iid
-		// printk(KERN_INFO "Proposer: removing instances older than %d",iid );
+		paxos_log_debug("Proposer: removing instances older than %d",iid );
 		proposer_trim_instances(p, &p->prepare_instances, iid);
 		proposer_trim_instances(p, &p->accept_instances, iid);
 	}
@@ -158,12 +157,6 @@ proposer_prepare(struct proposer* p, paxos_prepare* out)
 	iid_t id = ++(p->next_prepare_iid);
 	ballot_t bal = proposer_next_ballot(p, 0);
 	struct instance* inst = NULL;
-	// HASH_FIND_IID(p->prepare_instances, &id, inst);
-	// if(inst != NULL){
-	// 	HASH_DEL(p->prepare_instances, inst);
-	// 	instance_free(inst);
-	// 	inst = NULL;
-	// }
 	inst = instance_new(id, bal, p->acceptors);
 	HASH_ADD_IID(p->prepare_instances, iid, inst);
 	*out = (paxos_prepare) {inst->iid, inst->ballot};
@@ -177,27 +170,27 @@ proposer_receive_promise(struct proposer* p, paxos_promise* ack,
 	HASH_FIND_IID(p->prepare_instances, &ack->iid, inst);
 
 	if (inst == NULL) {
-		printk(KERN_INFO "Proposer: Promise dropped, instance %u not pending", ack->iid);
+		paxos_log_debug("Proposer: Promise dropped, instance %u not pending", ack->iid);
 		return 0;
 	}
 
 	if (ack->ballot < inst->ballot) {
-		printk(KERN_INFO "Proposer: Promise dropped, too old");
+		paxos_log_debug("Proposer: Promise dropped, too old");
 		return 0;
 	}
 
 	if (ack->ballot > inst->ballot) {
-		printk(KERN_INFO "Proposer: Instance %u preempted: ballot %d ack ballot %d", inst->iid, inst->ballot, ack->ballot);
+		paxos_log_debug("Proposer: Instance %u preempted: ballot %d ack ballot %d", inst->iid, inst->ballot, ack->ballot);
 		proposer_preempt(p, inst, out);
 		return 1;
 	}
 
 	if (quorum_add(&inst->quorum, ack->aid) == 0) {
-		printk(KERN_INFO "Proposer: Duplicate promise dropped from: %d, iid: %u", ack->aid, inst->iid);
+		paxos_log_debug("Proposer: Duplicate promise dropped from: %d, iid: %u", ack->aid, inst->iid);
 		return 0;
 	}
 
-	printk(KERN_INFO "Proposer: Received valid promise from: %d, iid: %u", ack->aid, inst->iid);
+	paxos_log_debug("Proposer: Received valid promise from: %d, iid: %u", ack->aid, inst->iid);
 
 	if (ack->value.paxos_value_len > 0) {
 		if (ack->value_ballot > inst->value_ballot) {
@@ -230,13 +223,13 @@ proposer_accept(struct proposer* p, paxos_accept* out)
 	if (inst == NULL || !quorum_reached(&inst->quorum))
 		return 0;
 
-	// printk(KERN_INFO "Proposer: Trying to accept iid %u", inst->iid);
+	// paxos_log_debug("Proposer: Trying to accept iid %u", inst->iid);
 
 	// Is there a value to accept?
 	if (!instance_has_value(inst))
 		inst->value = carray_pop_front(p->values);
 	if (!instance_has_value(inst) && !instance_has_promised_value(inst)) {
-		// printk(KERN_INFO "Proposer: No value to accept");
+		paxos_log_debug("Proposer: No value to accept");
 		return 0;
 	}
 
@@ -254,18 +247,18 @@ proposer_receive_accepted(struct proposer* p, paxos_accepted* ack)
 	HASH_FIND_IID(p->accept_instances, &ack->iid, inst);
 
 	if (inst == NULL) {
-		// printk(KERN_INFO "Proposer: Accept ack dropped, iid: %u not pending", ack->iid);
+		paxos_log_debug("Proposer: Accept ack dropped, iid: %u not pending", ack->iid);
 		return 0;
 	}
 
 	if (ack->ballot == inst->ballot) {
 		if (!quorum_add(&inst->quorum, ack->aid)) {
-			// printk(KERN_INFO "Proposer: Duplicate accept dropped from: %d, iid: %u", ack->aid, inst->iid);
+			paxos_log_debug("Proposer: Duplicate accept dropped from: %d, iid: %u", ack->aid, inst->iid);
 			return 0;
 		}
 
 		if (quorum_reached(&inst->quorum)) {
-			// printk(KERN_INFO "Proposer: Quorum reached for instance %u", inst->iid);
+			paxos_log_debug("Proposer: Quorum reached for instance %u", inst->iid);
 			if (instance_has_promised_value(inst)) {
 				if (inst->value != NULL && paxos_value_cmp(inst->value, inst->promised_value) != 0) {
 					carray_push_back(p->values, inst->value);
@@ -274,7 +267,7 @@ proposer_receive_accepted(struct proposer* p, paxos_accepted* ack)
 			}
 
 			HASH_DEL(p->accept_instances, inst);
-			// printk(KERN_INFO "Proposer: Closed instance");
+			paxos_log_debug("Proposer: Closed instance");
 			instance_free(inst);
 		}
 
@@ -293,13 +286,13 @@ proposer_receive_preempted(struct proposer* p, paxos_preempted* ack,
 
 
 	if (inst == NULL) {
-		// printk(KERN_INFO "Proposer: Preempted dropped, iid: %u not pending", ack->iid);
+		paxos_log_debug("Proposer: Preempted dropped, iid: %u not pending", ack->iid);
 		return 0;
 	}
 
 
 	if (ack->ballot > inst->ballot) {
-		// printk(KERN_INFO "Proposer: Received N < prev_prop, Instance %u preempted: ballot %d ack ballot %d", inst->iid, inst->ballot, ack->ballot);
+		paxos_log_debug("Proposer: Received N < prev_prop, Instance %u preempted: ballot %d ack ballot %d", inst->iid, inst->ballot, ack->ballot);
 		if (instance_has_promised_value(inst))
 			paxos_value_free(inst->promised_value);
 		proposer_move_instance(&p->accept_instances, &p->prepare_instances, inst);

@@ -25,7 +25,7 @@ static atomic_t must_stop, used_buf;
 
 int kdev_open(struct inode *inodep, struct file *filep){
   if(!mutex_trylock(&char_mutex) || working == 0){
-    // printk(KERN_ALERT "Device char: Device used by another process");
+    paxos_log_error("Device char: Device used by another process");
     return -EBUSY;
     working = 0;
   }
@@ -37,13 +37,12 @@ void kstop_device(){
 }
 
 static void rel_lock(unsigned long arg){
-  // printk(KERN_INFO "Too much time passed, released lock");
   mutex_unlock(&read_mutex);
 }
 
 void kset_message(struct timeval * timenow, char * msg, int client_id, unsigned int iid){
   if(atomic_read(&used_buf) > BUFFER_SIZE){
-    printk(KERN_ERR "Buffer is full! Lost a value");
+    paxos_log_error("Buffer is full! Lost a value");
     return;
   }
   mutex_lock(&buffer_mutex);
@@ -51,11 +50,12 @@ void kset_message(struct timeval * timenow, char * msg, int client_id, unsigned 
   memcpy(&msg_buf[current_buf].iid, &iid, sizeof(int));
   memcpy(&msg_buf[current_buf].client_id, &client_id, sizeof(int));
   memcpy(&msg_buf[current_buf].timenow, timenow, sizeof(struct timeval));
-  memcpy(&msg_buf[current_buf].msg, msg, value_size);
-  // msg_buf[current_buf].msg[value_size-1] = '\0';
+  memcpy(&msg_buf[current_buf].msg, msg, value_size -1);
+  msg_buf[current_buf].msg[value_size-1] = '\0';
   current_buf = (current_buf + 1) % BUFFER_SIZE;
   mutex_unlock(&buffer_mutex);
   mutex_unlock(&read_mutex);
+  paxos_log_debug("Set message %d, occupied %d/100, first one is %d", current_buf, atomic_read(&used_buf), first_buf);
   // printk(KERN_INFO "Set message %d, occupied %d/100, first one is %d", current_buf, atomic_read(&used_buf), first_buf);
 }
 
@@ -68,10 +68,8 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
   if(atomic_read(&must_stop) == 1){
     return -2;
   }
-  // printk(KERN_INFO"Gaining lock...");
   mod_timer(&release_lock, jiffies + timeval_to_jiffies(&interval));
   mutex_lock(&read_mutex);
-  // printk(KERN_INFO"Lock gained");
   del_timer(&release_lock);
   setup_timer( &release_lock,  rel_lock, 0);
   if(atomic_read(&used_buf) > 0){
@@ -80,12 +78,13 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
     if (error_count != 0){
       mutex_unlock(&buffer_mutex);
       working = 0;
-  		printk(KERN_INFO "Device Char: Failed to send %d characters to the user\n", error_count);
+  		paxos_log_error("Device Char: Failed to send %d characters to the user\n", error_count);
   		return -EFAULT;
   	}else{
       first_buf = (first_buf + 1) % BUFFER_SIZE;
       atomic_dec(&used_buf);
       // printk(KERN_INFO "Read message %d, occupied %d/100, first one is %d, last one is %d", first_buf -1, atomic_read(&used_buf), first_buf, current_buf);
+      paxos_log_debug("Read message %d, occupied %d/100, first one is %d, last one is %d", first_buf -1, atomic_read(&used_buf), first_buf, current_buf);
     }
     mutex_unlock(&buffer_mutex);
   }
@@ -100,19 +99,19 @@ ssize_t kdev_write(struct file *filep, const char *buffer, size_t len, loff_t *o
   if(working == 0){
     return -1;
   }
-  // printk(KERN_INFO "Device: Received id %d", *((int *) buffer));
+  paxos_log_debug(KERN_INFO "Device: Received id %d", *((int *) buffer));
   memcpy(value_size,buffer, sizeof(int));
   return len;
 }
 
 int kdev_release(struct inode *inodep, struct file *filep){
-  // if(working == 0)
-    // printk(KERN_INFO "Device Char: Device already closed\n");
+  if(working == 0)
+    paxos_log_debug(KERN_INFO "Device Char: Device already closed\n");
   mutex_unlock(&char_mutex);
   mutex_unlock(&read_mutex);
   mutex_unlock(&buffer_mutex);
-   // printk(KERN_INFO "Device Char: Device successfully closed\n");
-   return 0;
+  paxos_log_debug(KERN_INFO "Device Char: Device successfully closed\n");
+  return 0;
 }
 
 static void allocate_name(char ** dest, char * name, int id){
@@ -137,52 +136,52 @@ static void allocate_name_folder(char ** dest, char * name, int id){
 }
 
 int kdevchar_init(int id, char * name){
-   // printk(KERN_INFO "Client: Initializing the Device Char");
-   working = 1;
-   allocate_name_folder(&de_name, name, id);
-   majorNumber = register_chrdev(0, de_name, &fops);
-   if (majorNumber<0){
-      printk(KERN_ALERT "Device Char: failed to register a major number\n");
-      working = 0;
-      return majorNumber;
-   }
-  //  printk(KERN_INFO "Device Char: Device Char %s registered correctly with major number %d\n",de_name, majorNumber);
 
-   // Register the device class
-   allocate_name(&clas_name, name, id);
-   charClass = class_create(THIS_MODULE, clas_name);
-   if (IS_ERR(charClass)){
-      unregister_chrdev(majorNumber, de_name);
-      printk(KERN_ALERT "Device Char: failed to register device class\n");
-      working = 0;
-      return PTR_ERR(charClass);
-   }
-  //  printk(KERN_INFO "Device Char: device class %s registered correctly", clas_name);
+  paxos_log_debug(KERN_INFO "Client: Initializing the Device Char");
+  working = 1;
+  allocate_name_folder(&de_name, name, id);
+  majorNumber = register_chrdev(0, de_name, &fops);
+  if (majorNumber<0){
+    paxos_log_debug(KERN_ALERT "Device Char: failed to register a major number\n");
+    working = 0;
+    return majorNumber;
+  }
+  paxos_log_debug(KERN_INFO "Device Char: Device Char %s registered correctly with major number %d\n",de_name, majorNumber);
 
-   // Register the device driver
-   charDevice = device_create(charClass, NULL, MKDEV(majorNumber, 0), NULL, de_name);
-   if (IS_ERR(charDevice)){
-      class_destroy(charClass);
-      unregister_chrdev(majorNumber, de_name);
-      printk(KERN_ALERT "Device Char: failed to create the device\n");
-      working = 0;
-      return PTR_ERR(charDevice);
-   }
+  // Register the device class
+  allocate_name(&clas_name, name, id);
+  charClass = class_create(THIS_MODULE, clas_name);
+  if (IS_ERR(charClass)){
+    unregister_chrdev(majorNumber, de_name);
+    paxos_log_debug(KERN_ALERT "Device Char: failed to register device class\n");
+    working = 0;
+    return PTR_ERR(charClass);
+  }
+   paxos_log_debug(KERN_INFO "Device Char: device class %s registered correctly", clas_name);
 
-   mutex_init(&char_mutex);
-   mutex_init(&buffer_mutex);
-   mutex_init(&read_mutex);
-   atomic_set(&used_buf, 0);
-   atomic_set(&must_stop, 0);
-   setup_timer( &release_lock,  rel_lock, 0);
-   interval = (struct timeval){0, 100};
+  // Register the device driver
+  charDevice = device_create(charClass, NULL, MKDEV(majorNumber, 0), NULL, de_name);
+  if (IS_ERR(charDevice)){
+    class_destroy(charClass);
+    unregister_chrdev(majorNumber, de_name);
+    paxos_log_debug(KERN_ALERT "Device Char: failed to create the device\n");
+    working = 0;
+    return PTR_ERR(charDevice);
+  }
 
-  //  printk(KERN_INFO "Device Char: device class created correctly\n");
-   return 0;
+  mutex_init(&char_mutex);
+  mutex_init(&buffer_mutex);
+  mutex_init(&read_mutex);
+  atomic_set(&used_buf, 0);
+  atomic_set(&must_stop, 0);
+  setup_timer( &release_lock,  rel_lock, 0);
+  interval = (struct timeval){0, 100};
+
+   paxos_log_debug(KERN_INFO "Device Char: device class created correctly\n");
+  return 0;
 }
 
 void kdevchar_exit(void){
-  // printk(KERN_INFO "Called kdevchar_exit");
   if(working == 0){
     return;
   }
@@ -197,5 +196,5 @@ void kdevchar_exit(void){
   kfree(de_name);
   kfree(clas_name);
   unregister_chrdev(majorNumber, de_name);             // unregister the major number
- 	// printk(KERN_INFO "Device Char: Unloaded\n");
+ 	paxos_log_debug(KERN_INFO "Device Char: Unloaded\n");
 }

@@ -32,6 +32,7 @@
 #include "message.h"
 #include <linux/slab.h>
 
+#define L_PAX_PRINT 0
 struct evlearner
 {
 	struct learner* state;      /* The actual learner */
@@ -67,7 +68,7 @@ peer_send_hi(struct peer* p, void* arg)
 static void
 evlearner_check_holes(unsigned long arg)
 {
-	// printk(KERN_INFO "Learner: Checking holes");
+	paxos_log_debug("Learner: Checking holes");
 	paxos_repeat msg;
 	int chunks = 10;
 	struct evlearner* l = (struct evlearner *) arg;
@@ -75,7 +76,7 @@ evlearner_check_holes(unsigned long arg)
 		if ((msg.to - msg.from) > chunks)
 			msg.to = msg.from + chunks;
 		peers_foreach_acceptor(l->acceptors, peer_send_repeat, &msg);
-		// printk(KERN_INFO "Learner: sent PAXOS_REPEAT to all acceptors, missing %d chunks", (msg.to - msg.from));
+		paxos_log_info("Learner: sent PAXOS_REPEAT to all acceptors, missing %d chunks", (msg.to - msg.from));
 	}
 }
 
@@ -101,7 +102,7 @@ static void
 evlearner_handle_accepted(struct peer* p, paxos_message* msg, void* arg)
 {
 	struct evlearner* l = arg;
-	printk(KERN_INFO "Learner: Received PAXOS_ACCEPTED");
+	paxos_log_info("Learner: Received PAXOS_ACCEPTED");
 	learner_receive_accepted(l->state, &msg->u.accepted);
 	evlearner_deliver_next_closed(l);
 }
@@ -119,6 +120,7 @@ evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
 	learner->acceptors = peers;
 
 	peers_subscribe(peers, PAXOS_ACCEPTED, evlearner_handle_accepted, learner);
+	paxos_log_debug("Learner: Sent HI to all acceptors");
 	peers_foreach_acceptor(peers, peer_send_hi, NULL);
 
 	k->timer_cb[LEA_TIM] = evlearner_check_holes;
@@ -142,7 +144,7 @@ evlearner_init(const char* config_file, deliver_function f, void* arg,
 	addr.sin_addr.s_addr = INADDR_ANY;
 	struct peers* peers = peers_new(&addr, c, -1);
 	add_acceptors_from_config(-1, peers);
-	// printall(peers);
+	printall(peers, k->name);
 	sk_timeout_timeval.tv_sec = 0;
 	sk_timeout_timeval.tv_usec = 100000;
 
@@ -169,8 +171,7 @@ evlearner_free_internal(struct evlearner* l)
 void
 evlearner_free(struct evlearner* l)
 {
-	printk(KERN_INFO "LEARNER");
-	printall(l->acceptors);
+	printall(l->acceptors, "LEARNER");
 	peers_free(l->acceptors);
 	evlearner_free_internal(l);
 }
@@ -191,7 +192,7 @@ void
 evlearner_send_trim(struct evlearner* l, unsigned iid)
 {
 	paxos_trim trim = {iid};
-	// printk(KERN_INFO "Learner: Sent PAXOS_TRIM to all acceptors");
+	paxos_log_info("Learner: Sent PAXOS_TRIM to all acceptors");
 	trim_old_learn(l->state,iid);
 	peers_foreach_acceptor(l->acceptors, peer_send_trim, &trim);
 }

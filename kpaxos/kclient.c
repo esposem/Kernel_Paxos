@@ -70,9 +70,8 @@ client_submit_value(struct client* c)
 	v->size = c->value_size;
 	random_string(v->value, v->size);
 	size_t size = sizeof(struct client_value) + v->size;
-  // // printk(KERN_INFO "%s Sending the value...", kclient->name);
 	paxos_submit(get_sock(c->learner), &c->proposeradd, c->send_buffer, size);
-	// printk(KERN_INFO "%s submitted PAXOS_CLIENT_VALUE len %zu value %s",kclient->name, v->size, v->value);
+	paxos_log_info("%s submitted PAXOS_CLIENT_VALUE len %zu value %s",kclient->name, v->size, v->value);
 }
 
 static long
@@ -110,15 +109,12 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 
 	if (v->client_id == c->id) {
 		update_stats(&c->stats, v, size);
-    if(iid % 50000 == 0){
-      // printk(KERN_INFO "client %d Called trim, instance %d ", c->id, iid);
+    if(iid % 100000 == 0){
+      paxos_log_info("Client%d: trim called, instance %d ", c->id, iid);
       evlearner_send_trim(c->learner, iid);
     }
     client_submit_value(c);
-    // printk(KERN_INFO "%s On deliver iid:%d value:%.16s",kclient->name, iid, v->value );
-  	// struct timeval timenow;
-  	// do_gettimeofday(&timenow);
-  	// kset_message(timenow, v->value, iid);
+    printk(KERN_INFO "%s On deliver iid:%d value:%.16s",kclient->name, iid, v->value );
 	}
 }
 
@@ -141,13 +137,13 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 	memset(&c->stats, 0, sizeof(struct stats));
   struct evpaxos_config* conf = evpaxos_config_read(config);
 	if (conf == NULL) {
-		// printk(KERN_ERR "%s: Failed to read config file %s\n",kclient->name, config);
+		printk(KERN_ERR "%s: Failed to read config file %s\n",kclient->name, config);
 		return NULL;
 	}
   c->proposeradd = evpaxos_proposer_address(conf, proposer_id);
 
 	get_random_bytes(&c->id, sizeof(int));
-  // printk(KERN_INFO "%s  myid [%d]", kclient->name, c->id);
+
 	c->value_size = value_size;
 	c->outstanding = outstanding;
 	c->send_buffer = kmalloc(sizeof(struct client_value) + value_size, GFP_KERNEL);
@@ -159,7 +155,7 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
 	paxos_config.learner_catch_up = 0;
 	c->learner = evlearner_init(config, on_deliver, c, kclient);
 	if (c->learner == NULL) {
-		// printk(KERN_ERR "%s Could not start the learner!", kclient->name);
+		printk(KERN_ERR "%s Could not start the learner!", kclient->name);
 	}else{
 		for (int i = 0; i < c->outstanding; ++i)
 	    client_submit_value(c);
@@ -202,21 +198,21 @@ static void start_client_thread(void){
   kclient->u_thread = kthread_run((void *)run_client, NULL, kclient->name);
   if(kclient->u_thread >= 0){
     atomic_set(&kclient->thread_running,1);
-    // printk(KERN_INFO "%s Thread running", kclient->name);
+    printk(KERN_INFO "%s Thread running", kclient->name);
   }else{
-    // printk(KERN_ERR "%s Error in starting thread", kclient->name);
+    printk(KERN_ERR "%s Error in starting thread", kclient->name);
   }
 }
 
 static int __init init_client(void)
 {
 	if(id < 0 || id > 10){
-		// printk(KERN_ERR "you must give an id!");
+		printk(KERN_ERR "you must give an id!");
 		return 0;
 	}
   kclient = kmalloc(sizeof(udp_service), GFP_KERNEL);
   if(!kclient){
-    // printk(KERN_ERR "Failed to initialize CLIENT ");
+    printk(KERN_ERR "Failed to initialize CLIENT ");
   }else{
     init_service(kclient, "Client" , id);
     start_client_thread();

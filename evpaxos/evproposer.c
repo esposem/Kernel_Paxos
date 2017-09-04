@@ -61,13 +61,13 @@ proposer_preexecute(struct evproposer* p)
 	int i;
 	paxos_prepare pr;
 	int count = p->preexec_window - proposer_prepared_count(p->state);
-	// // printk(KERN_INFO "Proposer: Preexec %d - prepared count %d", p->preexec_window, proposer_prepared_count(p->state));
+	paxos_log_debug("Proposer: Preexec %d - prepared count %d", p->preexec_window, proposer_prepared_count(p->state));
 	if (count <= 0) return;
 	for (i = 0; i < count; i++) {
 		proposer_prepare(p->state, &pr);
 		peers_foreach_acceptor(p->peers, peer_send_prepare, &pr);
 	}
-	// printk(KERN_INFO "Proposer: Opened %d new instances", count);
+	paxos_log_info("Proposer: Opened %d new instances", count);
 }
 
 static void
@@ -80,7 +80,7 @@ try_accept(struct evproposer* p)
 		peers_foreach_acceptor(p->peers, peer_send_accept, &accept);
 	}
 	if(i == 1){
-		// printk(KERN_INFO "Proposer: Sending accept to all acceptors");
+		paxos_log_debug("Proposer: Sending accept to all acceptors");
 	}
 	proposer_preexecute(p);
 }
@@ -88,7 +88,7 @@ try_accept(struct evproposer* p)
 static void
 evproposer_handle_promise(struct peer* p, paxos_message* msg, void* arg)
 {
-	// printk(KERN_INFO "Proposer: received PROMISE");
+	paxos_log_info("Proposer: received PROMISE");
 	struct evproposer* proposer = arg;
 	paxos_prepare prepare;
 	paxos_promise* pro = &msg->u.promise;
@@ -105,7 +105,7 @@ evproposer_handle_accepted(struct peer* p, paxos_message* msg, void* arg)
 	struct evproposer* proposer = arg;
 	paxos_accepted* acc = &msg->u.accepted;
 	if (proposer_receive_accepted(proposer->state, acc)){
-		// printk(KERN_INFO "Proposer: received ACCEPTED");
+		paxos_log_info( "Proposer: received ACCEPTED");
 		try_accept(proposer);
 	}
 }
@@ -113,7 +113,7 @@ evproposer_handle_accepted(struct peer* p, paxos_message* msg, void* arg)
 static void
 evproposer_handle_preempted(struct peer* p, paxos_message* msg, void* arg)
 {
-	// printk(KERN_INFO "Proposer: received PREEMPTED");
+	paxos_log_info(KERN_INFO "Proposer: received PREEMPTED");
 	struct evproposer* proposer = arg;
 	paxos_prepare prepare;
 	int preempted = proposer_receive_preempted(proposer->state,
@@ -123,14 +123,6 @@ evproposer_handle_preempted(struct peer* p, paxos_message* msg, void* arg)
 		try_accept(proposer);
 	}
 }
-
-// struct client_value
-// {
-// 	int client_id;
-// 	struct timeval t;
-// 	size_t size;
-// 	char value[0];
-// };
 
 static void
 evproposer_handle_client_value(struct peer* p, paxos_message* msg, void* arg)
@@ -142,8 +134,7 @@ evproposer_handle_client_value(struct peer* p, paxos_message* msg, void* arg)
 		v->value.paxos_value_val,
 		v->value.paxos_value_len);
 
-	// struct client_value * clv = (struct client_value *) v->value.paxos_value_val;
-	// printk(KERN_INFO "Proposer: received a CLIENT VALUE from %d", 0 );
+	paxos_log_info("Proposer: received a CLIENT VALUE");
 	try_accept(proposer);
 }
 
@@ -165,21 +156,21 @@ evproposer_preexec_once(struct evproposer * arg)
 static void
 evproposer_check_timeouts(unsigned long arg)
 {
-	// printk(KERN_INFO "Proposer: evproposer_check_timeouts");
+	paxos_log_debug( "Proposer: evproposer_check_timeouts");
 
 	struct evproposer* p = (struct evproposer *) arg;
 	struct timeout_iterator* iter = proposer_timeout_iterator(p->state);
-	// // printk(KERN_INFO "Proposer: Instances timed out in phase 1 or 2.");
+	paxos_log_debug("Proposer: Instances timed out in phase 1 or 2.");
 
 	paxos_prepare pr;
 	while (timeout_iterator_prepare(iter, &pr)) {
-		// // printk(KERN_INFO "Proposer: Instance %d timed out in phase 1.", pr.iid);
+		paxos_log_debug("Proposer: Instance %d timed out in phase 1.", pr.iid);
 		peers_foreach_acceptor(p->peers, peer_send_prepare, &pr);
 	}
 
 	paxos_accept ar;
 	while (timeout_iterator_accept(iter, &ar)) {
-		// // printk(KERN_INFO "Proposer: Instance %d timed out in phase 2.", ar.iid);
+		paxos_log_debug("Proposer: Instance %d timed out in phase 2.", ar.iid);
 		peers_foreach_acceptor(p->peers, peer_send_accept, &ar);
 	}
 
@@ -225,13 +216,14 @@ evproposer_init(int id, const char* config_file, udp_service * k)
 		return NULL;
 
 	if (id < 0 || id >= MAX_N_OF_PROPOSERS) {
-		// printk(KERN_INFO "Invalid proposer id: %d", id);
+		printk(KERN_ERR "Invalid proposer id: %d", id);
 		return NULL;
 	}
 
 	struct sockaddr_in send_addr = evpaxos_proposer_address(config,id);
 	struct peers* peers = peers_new(&send_addr, config, id);
 	add_acceptors_from_config(-1, peers);
+	printall(peers, k->name);
 	sk_timeout_timeval.tv_sec = paxos_config.proposer_timeout;
 	sk_timeout_timeval.tv_usec = 0;
 	if(peers_sock_init(peers, k) == 0){
@@ -257,8 +249,7 @@ evproposer_free_internal(struct evproposer* p)
 void
 evproposer_free(struct evproposer* p)
 {
-	// printk(KERN_INFO "PROPOSER");
-	// printall(p->peers);
+	printall(p->peers, "PROPOSER");
 	peers_free(p->peers);
 	evproposer_free_internal(p);
 }

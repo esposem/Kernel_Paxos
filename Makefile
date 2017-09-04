@@ -10,9 +10,9 @@ klearner3.o \
 klearner4.o \
 kreplica0.o \
 kreplica1.o \
-kreplica2.o#\
+kreplica2.o \
 kclient1.o \
-kclient2.o \
+kclient2.o #\
 kproposer1.o \
 kproposer2.o
 
@@ -64,14 +64,14 @@ REP_OBJ= \
 	$(PAX_OBJ)
 
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
-ccflags-y:= -std=gnu99 -Wno-declaration-after-statement
+ccflags-y:= -std=gnu99 -Wno-declaration-after-statement -O2
 
 LFLAGS = -levent -I /usr/local/include -L /usr/local/lib
 USR_OBJ= kpaxos/client_user.c paxos/include/paxos_types.h kpaxos/include/kernel_device.h
 
 kclient0-y:= $(CL_OBJ)
-# kclient1-y:= $(CL_OBJ)
-# kclient2-y:= $(CL_OBJ)
+kclient1-y:= $(CL_OBJ)
+kclient2-y:= $(CL_OBJ)
 
 kproposer0-y:= $(PROP_OBJ)
 # kproposer1-y:= $(PROP_OBJ)
@@ -92,8 +92,11 @@ kreplica1-y:= $(REP_OBJ)
 kreplica2-y:= $(REP_OBJ)
 
 
+# HI issue
+# don't care about trim
+
 all: client_user
-	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules 
 
 client_user: $(USR_OBJ)
 	$(CC) $(EXTRA_CFLAGS) -o $@0 $< $(LFLAGS)
