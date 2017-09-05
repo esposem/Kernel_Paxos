@@ -29,7 +29,6 @@
 #ifndef _PAXOS_TYPES_H_
 #define _PAXOS_TYPES_H_
 
-// #include <net/udp.h>
 #include <linux/types.h>
 
 
@@ -124,6 +123,13 @@ struct paxos_learner_del
 typedef struct paxos_learner_del paxos_learner_del;
 
 
+struct paxos_acceptor_ok
+{
+	paxos_value value;
+};
+typedef struct paxos_acceptor_ok paxos_acceptor_ok;
+
+
 enum paxos_message_type
 {
 	PAXOS_PREPARE,
@@ -136,7 +142,8 @@ enum paxos_message_type
 	PAXOS_ACCEPTOR_STATE,
 	PAXOS_CLIENT_VALUE,
 	PAXOS_LEARNER_HI,
-	PAXOS_LEARNER_DEL
+	PAXOS_LEARNER_DEL,
+	PAXOS_ACCEPTOR_OK
 };
 typedef enum paxos_message_type paxos_message_type;
 
@@ -156,6 +163,7 @@ struct paxos_message
 		paxos_client_value client_value;
 		paxos_learner_hi learner_hi;
 		paxos_learner_del learner_del;
+		paxos_acceptor_ok accept_ok;
 	} u;
 };
 typedef struct paxos_message paxos_message;

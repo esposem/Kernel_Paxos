@@ -55,12 +55,14 @@ void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
 struct peer* peers_get_acceptor(struct peers* p, int id);
 void add_acceptors_from_config(int myid, struct peers * p);
 struct socket * get_send_socket(struct peer * p);
-// struct socket * get_rcv_socket(struct peer * p);
 struct sockaddr_in * get_sockaddr(struct peer * p);
 struct peer * get_me_send(struct peers * p);
-// struct peer * get_me_rcv(struct peers * p);
 int peer_get_id(struct peer* p);
 void printall(struct peers * p, char * name);
+void peers_delete_learner(struct peer * del);
+int peers_missing_ok(struct peers * p);
+void peers_update_ok(struct peer * p, struct sockaddr_in * addr);
+
 
 #ifdef __cplusplus
 }

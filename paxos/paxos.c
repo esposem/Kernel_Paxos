@@ -146,7 +146,7 @@ paxos_log(int level, const char* format, va_list ap)
 			printk(KERN_ERR "%s", msg);
 			break;
 		case PAXOS_LOG_INFO:
-			printk(KERN_INFO "%s", msg);
+			printk("%s", msg);
 			break;
 		case PAXOS_LOG_DEBUG:
 			printk(KERN_INFO "%s", msg);

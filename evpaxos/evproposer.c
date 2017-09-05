@@ -197,7 +197,7 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers, 
 
 	k->timer_cb[PROP_TIM] = evproposer_check_timeouts;
 	k->data[PROP_TIM] = (unsigned long) p;
-	k->timeout_jiffies[PROP_TIM] = timeval_to_jiffies(&sk_timeout_timeval);
+	k->timeout_jiffies[PROP_TIM] = msecs_to_jiffies(paxos_config.proposer_timeout * 1000);
 
 	p->state = proposer_new(p->id, acceptor_count);
 	p->peers = peers;
@@ -208,9 +208,9 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers, 
 }
 
 struct evproposer*
-evproposer_init(int id, const char* config_file, udp_service * k)
+evproposer_init(int id, udp_service * k)
 {
-	struct evpaxos_config* config = evpaxos_config_read(config_file);
+	struct evpaxos_config* config = evpaxos_config_read();
 
 	if (config == NULL)
 		return NULL;
@@ -224,8 +224,6 @@ evproposer_init(int id, const char* config_file, udp_service * k)
 	struct peers* peers = peers_new(&send_addr, config, id);
 	add_acceptors_from_config(-1, peers);
 	printall(peers, k->name);
-	sk_timeout_timeval.tv_sec = paxos_config.proposer_timeout;
-	sk_timeout_timeval.tv_usec = 0;
 	if(peers_sock_init(peers, k) == 0){
 		struct evproposer* p = evproposer_init_internal(id, config, peers, k);
 		evpaxos_config_free(config);

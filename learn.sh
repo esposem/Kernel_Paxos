@@ -36,7 +36,7 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
   while [ "$tot" -gt $i ]
   do
     if [ "$i" -lt $trim ]; then
-      cantrim=1
+      cantrim=100000
     else
       cantrim=0
     fi

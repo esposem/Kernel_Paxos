@@ -10,7 +10,6 @@
 #include "kernel_udp.h"
 
 static udp_service * kproposer;
-struct timeval sk_timeout_timeval;
 static struct evproposer* prop = NULL;
 
 static int id = 0;
@@ -18,11 +17,11 @@ module_param(id, int, S_IRUGO);
 MODULE_PARM_DESC(id,"The proposer id, default 0");
 
 static void
-start_proposer(const char* config, int id)
+start_proposer(int id)
 {
-	prop = evproposer_init(id, config, kproposer);
+	prop = evproposer_init(id, kproposer);
 	if (prop == NULL) {
-		printk(KERN_ERR "%s: Could not start the proposer!", kproposer->name);
+		printk(KERN_ERR "%s Could not start the proposer!", kproposer->name);
 	}else{
 		paxos_proposer_listen(kproposer, prop);
 		evproposer_free(prop);
@@ -31,8 +30,7 @@ start_proposer(const char* config, int id)
 
 static int run_proposer(void)
 {
-  const char* config = "../paxos.conf";
-  start_proposer(config, id);
+  start_proposer(id);
 	atomic_set(&kproposer->thread_running, 0);
   return 0;
 }

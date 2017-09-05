@@ -533,6 +533,10 @@ long msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v)
 		break;
 	case PAXOS_LEARNER_DEL:
 		ret = msgpack_pack_paxos_learner(p, &v->u.learner_del, PAXOS_LEARNER_DEL);
+		break;
+	case PAXOS_ACCEPTOR_OK:
+		ret = msgpack_pack_paxos_learner(p, &v->u.accept_ok, PAXOS_ACCEPTOR_OK);
+		break;
 	}
 	return ret;
 }
@@ -550,48 +554,40 @@ int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size)
 
 	switch (v->type) {
 	case PAXOS_PREPARE:
-		// // printk(KERN_INFO "\tReceived PAXOS_PREPARE");
 		msgpack_unpack_paxos_prepare(o, &v->u.prepare);
 		break;
 	case PAXOS_PROMISE:
-		// // printk(KERN_INFO "\tReceived PAXOS_PROMISE");
 		partial_message = msgpack_unpack_paxos_promise(o, &v->u.promise, size);
 		break;
 	case PAXOS_ACCEPT:
-		// // printk(KERN_INFO "\tReceived PAXOS_ACCEPT");
 		partial_message = msgpack_unpack_paxos_accept(o, &v->u.accept, size);
 		break;
 	case PAXOS_ACCEPTED:
-		// // printk(KERN_INFO "\tReceived PAXOS_ACCEPTED");
 		partial_message = msgpack_unpack_paxos_accepted(o, &v->u.accepted, size);
 		break;
 	case PAXOS_PREEMPTED:
-		// // printk(KERN_INFO "\tReceived PAXOS_PREEMPTED");
 		msgpack_unpack_paxos_preempted(o, &v->u.preempted);
 		break;
 	case PAXOS_REPEAT:
-		// // printk(KERN_INFO "\tReceived PAXOS_REPEAT");
 		msgpack_unpack_paxos_repeat(o, &v->u.repeat);
 		break;
 	case PAXOS_TRIM:
-		// // printk(KERN_INFO "\tReceived PAXOS_TRIM");
 		msgpack_unpack_paxos_trim(o, &v->u.trim);
 		break;
 	case PAXOS_ACCEPTOR_STATE:
-		// // printk(KERN_INFO "\tReceived PAXOS_ACCEPTOR_STATE");
 		msgpack_unpack_paxos_acceptor_state(o, &v->u.state);
 		break;
 	case PAXOS_CLIENT_VALUE:
-		// // printk(KERN_INFO "\tReceived PAXOS_CLIENT_VALUE");
 		partial_message = msgpack_unpack_paxos_client_value(o, &v->u.client_value, size);
 		break;
 	case PAXOS_LEARNER_HI:
-		// // printk(KERN_INFO "\tReceived PAXOS_LEARNER_HI");
 		// partial_message = msgpack_unpack_paxos_learner(o, &v->u.learner_hi, size, PAXOS_LEARNER_HI);
 		break;
 	case PAXOS_LEARNER_DEL:
-		// printk(KERN_INFO "Received PAXOS_LEARNER_DEL");
 		// partial_message = msgpack_unpack_paxos_learner(o, &v->u.learner_del, size, PAXOS_LEARNER_DEL);
+		break;
+	case PAXOS_ACCEPTOR_OK:
+		// partial_message = msgpack_unpack_paxos_learner(o, &v->u.accept_ok, size, PAXOS_ACCEPTOR_OK);
 		break;
 	}
 	return partial_message;

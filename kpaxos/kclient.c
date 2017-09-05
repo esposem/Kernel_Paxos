@@ -114,7 +114,7 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
       evlearner_send_trim(c->learner, iid);
     }
     client_submit_value(c);
-    printk(KERN_INFO "%s On deliver iid:%d value:%.16s",kclient->name, iid, v->value );
+    // printk(KERN_INFO "%s On deliver iid:%d value:%.16s",kclient->name, iid, v->value );
 	}
 }
 
@@ -129,15 +129,15 @@ on_stats(unsigned long arg)
 }
 
 static struct client*
-make_client(const char* config, int proposer_id, int outstanding, int value_size)
+make_client( int proposer_id, int outstanding, int value_size)
 {
 
 	c = kmalloc(sizeof(struct client), GFP_KERNEL);
 
 	memset(&c->stats, 0, sizeof(struct stats));
-  struct evpaxos_config* conf = evpaxos_config_read(config);
+  struct evpaxos_config* conf = evpaxos_config_read();
 	if (conf == NULL) {
-		printk(KERN_ERR "%s: Failed to read config file %s\n",kclient->name, config);
+		printk(KERN_ERR "%s: Failed to read config file\n",kclient->name);
 		return NULL;
 	}
   c->proposeradd = evpaxos_proposer_address(conf, proposer_id);
@@ -153,7 +153,7 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 
 	paxos_config.learner_catch_up = 0;
-	c->learner = evlearner_init(config, on_deliver, c, kclient);
+	c->learner = evlearner_init(on_deliver, c, kclient);
 	if (c->learner == NULL) {
 		printk(KERN_ERR "%s Could not start the learner!", kclient->name);
 	}else{
@@ -177,18 +177,17 @@ client_free(struct client* c)
 }
 
 static void
-start_client(const char* config, int proposer_id, int outstanding, int value_size)
+start_client(int proposer_id, int outstanding, int value_size)
 {
 	struct client* client;
-	client = make_client(config, proposer_id, outstanding, value_size);
+	client = make_client(proposer_id, outstanding, value_size);
 	if(client)
 		client_free(client);
 }
 
 static int run_client(void)
 {
-	const char* config = "../paxos.conf";
-	start_client(config, proposer_id, outstanding, value_size);
+	start_client(proposer_id, outstanding, value_size);
 	atomic_set(&kclient->thread_running, 0);
   return 0;
 }

@@ -17,7 +17,7 @@ static struct class * charClass  = NULL;   //< The device-driver class struct po
 static struct device * charDevice = NULL;  //< The device-driver device struct pointer
 static char * de_name, * clas_name;
 static int majorNumber, working, current_buf = 0, first_buf = 0;
-static struct user_msg msg_buf[BUFFER_SIZE];
+static struct user_msg * msg_buf[BUFFER_SIZE];
 static struct timer_list release_lock;
 static struct timeval interval;
 int value_size = 0;
@@ -40,18 +40,17 @@ static void rel_lock(unsigned long arg){
   mutex_unlock(&read_mutex);
 }
 
-void kset_message(struct timeval * timenow, char * msg, int client_id, unsigned int iid){
+void kset_message(char * msg, size_t size, unsigned int iid){
   if(atomic_read(&used_buf) > BUFFER_SIZE){
     paxos_log_error("Buffer is full! Lost a value");
     return;
   }
+  value_size = size;
   mutex_lock(&buffer_mutex);
   atomic_inc(&used_buf);
-  memcpy(&msg_buf[current_buf].iid, &iid, sizeof(int));
-  memcpy(&msg_buf[current_buf].client_id, &client_id, sizeof(int));
-  memcpy(&msg_buf[current_buf].timenow, timenow, sizeof(struct timeval));
-  memcpy(&msg_buf[current_buf].msg, msg, value_size -1);
-  msg_buf[current_buf].msg[value_size-1] = '\0';
+  msg_buf[current_buf] = kmalloc(sizeof(struct user_msg) + size, GFP_KERNEL);
+  memcpy(&msg_buf[current_buf]->iid, &iid, sizeof(int));
+  memcpy(&msg_buf[current_buf]->value, msg, size);
   current_buf = (current_buf + 1) % BUFFER_SIZE;
   mutex_unlock(&buffer_mutex);
   mutex_unlock(&read_mutex);
@@ -74,7 +73,8 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
   setup_timer( &release_lock,  rel_lock, 0);
   if(atomic_read(&used_buf) > 0){
     mutex_lock(&buffer_mutex);
-    error_count = copy_to_user(buffer, (char *) &msg_buf[first_buf], sizeof(struct user_msg));
+    error_count = copy_to_user(buffer, (char *) msg_buf[first_buf], sizeof(struct user_msg) + value_size);
+    kfree(msg_buf[first_buf]);
     if (error_count != 0){
       mutex_unlock(&buffer_mutex);
       working = 0;
@@ -100,7 +100,7 @@ ssize_t kdev_write(struct file *filep, const char *buffer, size_t len, loff_t *o
     return -1;
   }
   paxos_log_debug(KERN_INFO "Device: Received id %d", *((int *) buffer));
-  memcpy(value_size,buffer, sizeof(int));
+  // memcpy(value_size,buffer, sizeof(int));
   return len;
 }
 

@@ -6,21 +6,6 @@
 #include "paxos.h"
 #include "kernel_udp.h"
 
-u32 create_address(u8 *ip)
-{
-  u32 addr = 0;
-  int i;
-
-  for(i=0; i<4; i++)
-  {
-    addr += ip[i];
-    if(i==3)
-    break;
-    addr <<= 8;
-  }
-  return addr;
-}
-
 static char * analyze_error(int err){
   switch (err) {
     case -98:
@@ -141,7 +126,11 @@ int udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * ad
     int i = (int) sizeof(struct sockaddr_in);
     inet_getname(conn_socket, (struct sockaddr *) address, &i , 0);
     printk(KERN_INFO "%s Socket is bind to %pI4 : %hu",k->name, &address->sin_addr, ntohs(address->sin_port));
-    kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&sk_timeout_timeval, sizeof(struct timeval));
+
+    struct timeval t;
+    t.tv_sec= 0;
+    t.tv_usec = MAX_RCV_WAIT;
+    kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVTIMEO, (char * )&t, sizeof(struct timeval));
     int k = INT_MAX;
     kernel_setsockopt(conn_socket, SOL_SOCKET, SO_RCVBUF, (char * )&k, sizeof(int));
   }

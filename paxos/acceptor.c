@@ -94,7 +94,7 @@ acceptor_receive_prepare(struct acceptor* a,
 	if (storage_tx_commit(&a->store) != 0)
 		return 0;
 	paxos_accepted_to_promise(&acc, out);
-	// printk(KERN_INFO "Acceptor: Created promise for iid %u", req->iid);
+	paxos_log_debug("Acceptor: Created promise for iid %u", req->iid);
 	return 1;
 }
 
@@ -111,13 +111,11 @@ acceptor_receive_accept(struct acceptor* a,
 	int found = storage_get_record(&a->store, req->iid, &acc);
 	if (!found || acc.ballot <= req->ballot) {
 		paxos_accept_to_accepted(a->id, req, out);
-		// // printk(KERN_INFO "Created ACCEPT, Saving new accepted in storage");
 		if (storage_put_record(&a->store, &(out->u.accepted)) != 0) {
 			storage_tx_abort(&a->store);
 			return 0;
 		}
 	} else {
-		// printk(KERN_INFO "Preempted request");
 		paxos_accepted_to_preempted(a->id, &acc, out);
 	}
 	if (storage_tx_commit(&a->store) != 0)
@@ -135,7 +133,6 @@ acceptor_receive_repeat(struct acceptor* a, iid_t iid, paxos_accepted* out)
 	int found = storage_get_record(&a->store, iid, out);
 	if (storage_tx_commit(&a->store) != 0)
 		return 0;
-	// printk(KERN_INFO "Returned %d   found=%d   len %d", found && (out->value.paxos_value_len > 0), found, out->value.paxos_value_len );
 	return found && (out->value.paxos_value_len > 0);
 }
 

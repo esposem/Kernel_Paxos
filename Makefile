@@ -50,6 +50,7 @@ LEARN_OBJ= \
 	kpaxos/klearner.o \
 	evpaxos/evlearner.o \
 	paxos/learner.o \
+	kpaxos/kernel_device.o \
 	$(PAX_OBJ)
 
 REP_OBJ= \
@@ -92,11 +93,8 @@ kreplica1-y:= $(REP_OBJ)
 kreplica2-y:= $(REP_OBJ)
 
 
-# HI issue
-# don't care about trim
-
 all: client_user
-	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules 
+	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 client_user: $(USR_OBJ)
 	$(CC) $(EXTRA_CFLAGS) -o $@0 $< $(LFLAGS)

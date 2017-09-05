@@ -32,7 +32,6 @@
 #include "message.h"
 #include <linux/slab.h>
 
-#define L_PAX_PRINT 0
 struct evlearner
 {
 	struct learner* state;      /* The actual learner */
@@ -78,6 +77,12 @@ evlearner_check_holes(unsigned long arg)
 		peers_foreach_acceptor(l->acceptors, peer_send_repeat, &msg);
 		paxos_log_info("Learner: sent PAXOS_REPEAT to all acceptors, missing %d chunks", (msg.to - msg.from));
 	}
+
+	if(peers_missing_ok(l->acceptors)){
+		paxos_log_info( "Missing some ok, resending");
+		// printk( "Missing some ok, resending");
+		peers_foreach_acceptor(l->acceptors, peer_send_hi, NULL);
+	}
 }
 
 static void
@@ -107,6 +112,13 @@ evlearner_handle_accepted(struct peer* p, paxos_message* msg, void* arg)
 	evlearner_deliver_next_closed(l);
 }
 
+static void
+evlearner_handle_ok(struct peer* p, paxos_message* msg, void* arg)
+{
+	paxos_log_info("Learner: Received PAXOS_ACCEPTOR_OK");
+	peers_update_ok(p , get_sockaddr(p));
+}
+
 struct evlearner*
 evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
 	deliver_function f, void* arg, udp_service * k)
@@ -120,21 +132,22 @@ evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
 	learner->acceptors = peers;
 
 	peers_subscribe(peers, PAXOS_ACCEPTED, evlearner_handle_accepted, learner);
+	peers_subscribe(peers, PAXOS_ACCEPTOR_OK, evlearner_handle_ok, learner);
+
 	paxos_log_debug("Learner: Sent HI to all acceptors");
 	peers_foreach_acceptor(peers, peer_send_hi, NULL);
 
 	k->timer_cb[LEA_TIM] = evlearner_check_holes;
 	k->data[LEA_TIM] = (unsigned long) learner;
-	k->timeout_jiffies[LEA_TIM] = timeval_to_jiffies(&sk_timeout_timeval);
+	k->timeout_jiffies[LEA_TIM] = msecs_to_jiffies(100);
 
 	return learner;
 }
 
 struct evlearner*
-evlearner_init(const char* config_file, deliver_function f, void* arg,
-	udp_service * k)
+evlearner_init(deliver_function f, void* arg, udp_service * k)
 {
-	struct evpaxos_config* c = evpaxos_config_read(config_file);
+	struct evpaxos_config* c = evpaxos_config_read();
 	if (c == NULL){
 		return NULL;
 	}
@@ -144,9 +157,7 @@ evlearner_init(const char* config_file, deliver_function f, void* arg,
 	addr.sin_addr.s_addr = INADDR_ANY;
 	struct peers* peers = peers_new(&addr, c, -1);
 	add_acceptors_from_config(-1, peers);
-	printall(peers, k->name);
-	sk_timeout_timeval.tv_sec = 0;
-	sk_timeout_timeval.tv_usec = 100000;
+	// printall(peers, k->name);
 
 	if(peers_sock_init(peers, k) >= 0){
 		struct evlearner* l = evlearner_init_internal(c, peers, f, arg, k);
