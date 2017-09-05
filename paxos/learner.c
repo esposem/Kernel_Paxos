@@ -284,7 +284,7 @@ instance_has_quorum(struct instance* inst, int acceptors)
 		inst->final_value = inst->acks[a_valid_index];
 		return 1;
 	}
-	
+
 	return 0;
 }
 

@@ -122,6 +122,20 @@ evacceptor_handle_trim(struct peer* p, paxos_message* msg, void* arg)
 }
 
 static void
+evacceptor_handle_hi(struct peer* p, paxos_message* msg, void* arg)
+{
+	paxos_log_info("Acceptor: Received PAXOS_LEARNER_HI. Sending OK");
+	send_paxos_acceptor_ok(get_send_socket(p), get_sockaddr(p), NULL);
+}
+
+static void
+evacceptor_handle_del(struct peer* p, paxos_message* msg, void* arg)
+{
+	paxos_log_info("Acceptor: Received PAXOS_LEARNER_DEL.");
+	peers_delete_learner(p);
+}
+
+static void
 send_acceptor_state(unsigned long arg)
 {
 	paxos_log_debug("Acceptor: send_acceptor_state");
@@ -148,17 +162,19 @@ evacceptor_init_internal(int id, struct evpaxos_config* c, struct peers* p, udp_
 	peers_subscribe(p, PAXOS_ACCEPT, evacceptor_handle_accept, acceptor);
 	peers_subscribe(p, PAXOS_REPEAT, evacceptor_handle_repeat, acceptor);
 	peers_subscribe(p, PAXOS_TRIM, evacceptor_handle_trim, acceptor);
+	peers_subscribe(p, PAXOS_LEARNER_HI, evacceptor_handle_hi, acceptor);
+	peers_subscribe(p, PAXOS_LEARNER_DEL, evacceptor_handle_del, acceptor);
 
 	k->timer_cb[ACC_TIM] = send_acceptor_state;
 	k->data[ACC_TIM] = (unsigned long) acceptor;
-	k->timeout_jiffies[ACC_TIM] = timeval_to_jiffies(&sk_timeout_timeval);
+	k->timeout_jiffies[ACC_TIM] = msecs_to_jiffies(1000);
 	return acceptor;
 }
 
 struct evacceptor*
-evacceptor_init(int id, const char* config_file, udp_service * k)
+evacceptor_init(int id, udp_service * k)
 {
-	struct evpaxos_config* config = evpaxos_config_read(config_file);
+	struct evpaxos_config* config = evpaxos_config_read();
 	if (config  == NULL)
 		return NULL;
 
@@ -171,8 +187,6 @@ evacceptor_init(int id, const char* config_file, udp_service * k)
 	}
 	struct sockaddr_in send_add = evpaxos_acceptor_address(config,id);
 	struct peers* peers = peers_new(&send_add, config, id);
-	sk_timeout_timeval.tv_sec = 1;
-  sk_timeout_timeval.tv_usec = 0;
 	if(peers_sock_init(peers,k) >= 0){
 		struct evacceptor* acceptor = evacceptor_init_internal(id, config, peers, k);
 		evpaxos_config_free(config);

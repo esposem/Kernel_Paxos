@@ -14,8 +14,6 @@
 #define ACC_TIM 1
 #define LEA_TIM 2
 
-extern struct timeval sk_timeout_timeval;
-
 struct udp_service
 {
   struct task_struct * u_thread;
@@ -31,7 +29,6 @@ struct udp_service
 
 typedef struct udp_service udp_service;
 
-extern u32 create_address(u8 *ip);
 extern void prepare_sockaddr(struct sockaddr_in * address, int port, struct in_addr * addr, unsigned char * ip);
 extern int udp_server_init(udp_service * k, struct socket ** s, struct sockaddr_in * address, atomic_t * allocated);
 extern void init_service(udp_service * k, char * name, int id);

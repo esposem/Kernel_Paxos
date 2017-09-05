@@ -16,8 +16,8 @@
 #include "paxos_types.h"
 #include "kernel_client.h"
 
-#if 0
-	#define PORT 3003
+#if 1
+	#define PORT 5003
 	#define PROP_IP "127.0.0.3"
 #else
 	#define PORT 3002
@@ -26,8 +26,8 @@
 
 #define BUFFER_LENGTH 1000
 
-#define CCHAR_OP 0
-#define RESEND_TIMER 0
+#define CCHAR_OP 1
+#define RESEND_TIMER 1
 
 static char receive[BUFFER_LENGTH];
 static int cansend = 0;
@@ -152,17 +152,19 @@ timeval_diff(struct timeval* t1, struct timeval* t2)
 {
 	long us;
 	us = (t2->tv_sec - t1->tv_sec) * 1e6;
+	// printf("us %ld %ld - %ld  \n",us, t2->tv_sec , t1->tv_sec );
+
 	if (us < 0) return 0;
 	us += (t2->tv_usec - t1->tv_usec);
 	return us;
 }
 
 static void
-update_stats(struct stats* stats, struct timeval* delivered, size_t size)
+update_stats(struct stats* stats, struct timeval delivered, size_t size)
 {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	long lat = timeval_diff(delivered, &tv);
+	long lat = timeval_diff(&delivered, &tv);
 	stats->delivered_count++;
 	stats->delivered_bytes += size;
 	stats->avg_latency = stats->avg_latency +
@@ -174,11 +176,11 @@ update_stats(struct stats* stats, struct timeval* delivered, size_t size)
 }
 
 void unpack_message(char * msg){
-  struct user_msg * t = (struct user_msg *) msg;
-	// printf("my id %d, its id %d\n", cl->id, t->client_id );
-	if(t->client_id == cl->id){
-		update_stats(&cl->stats, &t->timenow, cl->value_size);
-		// printf("Client: On deliver iid:%d value:%.16s\n",t->iid, t->msg );
+  struct user_msg * mess = (struct user_msg *) msg;
+	struct client_value * val = (struct client_value *) mess->value;
+	if(val->client_id == cl->id){
+		update_stats(&cl->stats, val->t, cl->value_size);
+		// printf("Client: On deliver iid:%d value:%.16s\n",mess->iid, val->value );
 		client_submit_value(cl);
 	}
 	#if RESEND_TIMER
@@ -222,9 +224,9 @@ on_stats(evutil_socket_t fd, short event, void *arg)
 {
 	struct client* c = arg;
 	double mbps = (double)(c->stats.delivered_bytes * 8) / (1024*1024);
-	printf("Sent %d \n", sent_sec);
+	// printf("Sent %d \n", sent_sec);
 	sent_sec = 0;
-	// printf("Client: %d value/sec, %.2f Mbps, latency min %ld us max %ld us avg %ld us\n", c->stats.delivered_count, mbps, c->stats.min_latency, c->stats.max_latency, c->stats.avg_latency);
+	printf("Client: %d value/sec, %.2f Mbps, latency min %ld us max %ld us avg %ld us\n", c->stats.delivered_count, mbps, c->stats.min_latency, c->stats.max_latency, c->stats.avg_latency);
 	memset(&c->stats, 0, sizeof(struct stats));
 	event_add(c->stats_ev, &c->stats_interval);
 }
@@ -279,12 +281,12 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
   printf("id is %d\n",c->id );
 
 	#if CCHAR_OP
-	  if(c->fd >= 0){
-	    int ret = write(c->fd, (char *) &c->value_size, sizeof(int));
-	    if (ret < 0){
-	      perror("Failed to write the message to the device");
-	    }
-	  }
+	  // if(c->fd >= 0){
+	  //   int ret = write(c->fd, (char *) &c->value_size, sizeof(int));
+	  //   if (ret < 0){
+	  //     perror("Failed to write the message to the device");
+	  //   }
+	  // }
 
 		c->evread = event_new(c->base, c->fd, EV_READ | EV_PERSIST, client_read,
 													event_self_cbarg());
@@ -320,7 +322,7 @@ make_client(const char* config, int proposer_id, int outstanding, int value_size
     printf("Socket is bind to %s : %d \n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 		// print statistic every 1 sec
 		c->stats_interval = (struct timeval){1, 0};
-		c->reset_interval = (struct timeval){0, 1};
+		c->reset_interval = (struct timeval){1, 0};
 		c->stats_ev = evtimer_new(c->base, on_stats, c);
 		event_add(c->stats_ev, &c->stats_interval);
 
@@ -345,7 +347,7 @@ start_client(const char* config, int proposer_id, int outstanding, int value_siz
 {
 	make_client(config, proposer_id, outstanding, value_size);
 	// signal(SIGPIPE, SIG_IGN);
-	// libevent_global_shutdown();
+	libevent_global_shutdown();
 }
 
 static void

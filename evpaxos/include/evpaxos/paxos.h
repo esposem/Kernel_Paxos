@@ -67,7 +67,7 @@ typedef void (*deliver_function)(
  *
  * @see evpaxos_replica_free()
  */
-struct evpaxos_replica* evpaxos_replica_init(int id, const char* config,
+struct evpaxos_replica* evpaxos_replica_init(int id,
 	deliver_function cb, void* arg, udp_service * k);
 
 /**
@@ -111,7 +111,7 @@ int evpaxos_replica_count(struct evpaxos_replica* replica);
  * an optional argument to that is passed to the callback, and
  * a libevent event_base.
  */
-struct evlearner* evlearner_init(const char* config, deliver_function f,
+struct evlearner* evlearner_init( deliver_function f,
 	void* arg, udp_service * k);
 
 /**
@@ -140,7 +140,7 @@ void evlearner_send_trim(struct evlearner* l, unsigned iid);
  * Initializes a acceptor with a given id (which MUST be unique),
  * a config file and a libevent event_base.
  */
-struct evacceptor* evacceptor_init(int id, const char* config_file, udp_service * k);
+struct evacceptor* evacceptor_init(int id, udp_service * k);
 
 /**
  * Frees the memory allocated by the acceptor.
@@ -154,7 +154,7 @@ void evacceptor_free(struct evacceptor* a);
  *
  * @param id a unique identifier, must be in the range [0...(MAX_N_OF_PROPOSERS-1)]
  */
-struct evproposer* evproposer_init(int id, const char* config, udp_service * k);
+struct evproposer* evproposer_init(int id,  udp_service * k);
 
 /**
  * Release the memory allocated by the proposer

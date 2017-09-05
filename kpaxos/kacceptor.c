@@ -15,12 +15,11 @@ MODULE_PARM_DESC(id,"The acceptor id, default 0");
 
 static udp_service * kacceptor;
 static struct evacceptor* acc = NULL;
-struct timeval sk_timeout_timeval;
 
 static void
-start_acceptor(int id, const char* config)
+start_acceptor(int id)
 {
-	acc = evacceptor_init(id, config, kacceptor);
+	acc = evacceptor_init(id, kacceptor);
 	if (acc == NULL) {
 		printk(KERN_ERR "%s Could not start the acceptor", kacceptor->name);
 	}else{
@@ -32,8 +31,7 @@ start_acceptor(int id, const char* config)
 
 static int run_acceptor(void)
 {
-  const char* config = "../paxos.conf";
-	start_acceptor(id, config);
+	start_acceptor(id);
 	atomic_set(&kacceptor->thread_running, 0);
   return 0;
 }

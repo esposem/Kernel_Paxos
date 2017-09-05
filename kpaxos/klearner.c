@@ -7,7 +7,7 @@
 #include <net/sock.h>
 
 #define USE_CLIENT 0
-#define LCHAR_OP 0
+#define LCHAR_OP 1
 
 #include "paxos.h"
 #include "evpaxos.h"
@@ -35,9 +35,13 @@
 	};
 #endif
 
-static int cantrim = 0;
+static int cantrim = 100000;
 module_param(cantrim, int, S_IRUGO);
-MODULE_PARM_DESC(cantrim,"If it's a client, set 1");
+MODULE_PARM_DESC(cantrim,"If the module has to trim, set it to trim value");
+
+static int catch_up = 0;
+module_param(catch_up, int, S_IRUGO);
+MODULE_PARM_DESC(catch_up,"If the module has to trim, set it to trim value");
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
@@ -45,7 +49,6 @@ MODULE_PARM_DESC(id,"The learner id, default 0");
 
 static udp_service * klearner;
 static struct evlearner* lea = NULL;
-struct timeval sk_timeout_timeval;
 static atomic_t rcv;
 
 #if USE_CLIENT
@@ -89,56 +92,47 @@ static atomic_t rcv;
 	}
 #endif
 
-static void
-deliver(unsigned iid, char* value, size_t size, void* arg)
-{
-	atomic_inc(&rcv);
-	struct client_value* val = (struct client_value*)value;
-	printk(KERN_INFO "%s  iid %d [%.16s] %ld bytes", klearner->name, iid, val->value, (long)val->size);
-}
 
 static void
 on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 	atomic_inc(&rcv);
-	struct client_value* v = (struct client_value*)value;
 
-		#if USE_CLIENT
-			struct client* c = arg;
-			update_stats(&c->stats, v, size);
-		#endif
+	#if USE_CLIENT
+		struct client* c = arg;
+		update_stats(&c->stats, v, size);
+	#endif
 
-    if(iid % 100000 == 0){
-      printk(KERN_ALERT "Called trim, instance %d ", iid);
-      evlearner_send_trim(lea, iid);
-    }
-    printk(KERN_INFO "%s On deliver iid:%d value:%.16s",klearner->name, iid, v->value );
-		#if LCHAR_OP
-  	 	kset_message(&v->t, v->value, v->client_id, iid);
-		#endif
+  if(cantrim > 0 && (iid % cantrim == 0)){
+    paxos_log_info("Called trim, instance %d ", iid);
+    evlearner_send_trim(lea, iid);
+  }
+
+  // printk(KERN_INFO "%s On deliver iid:%d size %zu ",klearner->name, iid, size);
+	#if LCHAR_OP
+	 	kset_message(value, size, iid);
+	#endif
 }
 
 static void
-start_learner(const char* config)
+start_learner(void)
 {
-	if(cantrim){
+	if(catch_up == 0){
 		paxos_config.learner_catch_up = 0;
-
-		#if USE_CLIENT
-			struct client * c = kmalloc(sizeof(struct client), GFP_KERNEL);
-			cl = c;
-			memset(c, 0, sizeof(struct client));
-			setup_timer( &c->stats_ev,  on_stats, (unsigned long) c);
-			c->stats_interval = (struct timeval){1, 0};
-	  	mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
-			c->learner = lea;
-			lea = evlearner_init(config, on_deliver, c, klearner);
-		#else
-			lea = evlearner_init(config, on_deliver, NULL, klearner);
-		#endif
-	}else{
-		lea = evlearner_init(config, deliver, NULL, klearner);
 	}
+
+	#if USE_CLIENT
+		struct client * c = kmalloc(sizeof(struct client), GFP_KERNEL);
+		cl = c;
+		memset(c, 0, sizeof(struct client));
+		setup_timer( &c->stats_ev,  on_stats, (unsigned long) c);
+		c->stats_interval = (struct timeval){1, 0};
+  	mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
+		c->learner = lea;
+		lea = evlearner_init(on_deliver, c, klearner);
+	#else
+		lea = evlearner_init(on_deliver, NULL, klearner);
+	#endif
 
 	if (lea == NULL) {
 		printk(KERN_ERR "%s:Could not start the learner!", klearner->name);
@@ -155,13 +149,17 @@ static int run_learner(void)
 		return 0;
 	}
 
+	if(catch_up != 1 && catch_up != 0){
+		printk(KERN_ERR "invalid catch_up, set to 0");
+		catch_up = 0;
+	}
+
 	#if LCHAR_OP
 		kdevchar_init(id, "klearner");
 	#endif
 
 	atomic_set(&rcv,0);
-  const char* config = "../paxos.conf";
-  start_learner(config);
+  start_learner();
 	atomic_set(&klearner->thread_running, 0);
   return 0;
 }
@@ -190,11 +188,9 @@ static int __init init_learner(void)
 
 static void __exit learner_exit(void)
 {
-	if(cantrim){
-		#if USE_CLIENT
-		del_timer(&cl->stats_ev);
-		#endif
-	}
+	#if USE_CLIENT
+	del_timer(&cl->stats_ev);
+	#endif
 
 	#if LCHAR_OP
 		kstop_device();

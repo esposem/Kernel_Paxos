@@ -1,3 +1,3 @@
 #! /bin/sh
-make
+make > /dev/null
 sudo ./client_user2 -c -id 2

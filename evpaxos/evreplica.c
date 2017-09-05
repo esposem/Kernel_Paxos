@@ -45,31 +45,28 @@ evpaxos_replica_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 	struct evpaxos_replica* r = arg;
 	evproposer_set_instance_id(r->proposer, iid);
-	if (r->deliver)
+	if (r->deliver){
 		r->deliver(iid, value, size, r->arg);
+	}
 }
 
 struct evpaxos_replica*
-evpaxos_replica_init(int id, const char* config_file, deliver_function f,
-	void* arg, udp_service * k )
+evpaxos_replica_init(int id, deliver_function f, void* arg, udp_service * k )
 {
 	struct evpaxos_replica* r;
 	struct evpaxos_config* config;
 	r = kmalloc(sizeof(struct evpaxos_replica), GFP_KERNEL);
-
-	config = evpaxos_config_read(config_file);
+	config = evpaxos_config_read();
 
 	struct sockaddr_in send_addr = evpaxos_acceptor_address(config,id);
 	r->peers = peers_new(&send_addr, config, id);
 	add_acceptors_from_config(-1, r->peers);
 	printall(r->peers, k->name);
-	sk_timeout_timeval.tv_sec = 0;
-	sk_timeout_timeval.tv_usec = 100000;
 	if(peers_sock_init(r->peers, k) == 0){
+		r->deliver = f;
 		r->acceptor = evacceptor_init_internal(id, config, r->peers, k);
 		r->proposer = evproposer_init_internal(id, config, r->peers, k);
 		r->learner  = evlearner_init_internal(config, r->peers, evpaxos_replica_deliver, r, k);
-		r->deliver = f;
 		r->arg = arg;
 		evpaxos_config_free(config);
 		return r;

@@ -27,34 +27,31 @@ MODULE_PARM_DESC(id,"The replica id, default 0");
 
 static udp_service * kreplica;
 static struct evpaxos_replica* replica = NULL;
-struct timeval sk_timeout_timeval;
 
-static void
-deliver(unsigned iid, char* value, size_t size, void* arg)
+void deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 	atomic_inc(&rcv);
 	struct client_value* val = (struct client_value*)value;
-	printk(KERN_INFO "%s: %ld.%06ld [%.16s] %ld bytes", kreplica->name, val->t.tv_sec, val->t.tv_usec, val->value, (long)val->size);
+	// printk(KERN_INFO "%s: %ld.%06ld [%.16s] %ld bytes", kreplica->name, val->t.tv_sec, val->t.tv_usec, val->value, (long)val->size);
 }
 
 static void
-start_replica(int id, const char* config)
+start_replica(int id)
 {
-	deliver_function cb = NULL;
-	replica = evpaxos_replica_init(id, config, cb, deliver, kreplica);
+	deliver_function cb = deliver;
+	replica = evpaxos_replica_init(id, cb, NULL, kreplica);
 
 	if (replica == NULL) {
 		printk(KERN_ERR "Could not start the replica!");
 	}else{
 		paxos_replica_listen(kreplica, replica);
+		evpaxos_replica_free(replica);
 	}
-	evpaxos_replica_free(replica);
 }
 
 static int run_replica(void)
 {
-  const char* config = "../paxos.conf";
-  start_replica(id, config);
+  start_replica(id);
 	atomic_set(&kreplica->thread_running, 0);
   return 0;
 }
@@ -88,7 +85,7 @@ static int __init init_replica(void)
 
 static void __exit replica_exit(void)
 {
-	printk(KERN_ERR "Received %d", atomic_read(&rcv));
+	printk(KERN_ERR "Replica Received %d", atomic_read(&rcv));
   udp_server_quit(kreplica);
 }
 

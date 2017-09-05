@@ -95,7 +95,7 @@ unsigned int inet_addr(char *str)
 }
 
 struct evpaxos_config*
-evpaxos_config_read(const char* path)
+evpaxos_config_read(void)
 {
 	#if 0
 	int size_config = 7;
@@ -106,7 +106,7 @@ evpaxos_config_read(const char* path)
 		"proposer 0 127.0.0.2 3002",
 		"proposer 1 127.0.0.2 4002",
 		"proposer 2 127.0.0.2 5002",
-		"verbosity debug"
+		"verbosity quiet"
 	};
 	#else
 	int size_config = 4;
