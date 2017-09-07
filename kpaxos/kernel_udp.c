@@ -154,7 +154,7 @@ void init_service(udp_service * k, char * name, int id){
     stlen++; // add id
   }
 
-  k->name = kmalloc(stlen, GFP_KERNEL);
+  k->name = kmalloc(stlen, GFP_ATOMIC | __GFP_REPEAT);
   if(id != -1){
     k->name[namelen] = (id + '0');
   }

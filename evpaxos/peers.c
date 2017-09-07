@@ -74,7 +74,7 @@ static int on_read(char * data,struct peer * arg, int size);
 
 struct peers* peers_new(struct sockaddr_in * send_addr, struct evpaxos_config* config, int id)
 {
-	struct peers* p = kmalloc(sizeof(struct peers), GFP_KERNEL);
+	struct peers* p = kmalloc(sizeof(struct peers), GFP_ATOMIC | __GFP_REPEAT);
 	p->peers_count = 0;
 	p->clients_count = 0;
 	p->subs_count = 0;
@@ -131,7 +131,7 @@ peers_get_acceptor(struct peers* p, int id)
 void add_acceptors_from_config(int myid, struct peers * p){
 	struct sockaddr_in addr;
 	int n = evpaxos_acceptor_count(p->config);
-	p->peers = krealloc(p->peers, sizeof(struct peer*) * n, GFP_KERNEL);
+	p->peers = krealloc(p->peers, sizeof(struct peer*) * n, GFP_ATOMIC | __GFP_REPEAT);
 	for(int i = 0; i < n; i++){
 		if(i != myid){
 			addr = evpaxos_acceptor_address(p->config, i);
@@ -140,7 +140,7 @@ void add_acceptors_from_config(int myid, struct peers * p){
 		}
 	}
 	paxos_log_debug("ALLOCATED %d", p->peers_count);
-	peers_received_ok = kmalloc(sizeof(int) * p->peers_count, GFP_KERNEL);
+	peers_received_ok = kmalloc(sizeof(int) * p->peers_count, GFP_ATOMIC | __GFP_REPEAT);
 	memset(peers_received_ok, 0 , sizeof(int) * p->peers_count);
 }
 
@@ -189,7 +189,7 @@ static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
 	}
 	paxos_log_info( "Added a new client, now %d clients", p->clients_count + 1);
 	// printk( "%s Added a new client, now %d clients",la->name, p->clients_count + 1);
-	p->clients = krealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1), GFP_KERNEL);
+	p->clients = krealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1), GFP_ATOMIC | __GFP_REPEAT);
 	p->clients[p->clients_count] = make_peer(p, p->clients_count, addr);
 	p->clients_count++;
 	// printall(p, la->name);
@@ -239,7 +239,7 @@ void peers_delete_learner(struct peer * del){
 				p->clients[j]->id = j;
 			}
 			p->clients_count--;
-			p->clients = krealloc(p->clients, sizeof(struct peer *) * (p->clients_count), GFP_KERNEL);
+			p->clients = krealloc(p->clients, sizeof(struct peer *) * (p->clients_count), GFP_ATOMIC | __GFP_REPEAT);
 			break;
 		}
 	}
@@ -250,7 +250,7 @@ peers_listen(struct peers* p, udp_service * k)
 {
 	int ret, first_time = 0;
 	struct sockaddr_in address;
-	unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_KERNEL);
+	unsigned char * in_buf = kmalloc(MAX_UDP_SIZE, GFP_ATOMIC | __GFP_REPEAT);
 	struct peer tmp;
 
 	#if HANDLE_BIG_PKG
@@ -259,13 +259,17 @@ peers_listen(struct peers* p, udp_service * k)
 	#endif
 
 	paxos_log_debug("%s Listening", k->name);
-	unsigned long long time_passed[N_TIMER] = {0,0,0};
-	unsigned long temp;
+	unsigned long long time_passed[N_TIMER];
+
+	unsigned long long temp, first;
 	struct timeval t1, t2;
-	struct timeval * p1, *p2, * swap;
-	p1 = &t1;
-	p2 = &t2;
+
 	do_gettimeofday(&t1);
+	first = timeval_to_jiffies(&t1);
+
+	for(int i = 0; i < N_TIMER; i++){
+		time_passed[i] = first;
+	}
 
 	while(1){
 
@@ -304,7 +308,7 @@ peers_listen(struct peers* p, udp_service * k)
 							n_packet_toget++;
 						}
 						size_bigger_buf = MAX_UDP_SIZE * (n_packet_toget +1);
-						bigger_buff = krealloc(in_buf, size_bigger_buf, GFP_KERNEL);
+						bigger_buff = krealloc(in_buf, size_bigger_buf, GFP_ATOMIC | __GFP_REPEAT);
 						in_buf+=MAX_UDP_SIZE;
 						memset(in_buf, '\0', MAX_UDP_SIZE * n_packet_toget);
 						first_time = 1;
@@ -321,17 +325,15 @@ peers_listen(struct peers* p, udp_service * k)
 			}
 		}
 
-		do_gettimeofday(p2);
-		temp = timeval_to_jiffies(p2) - timeval_to_jiffies(p1);
-		swap = p2;
-		p2 = p1;
-		p1 = swap;
+		do_gettimeofday(&t2);
+		temp = timeval_to_jiffies(&t2);
 
 		for(int i = 0; i < N_TIMER; i++){
-			time_passed[i] += temp;
-			if(k->timer_cb[i] != NULL && time_passed[i] >= k->timeout_jiffies[i]){
-				time_passed[i] = 0;
-				k->timer_cb[i](k->data[i]);
+			if(k->timer_cb[i] != NULL){
+				if((temp - time_passed[i]) >= k->timeout_jiffies[i]){
+					time_passed[i] = temp;
+					k->timer_cb[i](k->data[i]);
+				}
 			}
 		}
 	}
@@ -381,7 +383,7 @@ on_read(char * data,struct peer * arg, int size)
 static struct peer*
 make_peer(struct peers* peers, int id, struct sockaddr_in* addr)
 {
-	struct peer* p = kmalloc(sizeof(struct peer), GFP_KERNEL);
+	struct peer* p = kmalloc(sizeof(struct peer), GFP_ATOMIC | __GFP_REPEAT);
 	p->id = id;
 	p->addr = *addr;
 	p->peers = peers;

@@ -48,7 +48,7 @@ static void start_acc_thread(void){
 
 static int __init init_acceptor(void)
 {
-  kacceptor = kmalloc(sizeof(udp_service), GFP_KERNEL);
+  kacceptor = kmalloc(sizeof(udp_service), GFP_ATOMIC | __GFP_REPEAT);
   if(!kacceptor){
     printk(KERN_ERR "Failed to initialize ACCEPTOR");
   }else{

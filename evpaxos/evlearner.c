@@ -124,7 +124,7 @@ evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
 	deliver_function f, void* arg, udp_service * k)
 {
 	int acceptor_count = evpaxos_acceptor_count(config);
-	struct evlearner* learner = kmalloc(sizeof(struct evlearner), GFP_KERNEL);
+	struct evlearner* learner = kmalloc(sizeof(struct evlearner), GFP_ATOMIC | __GFP_REPEAT);
 
 	learner->delfun = f;
 	learner->delarg = arg;
@@ -199,11 +199,15 @@ peer_send_trim(struct peer* p, void* arg)
 	send_paxos_trim(get_send_socket(p), get_sockaddr(p), arg);
 }
 
+void evlearner_auto_trim(struct evlearner* l, unsigned iid){
+	trim_old_learn(l->state,iid);
+}
+
 void
 evlearner_send_trim(struct evlearner* l, unsigned iid)
 {
 	paxos_trim trim = {iid};
 	paxos_log_info("Learner: Sent PAXOS_TRIM to all acceptors");
-	trim_old_learn(l->state,iid);
+	evlearner_auto_trim(l, iid);
 	peers_foreach_acceptor(l->acceptors, peer_send_trim, &trim);
 }

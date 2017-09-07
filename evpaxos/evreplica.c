@@ -55,7 +55,7 @@ evpaxos_replica_init(int id, deliver_function f, void* arg, udp_service * k )
 {
 	struct evpaxos_replica* r;
 	struct evpaxos_config* config;
-	r = kmalloc(sizeof(struct evpaxos_replica), GFP_KERNEL);
+	r = kmalloc(sizeof(struct evpaxos_replica), GFP_ATOMIC | __GFP_REPEAT);
 	config = evpaxos_config_read();
 
 	struct sockaddr_in send_addr = evpaxos_acceptor_address(config,id);
@@ -115,6 +115,12 @@ evpaxos_replica_send_trim(struct evpaxos_replica* r, unsigned iid)
 {
 	paxos_trim trim = {iid};
 	peers_foreach_acceptor(r->peers, peer_send_trim, &trim);
+}
+
+void
+evpaxos_replica_internal_trim(struct evpaxos_replica* r, unsigned iid)
+{
+	evlearner_auto_trim(r->learner, iid);
 }
 
 void

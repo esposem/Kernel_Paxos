@@ -60,7 +60,7 @@ static void paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src);
 static struct mem_storage*
 mem_storage_new(int acceptor_id)
 {
-	struct mem_storage* s = kmalloc(sizeof(struct mem_storage), GFP_KERNEL);
+	struct mem_storage* s = kmalloc(sizeof(struct mem_storage), GFP_ATOMIC | __GFP_REPEAT);
 	if (s == NULL)
 		return s;
 	s->trim_iid = 0;
@@ -124,7 +124,7 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 	struct mem_storage* s = handle;
 	struct hash_item * a;
 
-	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
+	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_ATOMIC | __GFP_REPEAT);
 	paxos_accepted_copy(val, acc);
 
 	HASH_FIND_IID(s->record, &(acc->iid), a);
@@ -134,7 +134,7 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 		a->iid = acc->iid;
 	}
 	else {
-		a = kmalloc(sizeof(struct hash_item), GFP_KERNEL);
+		a = kmalloc(sizeof(struct hash_item), GFP_ATOMIC | __GFP_REPEAT);
 		a->value = val;
 		a->iid = acc->iid;
 		HASH_ADD_IID(s->record, iid, a);
@@ -172,7 +172,7 @@ paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src)
 {
 	memcpy(dst, src, sizeof(paxos_accepted));
 	if (dst->value.paxos_value_len > 0) {
-		dst->value.paxos_value_val = kmalloc(src->value.paxos_value_len, GFP_KERNEL);
+		dst->value.paxos_value_val = kmalloc(src->value.paxos_value_len, GFP_ATOMIC | __GFP_REPEAT);
 		memcpy(dst->value.paxos_value_val, src->value.paxos_value_val,
 			src->value.paxos_value_len);
 	}

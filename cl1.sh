@@ -1,3 +1,3 @@
 #! /bin/sh
-make > /dev/null
-sudo ./client_user1 -c -id 1
+# make > /dev/null
+sudo ./client_user1 -c -id 1 -d

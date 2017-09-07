@@ -93,7 +93,11 @@ void evpaxos_replica_set_instance_id(struct evpaxos_replica* replica,
  *
  * @param iid trim instance id
  */
-void evpaxos_replica_send_trim(struct evpaxos_replica* replica, unsigned iid);
+ void evpaxos_replica_send_trim(struct evpaxos_replica* replica, unsigned iid);
+
+void evpaxos_replica_internal_trim(struct evpaxos_replica* replica, unsigned iid);
+
+void evlearner_auto_trim(struct evlearner* l, unsigned iid);
 
 /**
  * Used by replicas to submit values.

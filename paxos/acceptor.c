@@ -49,7 +49,7 @@ struct acceptor*
 acceptor_new(int id)
 {
 	struct acceptor* a;
-	a = kmalloc(sizeof(struct acceptor), GFP_KERNEL);
+	a = kmalloc(sizeof(struct acceptor), GFP_ATOMIC | __GFP_REPEAT);
 	storage_init(&a->store, id);
 	if (storage_open(&a->store) != 0) {
 		kfree(a);
@@ -176,7 +176,7 @@ paxos_accept_to_accepted(int id, paxos_accept* acc, paxos_message* out)
 	char* value = NULL;
 	int value_size = acc->value.paxos_value_len;
 	if (value_size > 0) {
-		value = kmalloc(value_size, GFP_KERNEL);
+		value = kmalloc(value_size, GFP_ATOMIC | __GFP_REPEAT);
 		memcpy(value, acc->value.paxos_value_val, value_size);
 	}
 	out->type = PAXOS_ACCEPTED;

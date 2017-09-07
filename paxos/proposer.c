@@ -95,7 +95,7 @@ struct proposer*
 proposer_new(int id, int acceptors)
 {
 	struct proposer *p;
-	p = kmalloc(sizeof(struct proposer), GFP_KERNEL);
+	p = kmalloc(sizeof(struct proposer), GFP_ATOMIC | __GFP_REPEAT);
 	p->id = id;
 	p->acceptors = acceptors;
 	p->max_trim_iid = 0;
@@ -145,10 +145,12 @@ proposer_set_instance_id(struct proposer* p, iid_t iid)
 	if (iid > p->next_prepare_iid) {
 		p->next_prepare_iid = iid;
 		// remove instances older than iid
-		paxos_log_debug("Proposer: removing instances older than %d",iid );
-		proposer_trim_instances(p, &p->prepare_instances, iid);
-		proposer_trim_instances(p, &p->accept_instances, iid);
 	}
+	paxos_log_debug("Proposer: removing instances older than %d",iid );
+
+	proposer_trim_instances(p, &p->prepare_instances, iid);
+	proposer_trim_instances(p, &p->accept_instances, iid);
+
 }
 
 void
@@ -316,7 +318,7 @@ struct timeout_iterator*
 proposer_timeout_iterator(struct proposer* p)
 {
 	struct timeout_iterator* iter;
-	iter = kmalloc(sizeof(struct timeout_iterator), GFP_KERNEL);
+	iter = kmalloc(sizeof(struct timeout_iterator), GFP_ATOMIC | __GFP_REPEAT);
 	iter->pi = p->prepare_instances;
 	iter->ai = p->accept_instances;
 	iter->proposer = p;
@@ -423,7 +425,7 @@ static struct instance*
 instance_new(iid_t iid, ballot_t ballot, int acceptors)
 {
 	struct instance* inst;
-	inst = kmalloc(sizeof(struct instance), GFP_KERNEL);
+	inst = kmalloc(sizeof(struct instance), GFP_ATOMIC | __GFP_REPEAT);
 	inst->iid = iid;
 	inst->ballot = ballot;
 	inst->value_ballot = 0;

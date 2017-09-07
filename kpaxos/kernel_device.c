@@ -20,7 +20,7 @@ static int majorNumber, working, current_buf = 0, first_buf = 0;
 static struct user_msg * msg_buf[BUFFER_SIZE];
 static struct timer_list release_lock;
 static struct timeval interval;
-int value_size = 0;
+size_t value_size = 0;
 static atomic_t must_stop, used_buf;
 
 int kdev_open(struct inode *inodep, struct file *filep){
@@ -45,10 +45,13 @@ void kset_message(char * msg, size_t size, unsigned int iid){
     paxos_log_error("Buffer is full! Lost a value");
     return;
   }
-  value_size = size;
+
+  if(value_size == 0){
+    return;
+  }
   mutex_lock(&buffer_mutex);
   atomic_inc(&used_buf);
-  msg_buf[current_buf] = kmalloc(sizeof(struct user_msg) + size, GFP_KERNEL);
+  // value_size = size; // In case you want to update the size of value.
   memcpy(&msg_buf[current_buf]->iid, &iid, sizeof(int));
   memcpy(&msg_buf[current_buf]->value, msg, size);
   current_buf = (current_buf + 1) % BUFFER_SIZE;
@@ -63,7 +66,7 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
     return -1;
   }
   int error_count = -1;
-  // WARNING! assume that the buffer has size > size_of_message
+  // WARNING! assume that the buffer has size >= size_of_message
   if(atomic_read(&must_stop) == 1){
     return -2;
   }
@@ -74,7 +77,6 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
   if(atomic_read(&used_buf) > 0){
     mutex_lock(&buffer_mutex);
     error_count = copy_to_user(buffer, (char *) msg_buf[first_buf], sizeof(struct user_msg) + value_size);
-    kfree(msg_buf[first_buf]);
     if (error_count != 0){
       mutex_unlock(&buffer_mutex);
       working = 0;
@@ -99,8 +101,14 @@ ssize_t kdev_write(struct file *filep, const char *buffer, size_t len, loff_t *o
   if(working == 0){
     return -1;
   }
-  paxos_log_debug(KERN_INFO "Device: Received id %d", *((int *) buffer));
-  // memcpy(value_size,buffer, sizeof(int));
+  paxos_log_info("Device: client value size is %zu", *((size_t *) buffer));
+  memcpy(&value_size,buffer, sizeof(size_t));
+  for(int i = 0; i < BUFFER_SIZE; i++){
+    msg_buf[i] = kmalloc(sizeof(struct user_msg) + value_size, GFP_ATOMIC | __GFP_REPEAT);
+    if(msg_buf[i] == NULL){
+      printk(KERN_ERR "ERROR");
+    }
+  }
   return len;
 }
 
@@ -116,7 +124,7 @@ int kdev_release(struct inode *inodep, struct file *filep){
 
 static void allocate_name(char ** dest, char * name, int id){
   size_t len = strlen(name) + 1;
-  *dest = kmalloc(len + 1, GFP_KERNEL);
+  *dest = kmalloc(len + 1, GFP_ATOMIC | __GFP_REPEAT);
   memcpy(*dest, name, len);
   (*dest)[len-1] = id + '0';
   (*dest)[len] = '\0';
@@ -126,7 +134,7 @@ static void allocate_name_folder(char ** dest, char * name, int id){
   char * folder = "chardevice";
   size_t f_len = strlen(folder);
   size_t len = strlen(name);
-  *dest = kmalloc(f_len + len + 3, GFP_KERNEL);
+  *dest = kmalloc(f_len + len + 3, GFP_ATOMIC | __GFP_REPEAT);
   memcpy(*dest, folder,f_len);
   (*dest)[f_len] = '/';
   (*dest)[f_len + 1] = '\0';
@@ -193,6 +201,10 @@ void kdevchar_exit(void){
   device_destroy(charClass, MKDEV(majorNumber, 0));     // remove the device
   class_unregister(charClass);                          // unregister the device class
   class_destroy(charClass);                             // remove the device class
+  for(int i = 0; i < BUFFER_SIZE; i++){
+    kfree(msg_buf[i]);
+  }
+
   kfree(de_name);
   kfree(clas_name);
   unregister_chrdev(majorNumber, de_name);             // unregister the major number

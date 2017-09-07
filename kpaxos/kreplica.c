@@ -9,17 +9,8 @@
 #include "evpaxos.h"
 #include "kernel_udp.h"
 #include "kernel_client.h"
-// #include "kernel_device.h"
 
-// struct file_operations fops =
-// {
-//   .open = kdev_open,
-//   .read = kdev_read,
-//   .write = kdev_write,
-//   .release = kdev_release,
-// };
-
-static atomic_t rcv;
+// static atomic_t rcv;
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
@@ -30,8 +21,10 @@ static struct evpaxos_replica* replica = NULL;
 
 void deliver(unsigned iid, char* value, size_t size, void* arg)
 {
-	atomic_inc(&rcv);
+	// atomic_inc(&rcv);
 	struct client_value* val = (struct client_value*)value;
+	if(iid % 100000 == 0)
+		evpaxos_replica_internal_trim(replica, iid- 1000000 + 1);
 	// printk(KERN_INFO "%s: %ld.%06ld [%.16s] %ld bytes", kreplica->name, val->t.tv_sec, val->t.tv_usec, val->value, (long)val->size);
 }
 
@@ -60,7 +53,7 @@ static void start_replica_thread(void){
   kreplica->u_thread = kthread_run((void *)run_replica, NULL, kreplica->name);
   if(kreplica->u_thread >= 0){
     atomic_set(&kreplica->thread_running,1);
-		atomic_set(&rcv,0);
+		// atomic_set(&rcv,0);
     printk(KERN_INFO "%s Thread running", kreplica->name);
   }else{
     printk(KERN_ERR "%s Error in starting thread.", kreplica->name);
@@ -73,7 +66,7 @@ static int __init init_replica(void)
 		printk(KERN_ERR "you must give a valid id!");
 		return 0;
 	}
-  kreplica = kmalloc(sizeof(udp_service), GFP_KERNEL);
+  kreplica = kmalloc(sizeof(udp_service), GFP_ATOMIC | __GFP_REPEAT);
   if(!kreplica){
     printk(KERN_ERR "Failed to initialize replica");
   }else{
@@ -85,7 +78,7 @@ static int __init init_replica(void)
 
 static void __exit replica_exit(void)
 {
-	printk(KERN_ERR "Replica Received %d", atomic_read(&rcv));
+	// printk(KERN_ERR "Replica Received %d", atomic_read(&rcv));
   udp_server_quit(kreplica);
 }
 
