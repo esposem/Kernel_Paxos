@@ -76,7 +76,7 @@ struct learner*
 learner_new(int acceptors)
 {
 	struct learner* l;
-	l = kmalloc(sizeof(struct learner), GFP_KERNEL);
+	l = kmalloc(sizeof(struct learner), GFP_ATOMIC | __GFP_REPEAT);
 	l->acceptors = acceptors;
 	l->current_iid = 1;
 	l->highest_iid_closed = 1;
@@ -120,7 +120,6 @@ learner_receive_accepted(struct learner* l, paxos_accepted* ack)
 
 	struct instance* inst;
 	inst = learner_get_instance_or_create(l, ack->iid);
-
 	instance_update(inst, ack, l->acceptors);
 
 	if (instance_has_quorum(inst, l->acceptors) && (inst->iid > l->highest_iid_closed)){
@@ -189,8 +188,6 @@ learner_get_instance_or_create(struct learner* l, iid_t iids)
 		inst = instance_new(l->acceptors);
 		inst->iid = iids;
 		HASH_ADD_IID(l->instances, iid, inst);
-		struct instance * h = NULL;
-		HASH_FIND_IID( l->instances, &iids, h);
 	}
 	return inst;
 }
@@ -207,12 +204,14 @@ instance_new(int acceptors)
 {
 	int i;
 	struct instance* inst;
-	inst = kmalloc(sizeof(struct instance), GFP_KERNEL);
+	inst = kmalloc(sizeof(struct instance), GFP_ATOMIC | __GFP_REPEAT);
 	if(inst){
 		memset(inst, 0, sizeof(struct instance));
-		inst->acks = kmalloc(sizeof(paxos_accepted*) * acceptors, GFP_KERNEL);
-		for (i = 0; i < acceptors; ++i)
-			inst->acks[i] = NULL;
+		inst->acks = kmalloc(sizeof(paxos_accepted*) * acceptors, GFP_ATOMIC | __GFP_REPEAT);
+		if(inst->acks){
+			for (i = 0; i < acceptors; ++i)
+				inst->acks[i] = NULL;
+		}
 	}
 	return inst;
 
@@ -309,7 +308,7 @@ static paxos_accepted*
 paxos_accepted_dup(paxos_accepted* ack)
 {
 	paxos_accepted* copy;
-	copy = kmalloc(sizeof(paxos_accepted), GFP_KERNEL);
+	copy = kmalloc(sizeof(paxos_accepted), GFP_ATOMIC | __GFP_REPEAT);
 	memcpy(copy, ack, sizeof(paxos_accepted));
 	paxos_value_copy(&copy->value, &ack->value);
 	return copy;
@@ -321,7 +320,7 @@ paxos_value_copy(paxos_value* dst, paxos_value* src)
 	int len = src->paxos_value_len;
 	dst->paxos_value_len = len;
 	if (src->paxos_value_val != NULL) {
-		dst->paxos_value_val = kmalloc(len, GFP_KERNEL);
+		dst->paxos_value_val = kmalloc(len, GFP_ATOMIC | __GFP_REPEAT);
 		memcpy(dst->paxos_value_val, src->paxos_value_val, len);
 	}
 }

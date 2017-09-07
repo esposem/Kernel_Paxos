@@ -45,6 +45,7 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
   echo "Modules Successfully complied"
 
   tmp=0
+  total_load=0
   while [ "$elements" -gt $tmp ]
   do
     name=filename$tmp
@@ -70,11 +71,32 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
             fi
             j=$(( j+1 ))
           done
+
+          k=0
+          while [ "$total_load" -gt $k ]
+          do
+            j=0
+            tmp=$(( tmp-1 ))
+            name=filename$tmp
+            number=nf$tmp
+            while [ "${!number}" -gt $j ]
+            do
+              if sudo rmmod ./${!name}$j.ko; then
+                echo "Successfully unloaded Module " ${!name}$j
+              else
+                echo "Error in unloading the module " ${!name}$j
+              fi
+              j=$(( j+1 ))
+            done
+            k=$(( k+j ))
+          done
+
           kill $$
         fi
         i=$(( i+1 ))
       done
     fi
+    total_load=$(( total_load+load ))
     tmp=$(( tmp+1 ))
   done
 

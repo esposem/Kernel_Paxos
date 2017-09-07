@@ -1,21 +1,31 @@
 #! /bin/bash
-trim=$1
-norm=$2
-tot=$(( trim + norm ))
+norm=$1
+trim=$2
 
-if [ $# -lt 2 ]; then
-  echo "Please only insert the number of trim learner you want to load
-followed by the number of normal learner
+if [ $# -lt 1 ]; then
+  echo "Please only insert the number of learner you want to load
+(optionally) followed by the index of the trim learner
 Example:
-./learn.sh 3 2
-Load 3 trim klearner (klearner0.ko, klearner1.ko, klearner2.ko) and 2 normal klearner (klearner3.ko, klearner4.ko) " ;
+./learn.sh 2 1
+Load 2 klearner (klearner0.ko, klearner1.ko) and klearner1 is a trim learner" ;
+  kill $$
+fi
+
+if [ $# -eq 1 ]; then
+  trim=-1
+  echo "No trim"
+fi
+
+
+if [ $trim -ge $norm ]; then
+  echo "With "$norm" modules, trim index must between 0 and " $(( norm-1 ))
   kill $$
 fi
 
 path=$(dirname klearner)
 
 i=0
-while [ "$tot" -gt $i ]
+while [ "$norm" -gt $i ]
 do
   if sudo rmmod klearner$i.ko 2> /dev/null; then
     echo "Module" klearner$i "was already present. Removed it"
@@ -33,9 +43,10 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
   i=0
   loaded=0
   cantrim=0
-  while [ "$tot" -gt $i ]
+  while [ "$norm" -gt $i ]
   do
-    if [ "$i" -lt $trim ]; then
+    if [ "$i" -eq $trim ]; then
+      echo "####Trim module #####"
       cantrim=100000
     else
       cantrim=0
@@ -44,6 +55,9 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
     if sudo insmod ./klearner$i.ko cantrim=$cantrim id=$i; then
       echo "Successfully loaded  Module " klearner$i
       loaded=$(( loaded+1 ))
+      if [ "$i" -eq $trim ]; then
+        echo "####################"
+      fi
     else
       echo "Could not load Module " klearner$i
       echo "Unloading all other modules"
@@ -69,7 +83,7 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
 
 
   i=0
-  while [ "$tot" -gt $i ]
+  while [ "$norm" -gt $i ]
   do
     if sudo rmmod ./klearner$i.ko; then
       echo "Successfully unloaded Module " klearner$i

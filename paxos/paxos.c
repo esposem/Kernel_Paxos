@@ -56,9 +56,9 @@ paxos_value*
 paxos_value_new(const char* value, size_t size)
 {
 	paxos_value* v;
-	v = kmalloc(sizeof(paxos_value), GFP_KERNEL);
+	v = kmalloc(sizeof(paxos_value), GFP_ATOMIC | __GFP_REPEAT);
 	v->paxos_value_len = size;
-	v->paxos_value_val = kmalloc(size, GFP_KERNEL);
+	v->paxos_value_val = kmalloc(size, GFP_ATOMIC | __GFP_REPEAT);
 	memcpy(v->paxos_value_val, value, size);
 	return v;
 }

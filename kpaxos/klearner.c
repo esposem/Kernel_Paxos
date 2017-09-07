@@ -6,34 +6,19 @@
 #include <linux/time.h>
 #include <net/sock.h>
 
-#define USE_CLIENT 0
-#define LCHAR_OP 1
-
 #include "paxos.h"
 #include "evpaxos.h"
 #include "kernel_udp.h"
 #include "kernel_client.h"
+#include "kernel_device.h"
 
-#if LCHAR_OP
-	#include "kernel_device.h"
-	struct file_operations fops =
-	{
-	  .open = kdev_open,
-	  .read = kdev_read,
-	  .write = kdev_write,
-	  .release = kdev_release,
-	};
-#endif
-
-#if USE_CLIENT
-	struct client
-	{
-		struct stats stats;
-		struct timer_list stats_ev;
-		struct timeval stats_interval;
-		struct evlearner* learner;
-	};
-#endif
+struct file_operations fops =
+{
+  .open = kdev_open,
+  .read = kdev_read,
+  .write = kdev_write,
+  .release = kdev_release,
+};
 
 static int cantrim = 100000;
 module_param(cantrim, int, S_IRUGO);
@@ -49,69 +34,20 @@ MODULE_PARM_DESC(id,"The learner id, default 0");
 
 static udp_service * klearner;
 static struct evlearner* lea = NULL;
-static atomic_t rcv;
-
-#if USE_CLIENT
-
-	static struct client * cl;
-
-	static long
-	timeval_diff(struct timeval* t1, struct timeval* t2)
-	{
-		long us;
-		us = (t2->tv_sec - t1->tv_sec) * 1000000;
-		if (us < 0) return 0;
-		us += (t2->tv_usec - t1->tv_usec);
-		return us;
-	}
-
-	static void
-	update_stats(struct stats* stats, struct client_value* delivered, size_t size)
-	{
-		struct timeval tv;
-		do_gettimeofday(&tv);
-		long lat = timeval_diff(&delivered->t, &tv);
-		stats->delivered_count++;
-		stats->delivered_bytes += size;
-		stats->avg_latency = stats->avg_latency +
-			((lat - stats->avg_latency) / stats->delivered_count);
-		if (stats->min_latency == 0 || lat < stats->min_latency)
-			stats->min_latency = lat;
-		if (lat > stats->max_latency)
-			stats->max_latency = lat;
-	}
-
-	static void
-	on_stats(unsigned long arg)
-	{
-		struct client* c = (struct client *) arg;
-		int mbps = (int)(c->stats.delivered_bytes * 8) / (1024*1024);
-		printk(KERN_INFO "%s %d value/sec, %d Mbps, latency min %ld us max %ld us avg %ld us\n",klearner->name, c->stats.delivered_count, mbps, c->stats.min_latency, c->stats.max_latency, c->stats.avg_latency);
-		memset(&c->stats, 0, sizeof(struct stats));
-	  mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
-	}
-#endif
-
+// static atomic_t rcv;
 
 static void
 on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
-	atomic_inc(&rcv);
-
-	#if USE_CLIENT
-		struct client* c = arg;
-		update_stats(&c->stats, v, size);
-	#endif
+	// atomic_inc(&rcv);
 
   if(cantrim > 0 && (iid % cantrim == 0)){
-    paxos_log_info("Called trim, instance %d ", iid);
-    evlearner_send_trim(lea, iid);
+    paxos_log_info("Called trim, instance %d ", iid - cantrim + 1);
+    evlearner_send_trim(lea, iid - cantrim + 1);
   }
 
   // printk(KERN_INFO "%s On deliver iid:%d size %zu ",klearner->name, iid, size);
-	#if LCHAR_OP
-	 	kset_message(value, size, iid);
-	#endif
+	kset_message(value, size, iid);
 }
 
 static void
@@ -121,18 +57,7 @@ start_learner(void)
 		paxos_config.learner_catch_up = 0;
 	}
 
-	#if USE_CLIENT
-		struct client * c = kmalloc(sizeof(struct client), GFP_KERNEL);
-		cl = c;
-		memset(c, 0, sizeof(struct client));
-		setup_timer( &c->stats_ev,  on_stats, (unsigned long) c);
-		c->stats_interval = (struct timeval){1, 0};
-  	mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
-		c->learner = lea;
-		lea = evlearner_init(on_deliver, c, klearner);
-	#else
-		lea = evlearner_init(on_deliver, NULL, klearner);
-	#endif
+	lea = evlearner_init(on_deliver, NULL, klearner);
 
 	if (lea == NULL) {
 		printk(KERN_ERR "%s:Could not start the learner!", klearner->name);
@@ -154,11 +79,9 @@ static int run_learner(void)
 		catch_up = 0;
 	}
 
-	#if LCHAR_OP
-		kdevchar_init(id, "klearner");
-	#endif
+	kdevchar_init(id, "klearner");
 
-	atomic_set(&rcv,0);
+	// atomic_set(&rcv,0);
   start_learner();
 	atomic_set(&klearner->thread_running, 0);
   return 0;
@@ -176,7 +99,7 @@ static void start_learner_thread(void){
 
 static int __init init_learner(void)
 {
-  klearner = kmalloc(sizeof(udp_service), GFP_KERNEL);
+  klearner = kmalloc(sizeof(udp_service), GFP_ATOMIC | __GFP_REPEAT);
   if(!klearner){
     printk(KERN_ERR "Failed to initialize server");
   }else{
@@ -188,15 +111,9 @@ static int __init init_learner(void)
 
 static void __exit learner_exit(void)
 {
-	#if USE_CLIENT
-	del_timer(&cl->stats_ev);
-	#endif
-
-	#if LCHAR_OP
-		kstop_device();
-		kdevchar_exit();
-	#endif
-	printk(KERN_ERR "Received %d", atomic_read(&rcv));
+	kstop_device();
+	kdevchar_exit();
+	// printk(KERN_ERR "Received %d", atomic_read(&rcv));
   udp_server_quit(klearner);
 }
 

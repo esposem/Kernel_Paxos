@@ -111,7 +111,7 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 		update_stats(&c->stats, v, size);
     if(iid % 100000 == 0){
       paxos_log_info("Client%d: trim called, instance %d ", c->id, iid);
-      evlearner_send_trim(c->learner, iid);
+      evlearner_send_trim(c->learner, iid -100000+1);
     }
     client_submit_value(c);
     // printk(KERN_INFO "%s On deliver iid:%d value:%.16s",kclient->name, iid, v->value );
@@ -132,7 +132,7 @@ static struct client*
 make_client( int proposer_id, int outstanding, int value_size)
 {
 
-	c = kmalloc(sizeof(struct client), GFP_KERNEL);
+	c = kmalloc(sizeof(struct client), GFP_ATOMIC | __GFP_REPEAT);
 
 	memset(&c->stats, 0, sizeof(struct stats));
   struct evpaxos_config* conf = evpaxos_config_read();
@@ -146,7 +146,7 @@ make_client( int proposer_id, int outstanding, int value_size)
 
 	c->value_size = value_size;
 	c->outstanding = outstanding;
-	c->send_buffer = kmalloc(sizeof(struct client_value) + value_size, GFP_KERNEL);
+	c->send_buffer = kmalloc(sizeof(struct client_value) + value_size, GFP_ATOMIC | __GFP_REPEAT);
 
   setup_timer( &c->stats_ev,  on_stats, (unsigned long) c);
 	c->stats_interval = (struct timeval){1, 0};
@@ -209,7 +209,7 @@ static int __init init_client(void)
 		printk(KERN_ERR "you must give an id!");
 		return 0;
 	}
-  kclient = kmalloc(sizeof(udp_service), GFP_KERNEL);
+  kclient = kmalloc(sizeof(udp_service), GFP_ATOMIC | __GFP_REPEAT);
   if(!kclient){
     printk(KERN_ERR "Failed to initialize CLIENT ");
   }else{

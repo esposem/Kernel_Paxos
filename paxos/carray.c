@@ -50,7 +50,7 @@ struct carray*
 carray_new(int size)
 {
 	struct carray* a;
-	a = kmalloc(sizeof(struct carray), GFP_KERNEL);
+	a = kmalloc(sizeof(struct carray), GFP_ATOMIC | __GFP_REPEAT);
 	// assert(a != NULL);
 	// WARN_ON(a == NULL);
 	if(a == NULL)
@@ -59,7 +59,7 @@ carray_new(int size)
 	a->tail = 0;
 	a->size = size;
 	a->count = 0;
-	a->array = kmalloc(sizeof(void*)*a->size, GFP_KERNEL);
+	a->array = kmalloc(sizeof(void*)*a->size, GFP_ATOMIC | __GFP_REPEAT);
 	if(a == NULL)
 		printk(KERN_ALERT "ARRAY IS NULL");
 	// assert(a->array != NULL);

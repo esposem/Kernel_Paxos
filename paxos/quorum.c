@@ -36,7 +36,7 @@ quorum_init(struct quorum* q, int acceptors)
 {
 	q->acceptors = acceptors;
 	q->quorum = paxos_quorum(acceptors);
-	q->acceptor_ids = kmalloc(sizeof(int) * q->acceptors, GFP_KERNEL);
+	q->acceptor_ids = kmalloc(sizeof(int) * q->acceptors, GFP_ATOMIC | __GFP_REPEAT);
 	quorum_clear(q);
 }
 

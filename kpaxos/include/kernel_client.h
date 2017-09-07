@@ -10,8 +10,8 @@ struct client_value
 };
 
 struct user_msg{
-  char value[0];
   int iid;
+	char value[0];
 };
 
 struct stats

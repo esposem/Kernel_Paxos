@@ -47,7 +47,7 @@ static void start_prop_thread(void){
 
 static int __init init_prop(void)
 {
-  kproposer = kmalloc(sizeof(udp_service), GFP_KERNEL);
+  kproposer = kmalloc(sizeof(udp_service), GFP_ATOMIC | __GFP_REPEAT);
   if(!kproposer){
     printk(KERN_ERR "Failed to initialize server");
   }else{
