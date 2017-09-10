@@ -125,20 +125,25 @@ mem_storage_put(void* handle, paxos_accepted* acc)
 	struct hash_item * a;
 
 	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_ATOMIC | __GFP_REPEAT);
-	paxos_accepted_copy(val, acc);
+	if(val){
+		paxos_accepted_copy(val, acc);
 
-	HASH_FIND_IID(s->record, &(acc->iid), a);
-	if (a != NULL) {
-		paxos_accepted_free(a->value);
-		a->value = val;
-		a->iid = acc->iid;
+		HASH_FIND_IID(s->record, &(acc->iid), a);
+		if (a) {
+			paxos_accepted_free(a->value);
+			a->value = val;
+			a->iid = acc->iid;
+		}
+		else {
+			a = kmalloc(sizeof(struct hash_item), GFP_ATOMIC | __GFP_REPEAT);
+			if(a){
+				a->value = val;
+				a->iid = acc->iid;
+				HASH_ADD_IID(s->record, iid, a);
+			}
+		}
 	}
-	else {
-		a = kmalloc(sizeof(struct hash_item), GFP_ATOMIC | __GFP_REPEAT);
-		a->value = val;
-		a->iid = acc->iid;
-		HASH_ADD_IID(s->record, iid, a);
-	}
+
 
 	return 0;
 

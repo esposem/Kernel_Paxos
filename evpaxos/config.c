@@ -122,19 +122,22 @@ evpaxos_config_read(void)
 	// + 1(.) + 3(0-255) + 1(.) + 3 (0-255) + 1(.) + 3 (0-255)
 	// + 1( ) + 5 (0-66000) + 1(\0)
 	// = 35
-	char * 	line = kmalloc(35, GFP_ATOMIC | __GFP_REPEAT);
 	struct evpaxos_config* c = NULL;
 
 	c = kmalloc(sizeof(struct evpaxos_config), GFP_ATOMIC | __GFP_REPEAT);
-	memset(c, 0, sizeof(struct evpaxos_config));
+	if(c){
+		memset(c, 0, sizeof(struct evpaxos_config));
 
-	for(int i = 0; i < size_config; i++){
-		memset(line, 0, 35);
-		memcpy(line, config_file[i], strlen(config_file[i]) + 1);
-		parse_line(c, line);
+		char * 	line = kmalloc(35, GFP_ATOMIC | __GFP_REPEAT);
+		if(line){
+			for(int i = 0; i < size_config; i++){
+				memset(line, 0, 35);
+				memcpy(line, config_file[i], strlen(config_file[i]) + 1);
+				parse_line(c, line);
+			}
+			kfree(line);
+		}
 	}
-
-	kfree(line);
 
 	return c;
 
@@ -233,7 +236,8 @@ parse_string(char* str, char** string)
 	if (str == NULL || str[0] == '\0' || str[0] == '\n')
 		return 0;
 	*string = kmalloc(strlen(str) + 1, GFP_ATOMIC | __GFP_REPEAT);
-	strcpy(*string, str);
+	if(*string)
+		strcpy(*string, str);
 	return 1;
 }
 
@@ -347,7 +351,8 @@ static void
 address_init(struct address* a, char* addr, int port)
 {
 	a->addr = kmalloc(strlen(addr) + 1, GFP_ATOMIC | __GFP_REPEAT);
-	strcpy(a->addr, addr);
+	if(a->addr)
+		strcpy(a->addr, addr);
 	a->port = port;
 }
 

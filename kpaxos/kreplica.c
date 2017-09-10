@@ -22,9 +22,9 @@ static struct evpaxos_replica* replica = NULL;
 void deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 	// atomic_inc(&rcv);
-	struct client_value* val = (struct client_value*)value;
-	if(iid % 100000 == 0)
-		evpaxos_replica_internal_trim(replica, iid- 1000000 + 1);
+	if(iid % 10000 == 0)
+		evpaxos_replica_internal_trim(replica, iid- 10000 + 1);
+		// struct client_value* val = (struct client_value*)value;
 	// printk(KERN_INFO "%s: %ld.%06ld [%.16s] %ld bytes", kreplica->name, val->t.tv_sec, val->t.tv_usec, val->value, (long)val->size);
 }
 

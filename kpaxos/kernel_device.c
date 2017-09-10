@@ -41,7 +41,7 @@ static void rel_lock(unsigned long arg){
 }
 
 void kset_message(char * msg, size_t size, unsigned int iid){
-  if(atomic_read(&used_buf) > BUFFER_SIZE){
+  if(atomic_read(&used_buf) >= BUFFER_SIZE){
     paxos_log_error("Buffer is full! Lost a value");
     return;
   }
@@ -51,14 +51,13 @@ void kset_message(char * msg, size_t size, unsigned int iid){
   }
   mutex_lock(&buffer_mutex);
   atomic_inc(&used_buf);
-  // value_size = size; // In case you want to update the size of value.
-  memcpy(&msg_buf[current_buf]->iid, &iid, sizeof(int));
-  memcpy(&msg_buf[current_buf]->value, msg, size);
+  memcpy(&(msg_buf[current_buf]->iid), &iid, sizeof(unsigned int));
+  memcpy(&(msg_buf[current_buf]->value), msg, size);
+
   current_buf = (current_buf + 1) % BUFFER_SIZE;
   mutex_unlock(&buffer_mutex);
   mutex_unlock(&read_mutex);
-  paxos_log_debug("Set message %d, occupied %d/100, first one is %d", current_buf, atomic_read(&used_buf), first_buf);
-  // printk(KERN_INFO "Set message %d, occupied %d/100, first one is %d", current_buf, atomic_read(&used_buf), first_buf);
+  paxos_log_debug("Set message %d, occupied %d/100, first one is %d", (current_buf -1) % BUFFER_SIZE, atomic_read(&used_buf), first_buf);
 }
 
 ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
@@ -70,23 +69,20 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
   if(atomic_read(&must_stop) == 1){
     return -2;
   }
-  mod_timer(&release_lock, jiffies + timeval_to_jiffies(&interval));
-  mutex_lock(&read_mutex);
-  del_timer(&release_lock);
+  // mod_timer(&release_lock, jiffies + timeval_to_jiffies(&interval));
+  // mutex_lock(&read_mutex);
+  // del_timer(&release_lock);
   setup_timer( &release_lock,  rel_lock, 0);
   if(atomic_read(&used_buf) > 0){
     mutex_lock(&buffer_mutex);
     error_count = copy_to_user(buffer, (char *) msg_buf[first_buf], sizeof(struct user_msg) + value_size);
     if (error_count != 0){
-      mutex_unlock(&buffer_mutex);
       working = 0;
   		paxos_log_error("Device Char: Failed to send %d characters to the user\n", error_count);
-  		return -EFAULT;
   	}else{
       first_buf = (first_buf + 1) % BUFFER_SIZE;
       atomic_dec(&used_buf);
-      // printk(KERN_INFO "Read message %d, occupied %d/100, first one is %d, last one is %d", first_buf -1, atomic_read(&used_buf), first_buf, current_buf);
-      paxos_log_debug("Read message %d, occupied %d/100, first one is %d, last one is %d", first_buf -1, atomic_read(&used_buf), first_buf, current_buf);
+      paxos_log_debug("Read message %d, occupied %d/100, new first one is %d, last one is %d", (first_buf - 1) % BUFFER_SIZE, atomic_read(&used_buf), first_buf, current_buf);
     }
     mutex_unlock(&buffer_mutex);
   }
@@ -102,13 +98,13 @@ ssize_t kdev_write(struct file *filep, const char *buffer, size_t len, loff_t *o
     return -1;
   }
   paxos_log_info("Device: client value size is %zu", *((size_t *) buffer));
-  memcpy(&value_size,buffer, sizeof(size_t));
-  for(int i = 0; i < BUFFER_SIZE; i++){
-    msg_buf[i] = kmalloc(sizeof(struct user_msg) + value_size, GFP_ATOMIC | __GFP_REPEAT);
-    if(msg_buf[i] == NULL){
-      printk(KERN_ERR "ERROR");
+  if(value_size == 0){
+    memcpy(&value_size,buffer, sizeof(size_t));
+    for(int i = 0; i < BUFFER_SIZE; i++){
+      msg_buf[i] = (struct user_msg *) kmalloc(sizeof(struct user_msg) + value_size, GFP_ATOMIC | __GFP_REPEAT);
     }
   }
+
   return len;
 }
 
@@ -180,10 +176,11 @@ int kdevchar_init(int id, char * name){
   mutex_init(&char_mutex);
   mutex_init(&buffer_mutex);
   mutex_init(&read_mutex);
+  mutex_lock(&read_mutex);
   atomic_set(&used_buf, 0);
   atomic_set(&must_stop, 0);
   setup_timer( &release_lock,  rel_lock, 0);
-  interval = (struct timeval){0, 100};
+  interval = (struct timeval){0, 1};
 
    paxos_log_debug(KERN_INFO "Device Char: device class created correctly\n");
   return 0;
