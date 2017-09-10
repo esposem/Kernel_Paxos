@@ -56,6 +56,9 @@ evpaxos_replica_init(int id, deliver_function f, void* arg, udp_service * k )
 	struct evpaxos_replica* r;
 	struct evpaxos_config* config;
 	r = kmalloc(sizeof(struct evpaxos_replica), GFP_ATOMIC | __GFP_REPEAT);
+	if(r == NULL){
+		return NULL;
+	}
 	config = evpaxos_config_read();
 
 	struct sockaddr_in send_addr = evpaxos_acceptor_address(config,id);

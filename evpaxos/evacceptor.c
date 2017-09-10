@@ -152,6 +152,9 @@ evacceptor_init_internal(int id, struct evpaxos_config* c, struct peers* p, udp_
 	struct evacceptor* acceptor;
 
 	acceptor = kmalloc(sizeof(struct evacceptor), GFP_ATOMIC | __GFP_REPEAT);
+	if(acceptor == NULL){
+		return NULL;
+	}
 	memset(acceptor, 0, sizeof(struct evacceptor));
 	acceptor->state = acceptor_new(id);
 	acceptor->peers = p;

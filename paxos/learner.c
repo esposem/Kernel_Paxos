@@ -77,11 +77,13 @@ learner_new(int acceptors)
 {
 	struct learner* l;
 	l = kmalloc(sizeof(struct learner), GFP_ATOMIC | __GFP_REPEAT);
-	l->acceptors = acceptors;
-	l->current_iid = 1;
-	l->highest_iid_closed = 1;
-	l->late_start = !paxos_config.learner_catch_up;
-	l->instances = NULL;
+	if(l){
+		l->acceptors = acceptors;
+		l->current_iid = 1;
+		l->highest_iid_closed = 1;
+		l->late_start = !paxos_config.learner_catch_up;
+		l->instances = NULL;
+	}
 	return l;
 }
 
@@ -309,8 +311,10 @@ paxos_accepted_dup(paxos_accepted* ack)
 {
 	paxos_accepted* copy;
 	copy = kmalloc(sizeof(paxos_accepted), GFP_ATOMIC | __GFP_REPEAT);
-	memcpy(copy, ack, sizeof(paxos_accepted));
-	paxos_value_copy(&copy->value, &ack->value);
+	if(copy){
+		memcpy(copy, ack, sizeof(paxos_accepted));
+		paxos_value_copy(&copy->value, &ack->value);
+	}
 	return copy;
 }
 
@@ -321,6 +325,7 @@ paxos_value_copy(paxos_value* dst, paxos_value* src)
 	dst->paxos_value_len = len;
 	if (src->paxos_value_val != NULL) {
 		dst->paxos_value_val = kmalloc(len, GFP_ATOMIC | __GFP_REPEAT);
-		memcpy(dst->paxos_value_val, src->paxos_value_val, len);
+		if(dst->paxos_value_val)
+			memcpy(dst->paxos_value_val, src->paxos_value_val, len);
 	}
 }

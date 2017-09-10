@@ -1,10 +1,12 @@
 #! /bin/bash
 norm=$1
 trim=$2
+cantrim=$3
 
 if [ $# -lt 1 ]; then
   echo "Please only insert the number of learner you want to load
-(optionally) followed by the index of the trim learner
+(optionally) followed by the index of the trim learner and after
+how many iid it should trim
 Example:
 ./learn.sh 2 1
 Load 2 klearner (klearner0.ko, klearner1.ko) and klearner1 is a trim learner" ;
@@ -16,6 +18,10 @@ if [ $# -eq 1 ]; then
   echo "No trim"
 fi
 
+if [ $# -eq 2 ]; then
+  cantrim=100000
+  echo "Cantrim is default to 100 000"
+fi
 
 if [ $trim -ge $norm ]; then
   echo "With "$norm" modules, trim index must between 0 and " $(( norm-1 ))
@@ -42,17 +48,16 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
 
   i=0
   loaded=0
-  cantrim=0
   while [ "$norm" -gt $i ]
   do
     if [ "$i" -eq $trim ]; then
       echo "####Trim module #####"
-      cantrim=100000
+      trim=$cantrim
     else
-      cantrim=0
+      trim=0
     fi
 
-    if sudo insmod ./klearner$i.ko cantrim=$cantrim id=$i; then
+    if sudo insmod ./klearner$i.ko cantrim=$trim id=$i; then
       echo "Successfully loaded  Module " klearner$i
       loaded=$(( loaded+1 ))
       if [ "$i" -eq $trim ]; then

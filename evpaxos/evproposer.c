@@ -184,6 +184,8 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers, 
 	int acceptor_count = evpaxos_acceptor_count(c);
 
 	p = kmalloc(sizeof(struct evproposer), GFP_ATOMIC | __GFP_REPEAT);
+	if(p == NULL)
+		return NULL;
 	p->k = k;
 	props = p;
 	p->id = id;
