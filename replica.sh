@@ -7,7 +7,7 @@ if [ $# -lt 1 ]; then
 (optionally) followed by the index of the trim learner
 Example:
 ./learn.sh 2 1
-Load 2 klearner (klearner0.ko, klearner1.ko) and klearner1 is a trim learner" ;
+Load 2 kreplica (kreplica0.ko, kreplica1.ko) and kreplica1 is a trim learner" ;
   kill $$
 fi
 
@@ -21,13 +21,13 @@ if [ $trim -ge $norm ]; then
   kill $$
 fi
 
-path=$(dirname klearner)
+path=$(dirname kreplica)
 
 i=0
 while [ "$norm" -gt $i ]
 do
-  if sudo rmmod klearner$i.ko 2> /dev/null; then
-    echo "Module" klearner$i "was already present. Removed it"
+  if sudo rmmod kreplica$i.ko 2> /dev/null; then
+    echo "Module" kreplica$i "was already present. Removed it"
   fi
   i=$(( i+1 ))
 done
@@ -51,22 +51,22 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
       cantrim=0
     fi
 
-    if sudo insmod ./klearner$i.ko cantrim=$cantrim id=$i; then
-      echo "Successfully loaded  Module " klearner$i
+    if sudo insmod ./kreplica$i.ko cantrim=$cantrim id=$i; then
+      echo "Successfully loaded  Module " kreplica$i
       loaded=$(( loaded+1 ))
       if [ "$i" -eq $trim ]; then
         echo "####################"
       fi
     else
-      echo "Could not load Module " klearner$i
+      echo "Could not load Module " kreplica$i
       echo "Unloading all other modules"
       j=0
       while [ "$loaded" -gt $j ]
       do
-        if sudo rmmod ./klearner$j.ko; then
-          echo "Successfully unloaded Module " klearner$j
+        if sudo rmmod ./kreplica$j.ko; then
+          echo "Successfully unloaded Module " kreplica$j
         else
-          echo "Error in unloading the module " klearner$j
+          echo "Error in unloading the module " kreplica$j
         fi
         j=$(( j+1 ))
       done
@@ -84,10 +84,10 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
   i=0
   while [ "$norm" -gt $i ]
   do
-    if sudo rmmod ./klearner$i.ko; then
-      echo "Successfully unloaded Module " klearner$i
+    if sudo rmmod ./kreplica$i.ko; then
+      echo "Successfully unloaded Module " kreplica$i
     else
-      echo "Error in unloading the module klearner$i"
+      echo "Error in unloading the module kreplica$i"
     fi
     i=$(( i+1 ))
   done

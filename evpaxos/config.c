@@ -97,7 +97,7 @@ unsigned int inet_addr(char *str)
 struct evpaxos_config*
 evpaxos_config_read(void)
 {
-	#if 1
+	#if 0
 	int size_config = 7;
 	char * config_file[] = {
 		"acceptor 0 127.0.0.3 3003",

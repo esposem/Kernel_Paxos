@@ -9,7 +9,7 @@
 #include "kernel_client.h"
 #include "paxos.h"
 
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 1000
 static DEFINE_MUTEX(char_mutex);
 static DEFINE_MUTEX(buffer_mutex);
 static DEFINE_MUTEX(read_mutex);
@@ -69,10 +69,7 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
   if(atomic_read(&must_stop) == 1){
     return -2;
   }
-  // mod_timer(&release_lock, jiffies + timeval_to_jiffies(&interval));
-  // mutex_lock(&read_mutex);
-  // del_timer(&release_lock);
-  setup_timer( &release_lock,  rel_lock, 0);
+
   if(atomic_read(&used_buf) > 0){
     mutex_lock(&buffer_mutex);
     error_count = copy_to_user(buffer, (char *) msg_buf[first_buf], sizeof(struct user_msg) + value_size);
@@ -85,6 +82,11 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
       paxos_log_debug("Read message %d, occupied %d/100, new first one is %d, last one is %d", (first_buf - 1) % BUFFER_SIZE, atomic_read(&used_buf), first_buf, current_buf);
     }
     mutex_unlock(&buffer_mutex);
+  }else{
+    mod_timer(&release_lock, jiffies + timeval_to_jiffies(&interval));
+    // printk("Locked");
+    mutex_lock(&read_mutex);
+    // printk("Unlocked");
   }
 
   if(atomic_read(&used_buf) != 0)
@@ -97,13 +99,24 @@ ssize_t kdev_write(struct file *filep, const char *buffer, size_t len, loff_t *o
   if(working == 0){
     return -1;
   }
-  paxos_log_info("Device: client value size is %zu", *((size_t *) buffer));
-  if(value_size == 0){
-    memcpy(&value_size,buffer, sizeof(size_t));
-    for(int i = 0; i < BUFFER_SIZE; i++){
-      msg_buf[i] = (struct user_msg *) kmalloc(sizeof(struct user_msg) + value_size, GFP_ATOMIC | __GFP_REPEAT);
-    }
+  switch (buffer[0] - '0') {
+    case VALUE:
+      if(value_size == 0){
+        memcpy(&value_size,buffer+1, sizeof(size_t));
+        paxos_log_debug("Device: client value size is %zu", value_size);
+        for(int i = 0; i < BUFFER_SIZE; i++){
+          msg_buf[i] = kmalloc(sizeof(struct user_msg) + value_size, GFP_ATOMIC | __GFP_REPEAT);
+        }
+      }
+      break;
+    case TRIM:
+      memcpy(&sendtrim,buffer+1, sizeof(size_t));
+      paxos_log_debug("Device: trim value size is %zu", sendtrim);
+      break;
+    default:
+      paxos_log_debug("Not recognized");
   }
+
 
   return len;
 }
@@ -180,7 +193,8 @@ int kdevchar_init(int id, char * name){
   atomic_set(&used_buf, 0);
   atomic_set(&must_stop, 0);
   setup_timer( &release_lock,  rel_lock, 0);
-  interval = (struct timeval){0, 1};
+  interval = (struct timeval){0, 3000};
+  sendtrim=0;
 
    paxos_log_debug(KERN_INFO "Device Char: device class created correctly\n");
   return 0;

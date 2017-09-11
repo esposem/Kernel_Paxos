@@ -20,13 +20,14 @@ struct file_operations fops =
   .release = kdev_release,
 };
 
-static int cantrim = 100000;
+size_t sendtrim;
+static int cantrim = 0;
 module_param(cantrim, int, S_IRUGO);
-MODULE_PARM_DESC(cantrim,"If the module has to trim, set it to trim value");
+MODULE_PARM_DESC(cantrim,"If the module has send to trim, set it to 1");
 
 static int catch_up = 0;
 module_param(catch_up, int, S_IRUGO);
-MODULE_PARM_DESC(catch_up,"If the module has to catch up the previous value, set it to 1");
+MODULE_PARM_DESC(catch_up,"If the module has to catch up the previous values, set it to 1");
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
@@ -34,18 +35,23 @@ MODULE_PARM_DESC(id,"The learner id, default 0");
 
 static udp_service * klearner;
 static struct evlearner* lea = NULL;
-// static atomic_t rcv;
 
 static void
 on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
-	// atomic_inc(&rcv);
-  if(cantrim > 0 && (iid % cantrim == 0)){
-    paxos_log_info("Called trim, instance %d ", iid - cantrim + 1);
-    evlearner_send_trim(lea, iid - cantrim + 1);
-    evlearner_auto_trim(lea, iid - cantrim + 1);
-  } else if (iid % 100000 == 0){
-    evlearner_auto_trim(lea, iid - 100000 + 1);
+  if(sendtrim > 0){
+    if(cantrim > 0){
+      printk(KERN_ERR "%s sent trim to all", klearner->name);
+      evlearner_send_trim(lea, sendtrim);
+    }
+    printk("%s sent autotrim", klearner->name);
+    evlearner_auto_trim(lea, sendtrim);
+    sendtrim = 0;
+  }else{
+    if(iid % 100000 == 0){
+      printk("%s sent autotrim", klearner->name);
+      evlearner_auto_trim(lea, iid- 100000 + 1);
+    }
   }
 
   // printk(KERN_INFO "%s On deliver iid:%d size %zu ",klearner->name, iid, size);
@@ -83,7 +89,6 @@ static int run_learner(void)
 
 	kdevchar_init(id, "klearner");
 
-	// atomic_set(&rcv,0);
   start_learner();
 	atomic_set(&klearner->thread_running, 0);
   return 0;
@@ -115,7 +120,6 @@ static void __exit learner_exit(void)
 {
 	kstop_device();
 	kdevchar_exit();
-	// printk(KERN_ERR "Received %d", atomic_read(&rcv));
   udp_server_quit(klearner);
 }
 
