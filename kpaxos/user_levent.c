@@ -8,8 +8,6 @@
 #include "user_levent.h"
 #include "user_udp.h"
 
-static atomic_int sent = 0;
-
 static void random_string(char *s, const int len);
 static void on_client_event(struct bufferevent *bev, short ev, void *arg);
 static void on_listener_error(struct evconnlistener *l, void *arg);
@@ -21,21 +19,18 @@ static void server_free(struct server *p);
 static void socket_set_nodelay(int fd);
 static void on_connect(struct bufferevent *bev, short events, void *arg);
 
-struct server *server_new(struct event_base *base) {
+struct server *server_new(struct client *base) {
   struct server *p = malloc(sizeof(struct server));
   p->clients_count = 0;
-  p->clients = NULL;
+  p->connections = NULL;
   p->listener = NULL;
-  p->base = base;
-  p->port = 0;
+  p->client = base;
   return p;
 }
 
 
 void handle_sigint(int sig, short ev, void* arg){
 	struct event_base* base = arg;
-	printf("Total sent %d\n", sent);
-	printf("Client: Caught signal %d\n", sig);
 	event_base_loopbreak(base);
 }
 
@@ -49,9 +44,12 @@ static void random_string(char *s, const int len){
 	s[len-1] = 0;
 }
 
-void write_file(int fd, void * data, size_t size){
+void write_file(int fd, void * data, int flag, size_t size){
 	if(fd >= 0){
-		int ret = write(fd, (char *) data, size);
+    char string[size+1];
+    string[0] = flag + '0';
+    memcpy(string+1, data, size);
+		int ret = write(fd, string, size + 1);
 		if (ret < 0){
 			perror("Failed to write the message to the device");
 		}
@@ -93,7 +91,6 @@ void client_submit_value(struct client* c) {
 	size_t size = sizeof(struct client_value) + v->size;
 	udp_send_msg(v, size);
 	// printf("Client: submitted PAXOS_CLIENT_VALUE %.16s\n", v->value);
-	sent++;
 }
 
 
@@ -111,14 +108,14 @@ static void on_client_event(struct bufferevent *bev, short ev, void *arg) {
   struct connection *p = (struct connection *)arg;
   if (ev & BEV_EVENT_EOF || ev & BEV_EVENT_ERROR) {
     int i;
-    struct connection **clients = p->server->clients;
+    struct connection **connections = p->server->connections;
     for (i = p->id; i < p->server->clients_count - 1; ++i) {
-      clients[i] = clients[i + 1];
-      clients[i]->id = i;
+      connections[i] = connections[i + 1];
+      connections[i]->id = i;
     }
     p->server->clients_count--;
-    p->server->clients =
-        realloc(p->server->clients,
+    p->server->connections =
+        realloc(p->server->connections,
                 sizeof(struct connection *) * (p->server->clients_count));
     free_connection(p);
   } else {
@@ -141,12 +138,12 @@ static void on_accept(struct evconnlistener *l, evutil_socket_t fd,
   struct connection *client;
   struct server *server = arg;
 
-  server->clients = realloc(server->clients, sizeof(struct connection *) *
+  server->connections = realloc(server->connections, sizeof(struct connection *) *
                                                  (server->clients_count + 1));
-  server->clients[server->clients_count] =
+  server->connections[server->clients_count] =
       make_connection(server, server->clients_count, (struct sockaddr_in *)addr);
 
-  client = server->clients[server->clients_count];
+  client = server->connections[server->clients_count];
   bufferevent_setfd(client->bev, fd);
   bufferevent_setcb(client->bev, NULL, NULL, on_client_event, client);
   bufferevent_enable(client->bev, EV_READ | EV_WRITE);
@@ -163,10 +160,9 @@ static struct connection *make_connection(struct server *server, int id,
   struct connection *p = malloc(sizeof(struct connection));
   p->id = id;
   p->addr = *addr;
-  p->bev = bufferevent_socket_new(server->base, -1, BEV_OPT_CLOSE_ON_FREE);
+  p->bev = bufferevent_socket_new(server->client->base, -1, BEV_OPT_CLOSE_ON_FREE);
   p->server = server;
   p->status = BEV_EVENT_EOF;
-  p->buffer = malloc(sizeof(struct client_value) + BUFFER_LENGTH);
   return p;
 }
 
@@ -181,9 +177,7 @@ int server_listen(struct server *p, char * ip, int port) {
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(0);
   addr.sin_port = htons(port);
-	// addr = address_to_sockaddr(ip, port);
-  p->port = port;
-  p->listener = evconnlistener_new_bind(p->base, on_accept, p, flags, -1,
+  p->listener = evconnlistener_new_bind(p->client->base, on_accept, p, flags, -1,
                                         (struct sockaddr *)&addr, sizeof(addr));
   if (p->listener == NULL) {
     printf("Failed to bind on port %d\n", port);
@@ -221,12 +215,13 @@ struct bufferevent *connect_to_server(struct client *c, const char *ip, int port
 }
 
 void usage(const char* name){
-	printf("Client Usage: %s [path/to/paxos.conf] [-h] [-o] [-v] [-p] [-c] [-d] [-s]\n", name);
+	printf("Client Usage: %s [path/to/paxos.conf] [-h] [-o] [-v] [-p] [-c] [-l] [-d] [-s]\n", name);
 	printf("  %-30s%s\n", "-h, --help", "Output this message and exit");
 	printf("  %-30s%s\n", "-o, --outstanding #", "Number of outstanding client values");
 	printf("  %-30s%s\n", "-v, --value-size #", "Size of client value (in bytes)");
 	printf("  %-30s%s\n", "-p, --proposer-id #", "id of the proposer to connect to");
-	printf("  %-30s%s\n", "-c, --client", "if this is a client (can send) or just a learner");
+  printf("  %-30s%s\n", "-c, --client", "if this is a client (can send)");
+	printf("  %-30s%s\n", "-l, --learner #", "if this is a learner (add also the trim value)");
 	printf("  %-30s%s\n", "-d, --device #", "id of the klearner where to connect");
 	printf("  %-30s%s\n", "-s, --socket # #", "ip and port of the learner to connect");
 	exit(1);
@@ -235,7 +230,6 @@ void usage(const char* name){
 
 static void free_connection(struct connection *p) {
   bufferevent_free(p->bev);
-  free(p->buffer);
   free(p);
 }
 
@@ -250,7 +244,7 @@ static void free_all_connections(struct connection **p, int count) {
 
 
 static void server_free(struct server *p) {
-  free_all_connections(p->clients, p->clients_count);
+  free_all_connections(p->connections, p->clients_count);
   if (p->listener != NULL)
     evconnlistener_free(p->listener);
   free(p);

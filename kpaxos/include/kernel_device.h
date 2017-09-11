@@ -4,6 +4,8 @@
 #include <linux/fs.h>
 #include <linux/time.h>
 
+extern size_t sendtrim;
+
 extern struct file_operations fops;
 extern int     kdev_open(struct inode *, struct file *);
 extern int     kdev_release(struct inode *, struct file *);

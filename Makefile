@@ -36,6 +36,7 @@ LEARN_OBJ= \
 	$(PAX_OBJ)
 
 REP_OBJ= \
+	kpaxos/kernel_device.o \
   kpaxos/kreplica.o \
 	evpaxos/evlearner.o \
 	evpaxos/evproposer.o \
@@ -55,8 +56,6 @@ kacceptor0.o \
 kacceptor1.o \
 kacceptor2.o \
 kproposer0.o \
-kproposer1.o \
-kproposer2.o \
 klearner0.o \
 klearner1.o \
 klearner2.o \
@@ -64,7 +63,9 @@ klearner3.o \
 klearner4.o \
 kreplica0.o \
 kreplica1.o \
-kreplica2.o
+kreplica2.o #\
+kproposer1.o \
+kproposer2.o
 
 kclient0-y:= $(CL_OBJ)
 kclient1-y:= $(CL_OBJ)
@@ -115,6 +116,9 @@ client_user: $(USR_OBJ)
 	$(CC) $(EXTRA_CFLAGS) -o $@0 $^ $(LFLAGS)
 	$(CC) $(EXTRA_CFLAGS) -o $@1 $^ $(LFLAGS)
 	$(CC) $(EXTRA_CFLAGS) -o $@2 $^ $(LFLAGS)
+	$(CC) $(EXTRA_CFLAGS) -o $@3 $^ $(LFLAGS)
+	$(CC) $(EXTRA_CFLAGS) -o $@4 $^ $(LFLAGS)
+	$(CC) $(EXTRA_CFLAGS) -o $@5 $^ $(LFLAGS)
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean

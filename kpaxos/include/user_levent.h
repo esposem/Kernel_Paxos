@@ -20,21 +20,29 @@ extern struct client * cl;
 struct client
 {
 	int id;
-	int fd;
-  int socket;
 	int value_size;
-	char* send_buffer;
-	struct server * s;
-	struct stats stats;
-	struct event *evread;
-	struct event* stats_ev;
-	struct event* resend_ev;
 	struct event_base* base;
-	struct sockaddr_in si_other;
-	struct timeval stats_interval;
-	struct timeval reset_interval;
-	struct bufferevent *bev;
 	struct event* sig;
+
+	// Statistics
+	struct stats stats;
+	struct timeval stats_interval;
+	struct event* stats_ev;
+
+	// File op
+	int fd;
+	struct event *evread;
+
+	// UDP op
+  int socket;
+	char* send_buffer;
+	struct sockaddr_in prop_addr;
+	struct timeval resend_interval;
+	struct event* resend_ev;
+
+	// TCP op
+	struct server * s;
+	struct bufferevent *bev;
 };
 
 struct connection {
@@ -42,16 +50,14 @@ struct connection {
   int status;
   struct bufferevent *bev;
   struct sockaddr_in addr;
-  char *buffer;
   struct server *server;
 };
 
 struct server {
-  int port;
   int clients_count;
-  struct connection **clients; /* server we accepted connections from */
+  struct connection **connections; /* server we accepted connections from */
   struct evconnlistener *listener;
-  struct event_base *base;
+  struct client * client;
 };
 
 extern void open_file(struct client * c);
@@ -59,9 +65,9 @@ extern void usage(const char* name);
 extern void handle_sigint(int sig, short ev, void* arg);
 extern void client_submit_value(struct client* c);
 extern void client_free(struct client* c, int chardevice, int send, int sock);
-extern void write_file(int fd, void * data, size_t size);
+extern void write_file(int fd, void * data, int flag, size_t size);
 extern int server_listen(struct server *p, char * ip, int port);
-extern struct server *server_new(struct event_base *base);
+extern struct server *server_new(struct client *base);
 extern void on_read_sock(struct bufferevent *bev, void *arg);
 struct bufferevent *connect_to_server(struct client *c, const char *ip, int port);
 

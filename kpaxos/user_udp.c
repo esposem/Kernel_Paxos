@@ -7,7 +7,7 @@
 #include "user_udp.h"
 #include "paxos_types.h"
 
-#if 0
+#if 1
 	#define PORT 5003
 	#define PROP_IP "127.0.0.3"
 #else
@@ -65,7 +65,7 @@ void udp_send_msg(struct client_value * clv, size_t size)
   }
   memcpy(tmp, value, len);
   if(cl->socket != -1){
-    if (sendto(cl->socket, packer, size2, 0,(struct sockaddr *) &cl->si_other, sizeof(cl->si_other))==-1)
+    if (sendto(cl->socket, packer, size2, 0,(struct sockaddr *) &cl->prop_addr, sizeof(cl->prop_addr))==-1)
       perror("sendto()");
   }
   free(packer);
@@ -79,10 +79,10 @@ void init_socket(struct client * c){
 		free(c->send_buffer);
 		exit(1);
 	}
-	memset((char *) &c->si_other, 0, sizeof(cl->si_other));
-	c->si_other.sin_family = AF_INET;
-	c->si_other.sin_port = htons(PORT);
-	if (inet_aton(PROP_IP, &cl->si_other.sin_addr)==0) {
+	memset((char *) &c->prop_addr, 0, sizeof(cl->prop_addr));
+	c->prop_addr.sin_family = AF_INET;
+	c->prop_addr.sin_port = htons(PORT);
+	if (inet_aton(PROP_IP, &cl->prop_addr.sin_addr)==0) {
 		fprintf(stderr, "inet_aton() failed\n");
 		free(c);
 		exit(1);

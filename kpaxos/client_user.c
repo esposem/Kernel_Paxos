@@ -8,17 +8,16 @@
 
 static char receive[BUFFER_LENGTH];
 struct client * cl;
-static int use_chardevice = 0, cansend = 0, use_socket = 0;
+static int use_chardevice = 0, cansend = 0, use_socket = 0, dest_port = 9000, trimvalue = 100000, isalearner = 0;
+static char * dest_addr = "127.0.0.1";
 int learner_id = -1;
-char * dest_addr;
-int dest_port;
 
 static void unpack_message(char * msg){
   struct user_msg * mess = (struct user_msg *) msg;
 	struct client_value * val = (struct client_value *) mess->value;
 	if(cansend && val->client_id == cl->id){
 		update_stats(&cl->stats, val->t, cl->value_size);
-		event_add(cl->resend_ev, &cl->reset_interval);
+		event_add(cl->resend_ev, &cl->resend_interval);
 
 		// struct timespec t, j;
 		// t.tv_sec = 0;
@@ -27,9 +26,13 @@ static void unpack_message(char * msg){
 		client_submit_value(cl);
 	}else if (!cansend){
 		printf("On deliver iid:%d value:%.16s\n",mess->iid, val->value );
+    if(mess->iid % trimvalue == 0){
+      size_t s = mess->iid - trimvalue+1;
+      write_file(cl->fd, &s, TRIM, sizeof(size_t));
+    }
     if(use_socket){
       for (size_t i = 0; i < cl->s->clients_count; i++) {
-        bufferevent_write(cl->s->clients[i]->bev, msg, sizeof(struct user_msg) + sizeof(struct client_value) + cl->value_size);
+        bufferevent_write(cl->s->connections[i]->bev, msg, sizeof(struct user_msg) + sizeof(struct client_value) + cl->value_size);
       }
     }
 	}
@@ -40,7 +43,6 @@ void on_read_sock(struct bufferevent *bev, void *arg) {
   char * c = malloc(BUFFER_LENGTH);
   size_t len = bufferevent_read(bev, c, BUFFER_LENGTH);
   if (len) {
-		// printf("Got from socket!\n");
 		unpack_message(c);
     free(c);
   }
@@ -69,7 +71,7 @@ static void
 on_resend(evutil_socket_t fd, short event, void *arg)
 {
 	client_submit_value(cl);
-	event_add(cl->resend_ev, &cl->reset_interval);
+	event_add(cl->resend_ev, &cl->resend_interval);
 }
 
 
@@ -86,12 +88,12 @@ make_client(int proposer_id, int outstanding, int value_size)
   event_config_avoid_method(cfg, "epoll");
   c->base = event_base_new_with_config(cfg);
 	c->id = rand();
-	printf("id is %d\n",c->id );
+	// printf("id is %d\n",c->id );
 
 	if(use_chardevice){
 		open_file(c);
 		size_t s = sizeof(struct client_value) + value_size;
-		write_file(c->fd, &s, sizeof(size_t));
+		write_file(c->fd, &s, VALUE, sizeof(size_t));
 		c->evread = event_new(c->base, c->fd, EV_READ | EV_PERSIST, on_read_file, event_self_cbarg());
 		event_add(c->evread, NULL);
 	}
@@ -104,7 +106,7 @@ make_client(int proposer_id, int outstanding, int value_size)
         exit(1);
       }
 		}else{
-      c->s = server_new(c->base);
+      c->s = server_new(c);
       if (c->s == NULL){
         printf("Could not start TCP connection\n");
         exit(1);
@@ -120,15 +122,21 @@ make_client(int proposer_id, int outstanding, int value_size)
 	if(cansend){
 		c->send_buffer = malloc(sizeof(struct client_value) + c->value_size);
 		init_socket(c);
+
+    for (size_t i = 0; i < outstanding; i++) {
+      client_submit_value(c);
+    }
+
 		// print statistic every 1 sec
 		c->stats_interval = (struct timeval){1, 0};
-		c->reset_interval = (struct timeval){1, 0};
+		c->resend_interval = (struct timeval){1, 0};
 		c->stats_ev = evtimer_new(c->base, on_stats, c);
 		event_add(c->stats_ev, &c->stats_interval);
+
 		// resend value after 1 sec I did not receive anything
 		c->resend_ev = evtimer_new(c->base, on_resend, NULL);
-		event_add(c->resend_ev, &c->reset_interval);
-		client_submit_value(c);
+		event_add(c->resend_ev, &c->resend_interval);
+
 	}
 
 	event_base_dispatch(c->base);
@@ -140,7 +148,7 @@ static void
 start_client(int proposer_id, int outstanding, int value_size)
 {
 	make_client(proposer_id, outstanding, value_size);
-	signal(SIGPIPE, SIG_IGN);
+	// signal(SIGPIPE, SIG_IGN);
 	libevent_global_shutdown();
 }
 
@@ -164,30 +172,33 @@ main(int argc, char const *argv[])
 			proposer_id = atoi(argv[++i]);
 		else if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--client") == 0)
 			cansend = 1;
-		else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--device") == 0 ){
+    else if (strcmp(argv[i], "-l") == 0 || strcmp(argv[i], "--learner") == 0){
+      isalearner = 1;
+      trimvalue = atoi(argv[++i]);
+    } else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--device") == 0 ){
 			use_chardevice = 1;
 			learner_id = atoi(argv[++i]);
 		} else if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--socket") == 0 ){
 			use_socket = 1;
-			if(i + 2 < argc){
-				dest_addr = (char *) argv[++i];
-        dest_port = atoi(argv[++i]);
-			}else{
-        dest_addr = "127.0.0.1";
-        dest_port = 9000;
-			}
-		}
-		else
+			dest_addr = (char *) argv[++i];
+      dest_port = atoi(argv[++i]);
+		} else
 			usage(argv[0]);
 		i++;
 	}
 
-	if(cansend && use_chardevice && use_socket ){
+  if(!((cansend && !isalearner) || (!cansend && isalearner))){
+    printf("Either choose a client or a learner!\n");
+		exit(1);
+  }
+
+
+	if(cansend && !((use_chardevice && !use_socket) || (!use_chardevice && use_socket))){
 		printf("As client, either use chardevice or connect remotely to a listener\n");
 		exit(1);
 	}
 
-	if(cansend == 0 && use_chardevice == 0){
+	if(isalearner && !use_chardevice){
 		printf("As learner, you must read from chardevice\n");
 		exit(1);
 	}
