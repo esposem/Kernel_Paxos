@@ -144,11 +144,11 @@ static void on_accept(struct evconnlistener *l, evutil_socket_t fd,
       make_connection(server, server->clients_count, (struct sockaddr_in *)addr);
 
   client = server->connections[server->clients_count];
+  server->clients_count++;
   bufferevent_setfd(client->bev, fd);
-  bufferevent_setcb(client->bev, NULL, NULL, on_client_event, client);
+  bufferevent_setcb(client->bev, on_read_sock, NULL, on_client_event, client);
   bufferevent_enable(client->bev, EV_READ | EV_WRITE);
   socket_set_nodelay(fd);
-  server->clients_count++;
   printf("Accepted connection from %s:%d\n",
          inet_ntoa(((struct sockaddr_in *)addr)->sin_addr),
          ntohs(((struct sockaddr_in *)addr)->sin_port));
@@ -194,6 +194,7 @@ static void on_connect(struct bufferevent *bev, short events, void *arg) {
 
   if (events & BEV_EVENT_CONNECTED) {
     printf("Connected to server\n");
+    bufferevent_write(c->bev, &c->id, sizeof(int));
   } else {
     printf("ERROR: %s\n", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
 		// exit(1);

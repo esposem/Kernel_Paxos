@@ -41,15 +41,15 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
   if(sendtrim > 0){
     if(cantrim > 0){
-      printk(KERN_ERR "%s sent trim to all", klearner->name);
+      // printk(KERN_ERR "%s sent trim to all", klearner->name);
       evlearner_send_trim(lea, sendtrim);
     }
-    printk("%s sent autotrim", klearner->name);
+    // printk("%s sent autotrim", klearner->name);
     evlearner_auto_trim(lea, sendtrim);
     sendtrim = 0;
   }else{
     if(iid % 100000 == 0){
-      printk("%s sent autotrim", klearner->name);
+      // printk("%s sent autotrim", klearner->name);
       evlearner_auto_trim(lea, iid- 100000 + 1);
     }
   }

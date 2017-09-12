@@ -12,14 +12,11 @@
 #define BUFFER_SIZE 1000
 static DEFINE_MUTEX(char_mutex);
 static DEFINE_MUTEX(buffer_mutex);
-static DEFINE_MUTEX(read_mutex);
 static struct class * charClass  = NULL;   //< The device-driver class struct pointer
 static struct device * charDevice = NULL;  //< The device-driver device struct pointer
 static char * de_name, * clas_name;
 static int majorNumber, working, current_buf = 0, first_buf = 0;
 static struct user_msg * msg_buf[BUFFER_SIZE];
-static struct timer_list release_lock;
-static struct timeval interval;
 size_t value_size = 0;
 static atomic_t must_stop, used_buf;
 
@@ -36,10 +33,6 @@ void kstop_device(){
   atomic_set(&must_stop,1);
 }
 
-static void rel_lock(unsigned long arg){
-  mutex_unlock(&read_mutex);
-}
-
 void kset_message(char * msg, size_t size, unsigned int iid){
   if(atomic_read(&used_buf) >= BUFFER_SIZE){
     paxos_log_error("Buffer is full! Lost a value");
@@ -53,10 +46,8 @@ void kset_message(char * msg, size_t size, unsigned int iid){
   atomic_inc(&used_buf);
   memcpy(&(msg_buf[current_buf]->iid), &iid, sizeof(unsigned int));
   memcpy(&(msg_buf[current_buf]->value), msg, size);
-
   current_buf = (current_buf + 1) % BUFFER_SIZE;
   mutex_unlock(&buffer_mutex);
-  mutex_unlock(&read_mutex);
   paxos_log_debug("Set message %d, occupied %d/100, first one is %d", (current_buf -1) % BUFFER_SIZE, atomic_read(&used_buf), first_buf);
 }
 
@@ -82,15 +73,7 @@ ssize_t kdev_read(struct file *filep, char *buffer, size_t len, loff_t *offset){
       paxos_log_debug("Read message %d, occupied %d/100, new first one is %d, last one is %d", (first_buf - 1) % BUFFER_SIZE, atomic_read(&used_buf), first_buf, current_buf);
     }
     mutex_unlock(&buffer_mutex);
-  }else{
-    mod_timer(&release_lock, jiffies + timeval_to_jiffies(&interval));
-    // printk("Locked");
-    mutex_lock(&read_mutex);
-    // printk("Unlocked");
   }
-
-  if(atomic_read(&used_buf) != 0)
-    mutex_unlock(&read_mutex);
 
   return error_count;
 }
@@ -125,7 +108,6 @@ int kdev_release(struct inode *inodep, struct file *filep){
   if(working == 0)
     paxos_log_debug(KERN_INFO "Device Char: Device already closed\n");
   mutex_unlock(&char_mutex);
-  mutex_unlock(&read_mutex);
   mutex_unlock(&buffer_mutex);
   paxos_log_debug(KERN_INFO "Device Char: Device successfully closed\n");
   return 0;
@@ -188,15 +170,10 @@ int kdevchar_init(int id, char * name){
 
   mutex_init(&char_mutex);
   mutex_init(&buffer_mutex);
-  mutex_init(&read_mutex);
-  mutex_lock(&read_mutex);
   atomic_set(&used_buf, 0);
   atomic_set(&must_stop, 0);
-  setup_timer( &release_lock,  rel_lock, 0);
-  interval = (struct timeval){0, 3000};
   sendtrim=0;
-
-   paxos_log_debug(KERN_INFO "Device Char: device class created correctly\n");
+  paxos_log_debug(KERN_INFO "Device Char: device class created correctly\n");
   return 0;
 }
 
@@ -205,10 +182,8 @@ void kdevchar_exit(void){
     return;
   }
   working = 0;
-  del_timer(&release_lock);
   mutex_destroy(&char_mutex);
   mutex_destroy(&buffer_mutex);
-  mutex_destroy(&read_mutex);
   device_destroy(charClass, MKDEV(majorNumber, 0));     // remove the device
   class_unregister(charClass);                          // unregister the device class
   class_destroy(charClass);                             // remove the device class

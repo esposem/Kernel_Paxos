@@ -7,7 +7,7 @@
 #include "user_udp.h"
 #include "paxos_types.h"
 
-#if 1
+#if 0
 	#define PORT 5003
 	#define PROP_IP "127.0.0.3"
 #else

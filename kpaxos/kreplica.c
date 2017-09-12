@@ -35,20 +35,20 @@ static struct evpaxos_replica* replica = NULL;
 void deliver(unsigned iid, char* value, size_t size, void* arg)
 {
 
-	struct client_value* val = (struct client_value*)value;
+	// struct client_value* val = (struct client_value*)value;
 	// printk(KERN_INFO "%s: %ld.%06ld [%.16s] %ld bytes", kreplica->name, val->t.tv_sec, val->t.tv_usec, val->value, (long)val->size);
 
 	if(sendtrim > 0){
     if(cantrim > 0){
-			printk(KERN_ERR "%s sent trim to all", kreplica->name);
+			// printk(KERN_ERR "%s sent trim to all", kreplica->name);
       evpaxos_replica_send_trim(replica, sendtrim);
     }
-		printk("%s sent autotrim", kreplica->name);
+		// printk("%s sent autotrim", kreplica->name);
     evpaxos_replica_internal_trim(replica, sendtrim);
     sendtrim = 0;
   }else{ // no learner in user space, I must trim
 		if(iid % 100000 == 0){
-			printk("%s sent autotrim", kreplica->name);
+			// printk("%s sent autotrim", kreplica->name);
 			evpaxos_replica_internal_trim(replica, iid- 100000 + 1);
 		}
 	}
