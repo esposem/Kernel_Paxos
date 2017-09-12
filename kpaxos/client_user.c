@@ -70,8 +70,6 @@ void on_read_sock(struct bufferevent *bev, void *arg){
     if(isalearner){
       memcpy(&conn->cl_id, c, sizeof(int));
       bufferevent_write(conn->bev, &ok, 1);
-      cl->evread = event_new(cl->base, cl->fd, EV_READ | EV_PERSIST, on_read_file, event_self_cbarg());
-  		event_add(cl->evread, NULL);
     }else{
       if(memcmp(c, &ok, 1) == 0){
         for (size_t i = 0; i < outstanding; i++) {
@@ -130,6 +128,8 @@ make_client(int proposer_id, int value_size)
 		open_file(c);
 		size_t s = sizeof(struct client_value) + value_size;
 		write_file(c->fd, &s, VALUE, sizeof(size_t));
+    cl->evread = event_new(cl->base, cl->fd, EV_READ | EV_PERSIST, on_read_file, event_self_cbarg());
+    event_add(cl->evread, NULL);
 	}
 
 	c->value_size = value_size;
