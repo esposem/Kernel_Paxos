@@ -47,6 +47,7 @@ struct client
 
 struct connection {
   int id;
+	int cl_id;
   int status;
   struct bufferevent *bev;
   struct sockaddr_in addr;
