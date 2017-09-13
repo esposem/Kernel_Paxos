@@ -216,23 +216,26 @@ main(int argc, char const *argv[])
 
   if(!((cansend && !isalearner) || (!cansend && isalearner))){
     printf("Either choose a client or a learner!\n");
-		exit(1);
+		goto quit;
   }
 
 
 	if(cansend && !((use_chardevice && !use_socket) || (!use_chardevice && use_socket))){
 		printf("As client, either use chardevice or connect remotely to a listener\n");
-		exit(1);
+    goto quit;
 	}
 
 	if(isalearner && !use_chardevice){
 		printf("As learner, you must read from chardevice\n");
-		exit(1);
+    goto quit;
 	}
 
 	gettimeofday(&seed, NULL);
 	srand(seed.tv_usec);
 	start_client(proposer_id, value_size);
 
+  quit:
+    usage(argv[0]);
+    exit(1);
 	return 0;
 }

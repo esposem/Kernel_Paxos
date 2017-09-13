@@ -115,10 +115,10 @@ USR_OBJ=client_user.o user_udp.o user_levent.o user_stats.o
 client_user: $(USR_OBJ)
 	$(CC) $(EXTRA_CFLAGS) -o $@0 $^ $(LFLAGS)
 	$(CC) $(EXTRA_CFLAGS) -o $@1 $^ $(LFLAGS)
-	$(CC) $(EXTRA_CFLAGS) -o $@2 $^ $(LFLAGS)
-	$(CC) $(EXTRA_CFLAGS) -o $@3 $^ $(LFLAGS)
-	$(CC) $(EXTRA_CFLAGS) -o $@4 $^ $(LFLAGS)
-	$(CC) $(EXTRA_CFLAGS) -o $@5 $^ $(LFLAGS)
+	# $(CC) $(EXTRA_CFLAGS) -o $@2 $^ $(LFLAGS)
+	# $(CC) $(EXTRA_CFLAGS) -o $@3 $^ $(LFLAGS)
+	# $(CC) $(EXTRA_CFLAGS) -o $@4 $^ $(LFLAGS)
+	# $(CC) $(EXTRA_CFLAGS) -o $@5 $^ $(LFLAGS)
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean

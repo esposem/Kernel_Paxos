@@ -3,11 +3,11 @@ norm=$1
 trim=$2
 
 if [ $# -lt 1 ]; then
-  echo "Please only insert the number of learner you want to load
-(optionally) followed by the index of the trim learner
+  echo "Please only insert the number of replicas you want to load
+(optionally) followed by the index of the trim replica
 Example:
 ./learn.sh 2 1
-Load 2 kreplica (kreplica0.ko, kreplica1.ko) and kreplica1 is a trim learner" ;
+Load 2 kreplica (kreplica0.ko, kreplica1.ko) and kreplica1 is a trim replica" ;
   kill $$
 fi
 
@@ -82,7 +82,7 @@ if cd $path > /dev/null && make > /dev/null && cd -  > /dev/null;then
 
 
   i=0
-  while [ "$norm" -gt $i ]
+  while [ "$norm" -gt $i ]c
   do
     if sudo rmmod ./kreplica$i.ko; then
       echo "Successfully unloaded Module " kreplica$i
