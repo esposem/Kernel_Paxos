@@ -44,12 +44,18 @@ static void random_string(char *s, const int len){
 	s[len-1] = 0;
 }
 
-void write_file(int fd, void * data, int flag, size_t size){
+void write_file(int fd, void * data, int flag, size_t size, int opt){
 	if(fd >= 0){
-    char string[size+1];
+    size_t tot = size+1;
+    if(opt != -1)
+      tot+=1;
+    char string[tot];
     string[0] = flag + '0';
+    if(opt != -1)
+      string[tot-1] = opt + '0';
+
     memcpy(string+1, data, size);
-		int ret = write(fd, string, size + 1);
+		int ret = write(fd, string, tot);
 		if (ret < 0){
 			perror("Failed to write the message to the device");
 		}

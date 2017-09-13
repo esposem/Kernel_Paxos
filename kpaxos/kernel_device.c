@@ -17,7 +17,7 @@ static struct device * charDevice = NULL;  //< The device-driver device struct p
 static char * de_name, * clas_name;
 static int majorNumber, working, current_buf = 0, first_buf = 0;
 static struct user_msg * msg_buf[BUFFER_SIZE];
-size_t value_size = 0;
+static size_t value_size = 0;
 static atomic_t must_stop, used_buf;
 
 int kdev_open(struct inode *inodep, struct file *filep){
@@ -89,6 +89,9 @@ ssize_t kdev_write(struct file *filep, const char *buffer, size_t len, loff_t *o
         paxos_log_debug("Device: client value size is %zu", value_size);
         for(int i = 0; i < BUFFER_SIZE; i++){
           msg_buf[i] = kmalloc(sizeof(struct user_msg) + value_size, GFP_ATOMIC | __GFP_REPEAT);
+        }
+        if(*(buffer+1+sizeof(size_t)) - '0' == TRIM){
+          atomic_set(&auto_trim,1);
         }
       }
       break;
@@ -172,6 +175,7 @@ int kdevchar_init(int id, char * name){
   mutex_init(&buffer_mutex);
   atomic_set(&used_buf, 0);
   atomic_set(&must_stop, 0);
+  atomic_set(&auto_trim,0);
   sendtrim=0;
   paxos_log_debug(KERN_INFO "Device Char: device class created correctly\n");
   return 0;

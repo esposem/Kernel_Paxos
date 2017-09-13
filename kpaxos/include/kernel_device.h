@@ -3,8 +3,10 @@
 
 #include <linux/fs.h>
 #include <linux/time.h>
+#include <asm/atomic.h>
 
 extern size_t sendtrim;
+extern atomic_t auto_trim;
 
 extern struct file_operations fops;
 extern int     kdev_open(struct inode *, struct file *);

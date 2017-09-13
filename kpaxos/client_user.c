@@ -16,7 +16,7 @@ int learner_id = -1;
 static void unpack_message(char * msg){
   struct user_msg * mess = (struct user_msg *) msg;
 	struct client_value * val = (struct client_value *) mess->value;
-
+  // printf("%d %d\n",val->client_id, cl->id );
 	if(cansend && val->client_id == cl->id){
 		update_stats(&cl->stats, val->t, cl->value_size);
 		event_add(cl->resend_ev, &cl->resend_interval);
@@ -28,10 +28,6 @@ static void unpack_message(char * msg){
 		client_submit_value(cl);
 	}else if (isalearner){
 		// printf("On deliver iid:%d value:%.16s",mess->iid, val->value );
-    if(mess->iid % trimvalue == 0){
-      size_t s = mess->iid - trimvalue+1;
-      write_file(cl->fd, &s, TRIM, sizeof(size_t));
-    }
 
     if(use_socket){
       for (size_t i = 0; i < cl->s->clients_count; i++) {
@@ -43,6 +39,11 @@ static void unpack_message(char * msg){
       }
     }
 	}
+
+  if(use_chardevice && mess->iid % trimvalue == 0){
+    size_t s = mess->iid - trimvalue+1;
+    write_file(cl->fd, &s, TRIM, sizeof(size_t), -1);
+  }
 }
 
 static void on_read_file(evutil_socket_t fd, short event, void *arg) {
@@ -87,7 +88,7 @@ void on_read_sock(struct bufferevent *bev, void *arg){
 static void
 on_resend(evutil_socket_t fd, short event, void *arg)
 {
-	// client_submit_value(cl);
+	client_submit_value(cl);
 	event_add(cl->resend_ev, &cl->resend_interval);
 }
 
@@ -127,7 +128,10 @@ make_client(int proposer_id, int value_size)
 	if(use_chardevice){
 		open_file(c);
 		size_t s = sizeof(struct client_value) + value_size;
-		write_file(c->fd, &s, VALUE, sizeof(size_t));
+    int opt = -1;
+    if(trimvalue > 0)
+      opt = TRIM;
+		write_file(c->fd, &s, VALUE, sizeof(size_t), opt);
     cl->evread = event_new(cl->base, cl->fd, EV_READ | EV_PERSIST, on_read_file, event_self_cbarg());
     event_add(cl->evread, NULL);
 	}
@@ -150,6 +154,12 @@ make_client(int proposer_id, int value_size)
 		c->resend_ev = evtimer_new(c->base, on_resend, NULL);
 		event_add(c->resend_ev, &c->resend_interval);
 
+    if(!use_socket){
+      for (size_t i = 0; i < outstanding; i++) {
+        client_submit_value(cl);
+      }
+    }
+
 	}
 
 	event_base_dispatch(c->base);
@@ -161,7 +171,7 @@ static void
 start_client(int proposer_id, int value_size)
 {
 	make_client(proposer_id, value_size);
-	// signal(SIGPIPE, SIG_IGN);
+	signal(SIGPIPE, SIG_IGN);
 	libevent_global_shutdown();
 }
 
@@ -170,7 +180,6 @@ main(int argc, char const *argv[])
 {
 	int i = 1;
 	int proposer_id = 0;
-	// int outstanding = 1;
 	int value_size = 64;
 	struct timeval seed;
 
@@ -194,7 +203,12 @@ main(int argc, char const *argv[])
 		} else if (strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--socket") == 0 ){
 			use_socket = 1;
 			dest_addr = (char *) argv[++i];
-      dest_port = atoi(argv[++i]);
+      if(i+1 < argc)
+        dest_port = atoi(argv[++i]);
+      else{
+        printf("Plaese add also the port!\n");
+        i++;
+      }
 		} else
 			usage(argv[0]);
 		i++;
