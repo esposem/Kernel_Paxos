@@ -21,6 +21,7 @@ struct file_operations fops =
 };
 
 size_t sendtrim;
+atomic_t auto_trim;
 static int cantrim = 0;
 module_param(cantrim, int, S_IRUGO);
 MODULE_PARM_DESC(cantrim,"If the module has send to trim, set it to 1");
@@ -39,17 +40,19 @@ static struct evlearner* lea = NULL;
 static void
 on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
-  if(sendtrim > 0){
-    if(cantrim > 0){
-      // printk(KERN_ERR "%s sent trim to all", klearner->name);
-      evlearner_send_trim(lea, sendtrim);
+  if(atomic_read(&auto_trim) == 1){
+    if(sendtrim > 0){
+      if(cantrim > 0){
+        printk(KERN_ERR "%s sent trim to all", klearner->name);
+        evlearner_send_trim(lea, sendtrim);
+      }
+      printk("%s sent autotrim", klearner->name);
+      evlearner_auto_trim(lea, sendtrim);
+      sendtrim = 0;
     }
-    // printk("%s sent autotrim", klearner->name);
-    evlearner_auto_trim(lea, sendtrim);
-    sendtrim = 0;
   }else{
     if(iid % 100000 == 0){
-      // printk("%s sent autotrim", klearner->name);
+      printk("%s sent indipendent autotrim", klearner->name);
       evlearner_auto_trim(lea, iid- 100000 + 1);
     }
   }

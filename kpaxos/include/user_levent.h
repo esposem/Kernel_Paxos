@@ -66,7 +66,7 @@ extern void usage(const char* name);
 extern void handle_sigint(int sig, short ev, void* arg);
 extern void client_submit_value(struct client* c);
 extern void client_free(struct client* c, int chardevice, int send, int sock);
-extern void write_file(int fd, void * data, int flag, size_t size);
+extern void write_file(int fd, void * data, int flag, size_t size, int opt);
 extern int server_listen(struct server *p, char * ip, int port);
 extern struct server *server_new(struct client *base);
 extern void on_read_sock(struct bufferevent *bev, void *arg);
