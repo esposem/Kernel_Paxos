@@ -47,7 +47,7 @@ REP_OBJ= \
 	evpaxos/evreplica.o \
 	$(PAX_OBJ)
 
-###########################################
+########################################### MODIFY HERE ###########
 obj-m += \
 kclient0.o \
 kclient1.o \
@@ -72,8 +72,8 @@ kclient1-y:= $(CL_OBJ)
 kclient2-y:= $(CL_OBJ)
 
 kproposer0-y:= $(PROP_OBJ)
-kproposer1-y:= $(PROP_OBJ)
-kproposer2-y:= $(PROP_OBJ)
+# kproposer1-y:= $(PROP_OBJ)
+# kproposer2-y:= $(PROP_OBJ)
 
 kacceptor0-y:= $(ACC_OBJ)
 kacceptor1-y:= $(ACC_OBJ)
@@ -88,7 +88,7 @@ klearner4-y:= $(LEARN_OBJ)
 kreplica0-y:= $(REP_OBJ)
 kreplica1-y:= $(REP_OBJ)
 kreplica2-y:= $(REP_OBJ)
-#########################################
+##############################################################
 C_COMP:= -std=c99
 G_COMP:= -std=gnu99
 USR_FLAGS:= -Wall -D user_space
@@ -114,9 +114,12 @@ user_stats.o: kpaxos/user_stats.c
 client_user.o: kpaxos/client_user.c
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
+############## MODIFY HERE IF YOU WANT TO ADD MORE USER SPACE APPLICATIONS
 client_user: $(USR_OBJ)
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@0 $^ $(LFLAGS)
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@1 $^ $(LFLAGS)
+
+###########################################################################
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
