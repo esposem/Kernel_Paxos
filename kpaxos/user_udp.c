@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netinet/in.h>
-#include <fcntl.h>
 
 #include "user_udp.h"
 #include "paxos_types.h"
@@ -97,7 +95,7 @@ void init_socket(struct client * c){
 	if (bind(c->socket, (struct sockaddr *)&si_me, sizeof(si_me))==-1)
 		perror("bind");
 	struct sockaddr_in address;
-	int i = (int) sizeof(struct sockaddr_in);
+	socklen_t i = (socklen_t) sizeof(struct sockaddr_in);
 	getsockname(c->socket, (struct sockaddr *) &address, &i);
 	printf("Socket is bind to %s : %d \n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 }
