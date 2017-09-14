@@ -87,7 +87,8 @@ ssize_t kdev_write(struct file *filep, const char *buffer, size_t len, loff_t *o
       if(value_size == 0){
         memcpy(&value_size,buffer+1, sizeof(size_t));
         paxos_log_debug("Device: client value size is %zu", value_size);
-        for(int i = 0; i < BUFFER_SIZE; i++){
+        int i;
+        for(i = 0; i < BUFFER_SIZE; i++){
           msg_buf[i] = kmalloc(sizeof(struct user_msg) + value_size, GFP_ATOMIC | __GFP_REPEAT);
         }
         if(*(buffer+1+sizeof(size_t)) - '0' == TRIM){
@@ -190,8 +191,9 @@ void kdevchar_exit(void){
   mutex_destroy(&buffer_mutex);
   device_destroy(charClass, MKDEV(majorNumber, 0));     // remove the device
   class_unregister(charClass);                          // unregister the device class
-  class_destroy(charClass);                             // remove the device class
-  for(int i = 0; i < BUFFER_SIZE; i++){
+  class_destroy(charClass);     // remove the device class
+  int i;
+  for(i = 0; i < BUFFER_SIZE; i++){
     kfree(msg_buf[i]);
   }
 

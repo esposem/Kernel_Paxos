@@ -29,7 +29,8 @@ static void unpack_message(char * msg){
 		// printf("On deliver iid:%d value:%.16s",mess->iid, val->value );
 
     if(use_socket){
-      for (size_t i = 0; i < cl->s->clients_count; i++) {
+      size_t i;
+      for (i = 0; i < cl->s->clients_count; i++) {
         if(cl->s->connections[i]->cl_id == val->client_id){
           size_t total_size = sizeof(struct user_msg) + sizeof(struct client_value) + cl->value_size;
           bufferevent_write(cl->s->connections[i]->bev, msg, total_size);
@@ -72,7 +73,8 @@ void on_read_sock(struct bufferevent *bev, void *arg){
       bufferevent_write(conn->bev, &ok, 1);
     }else{
       if(memcmp(c, &ok, 1) == 0){
-        for (size_t i = 0; i < outstanding; i++) {
+        size_t i;
+        for (i = 0; i < outstanding; i++) {
           client_submit_value(cl);
         }
       }else{
@@ -154,7 +156,8 @@ make_client(int proposer_id, int value_size)
 		event_add(c->resend_ev, &c->resend_interval);
 
     if(!use_socket){
-      for (size_t i = 0; i < outstanding; i++) {
+      size_t i;
+      for (i = 0; i < outstanding; i++) {
         client_submit_value(cl);
       }
     }

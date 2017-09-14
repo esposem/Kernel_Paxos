@@ -132,7 +132,8 @@ void add_acceptors_from_config(int myid, struct peers * p){
 	struct sockaddr_in addr;
 	int n = evpaxos_acceptor_count(p->config);
 	p->peers = krealloc(p->peers, sizeof(struct peer*) * n, GFP_ATOMIC | __GFP_REPEAT);
-	for(int i = 0; i < n; i++){
+	int i;
+	for(i = 0; i < n; i++){
 		if(i != myid){
 			addr = evpaxos_acceptor_address(p->config, i);
 			p->peers[p->peers_count] = make_peer(p, i, &addr);
@@ -149,14 +150,15 @@ void printall(struct peers * p, char * name){
 	// printk("%s", name);
 	paxos_log_info("PEERS we connect to");
 	// printk("PEERS we connect to");
-	for(int i = 0; i < p->peers_count; i++){
+	int i;
+	for(i = 0; i < p->peers_count; i++){
 		paxos_log_info("id = %d, ip = %pI4, port = %d", p->peers[i]->id, &(p->peers[i]->addr.sin_addr), ntohs(p->peers[i]->addr.sin_port) );
 		// printk("id = %d, ip = %pI4, port = %d", p->peers[i]->id, &(p->peers[i]->addr.sin_addr), ntohs(p->peers[i]->addr.sin_port) );
 	}
 
 	paxos_log_info("CLIENTS we receive connections \n(will be updated as message are received)");
 	// printk("CLIENTS we receive connections \n(will be updated as message are received)");
-	for(int i = 0; i < p->clients_count; i++){
+	for(i = 0; i < p->clients_count; i++){
 		paxos_log_info("id = %d, ip = %pI4, port = %d", p->clients[i]->id, &(p->clients[i]->addr.sin_addr), ntohs(p->clients[i]->addr.sin_port) );
 		// printk("id = %d, ip = %pI4, port = %d", p->clients[i]->id, &(p->clients[i]->addr.sin_addr), ntohs(p->clients[i]->addr.sin_port) );
 	}
@@ -181,7 +183,8 @@ peer_get_id(struct peer* p)
 }
 
 static void add_or_update_client(struct sockaddr_in * addr, struct peers * p){
-	for (int i = 0; i < p->clients_count; ++i){
+	int i;
+	for (i = 0; i < p->clients_count; ++i){
 		if(memcmp(&(addr->sin_port), &(p->clients[i]->addr.sin_port), sizeof(unsigned short)) == 0
 		&& memcmp(&(addr->sin_addr), &(p->clients[i]->addr.sin_addr), sizeof(struct in_addr)) == 0){
 			return;
@@ -212,8 +215,8 @@ int peers_missing_ok(struct peers*p){
 
 void peers_update_ok(struct peer * pe, struct sockaddr_in * addr){
 	struct peers * p = pe->peers;
-
-	for (int i = 0; i < p->peers_count; ++i){
+	int i;
+	for (i = 0; i < p->peers_count; ++i){
 		if(memcmp(&(addr->sin_port), &(p->peers[i]->addr.sin_port), sizeof(unsigned short)) == 0
 		&& memcmp(&(addr->sin_addr), &(p->peers[i]->addr.sin_addr), sizeof(struct in_addr)) == 0
 		&& peers_received_ok[p->peers[i]->id] == 0){
@@ -230,11 +233,12 @@ void peers_update_ok(struct peer * pe, struct sockaddr_in * addr){
 void peers_delete_learner(struct peer * del){
 	struct peers * p = del->peers;
 	struct sockaddr_in * addr = &del->addr;
-	for (int i = 0; i < p->clients_count; ++i){
+	int i,j;
+	for (i = 0; i < p->clients_count; ++i){
 		if(memcmp(&(addr->sin_port), &(p->clients[i]->addr.sin_port), sizeof(unsigned short)) == 0
 		&& memcmp(&(addr->sin_addr), &(p->clients[i]->addr.sin_addr), sizeof(struct in_addr)) == 0){
 			kfree(p->clients[i]);
-			for (int j = i; j < p->clients_count -1; ++j){
+			for (j = i; j < p->clients_count -1; ++j){
 				p->clients[j] = p->clients[j+1];
 				p->clients[j]->id = j;
 			}
@@ -266,8 +270,8 @@ peers_listen(struct peers* p, udp_service * k)
 
 	do_gettimeofday(&t1);
 	first = timeval_to_jiffies(&t1);
-
-	for(int i = 0; i < N_TIMER; i++){
+	int i;
+	for(i = 0; i < N_TIMER; i++){
 		time_passed[i] = first;
 	}
 
@@ -328,7 +332,7 @@ peers_listen(struct peers* p, udp_service * k)
 		do_gettimeofday(&t2);
 		temp = timeval_to_jiffies(&t2);
 
-		for(int i = 0; i < N_TIMER; i++){
+		for(i = 0; i < N_TIMER; i++){
 			if(k->timer_cb[i] != NULL){
 				if((temp - time_passed[i]) >= k->timeout_jiffies[i]){
 					time_passed[i] = temp;
