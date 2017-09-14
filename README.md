@@ -5,7 +5,7 @@ Tested on Ubuntu 17.04 zesty, kernel 4.10.0-33-generic.
 
 The logic implementation of Paxos protocol used in these modules has been taken from [libpaxos](http://libpaxos.sourceforge.net/)
 
-You need to have installed libevent2.18 or later versions.
+You need to have libevent2.18 or later versions.
 ## Description
 ### Kernel space
 There are 5 kind of modules: Kacceptor, Kproposer, Klearner, Kclient and Kreplica.
@@ -33,6 +33,53 @@ There are 2 kind of user space applications: Client and Learner.
 These are some of the possible connections that can be created.<br>
 Other examples include using replica instead of proposer and 3 acceptors and using kclients instead of user space application.<br>
 ![Paxos_images.png](./.images/Paxos_images.png)
+
+## Files
+The structure of the project is organized as follows:
+```
+.
+├── kpaxos                  // User space applications and Kernel modules
+│   ├── include
+│   │   └── *header files*
+|   |
+--------KERNEL MODULES----------
+│   ├── kacceptor.c         
+│   ├── kclient.c
+│   ├── klearner.c
+│   ├── kproposer.c
+│   ├── kreplica.c          
+---------------------------------
+|   |
+--------USER SPACE APPLICATIONS----------
+│   ├── client_user.c
+-----------------------------------------
+|   |
+│   └── *other files*
+|
+├── evpaxos                 // handle received packets
+│   ├── include
+│   │   └── *header files*
+│   ├── config.c            // where all ip and configurations are given
+│   └── *other files*
+
+|
+├── paxos                   // internal logic of paxos, instance handling and hashmap
+│   ├── include
+│   │   └── *header files*
+│   └── *other files*
+|
+-------------------SCRIPTS (see Scripts section) ---------------------
+├── prop_acc.sh           // start 1 proposer 3 acceptors
+├── learn.sh              // start learners
+├── replica.sh            // start replicas
+├── run.sh                // start up to two different kind of modules
+----------------------------------------------------------------------
+|
+├── LICENSE
+├── Makefile
+└── README.md
+```
+
 ## Difference from libpaxos
 
 There are some difference between Kernel_Paxos and Libpaxos: first of all, Libpaxos uses libevent, msgpacker and khash.
@@ -43,6 +90,20 @@ Obviously, these are user space libraries, that cannot be used in kernel program
 <b> msgpacker</b>: msgpacker is used to pack the message to send, so the message can be read by big and little endian platforms. I had to do it manually too, manipulating the integers and checking the `_BIG_ENDIAN` and `_LITTLE_ENDIAN` flags inside the kernel.
 
 <b> khash</b>: khash uses floating point internally, and the kernel does not like it. Therefore I used uthash, that is an hashmap that does not use floating point operations.
+
+<b>lmdb</b>: libpaxos offers the option to use a db where the values can be saved permanently. This is not implemented here, everything is kept in memory.
+
+In addition to this, there are little changes in the logic:
+- Since the communication is in UDP, the kacceptor must know what is the address of klearners. Therefore, when a klearner is started, sends an "hi" to the kacceptor, that saves its ip replies back "ok". If a kacceptor does not reply back, the learner keeps sending "hi" to the given address.
+
+- The kleaner also sends a "del" to the kacceptor when it is being unloaded, so the kacceptor can delete its entry from the known ip addresses.
+
+- Since the client value sent from the client can is sent in UDP, it can be lost. Therefore the client sends the value and waits 1 second for delivering by the learner. If in one second the value is not received, it resends the value to the kproposer. This is not implemented in kclient.
+
+- In libpaxos, trim is never called. Here, kernel memory is way smaller than the portion used in user space. Therefore a trim has to be called periodically, otherwise the application will crash.
+
+- The maximum packet size in UDP is 65507, as defined in `kernel_udp.h`. Bigger packets will be only sent partially. The application must care about limiting the data size.
+
 
 ## How to run
 
@@ -61,13 +122,15 @@ Go to `obj-m` list and add to the last line the entry kacceptor3.ko<br>
 `...` <br>
 `kreplica2.o ` change this line to this `kreplica2.o kacceptor3.ko`<br>
 
-Then, since we are adding a kacceptor, add it to the kacceprtor section<br>
+Then, since we are adding a kacceptor, add it to the kaccepttor section<br>
 `kacceptor0-y:= $(ACC_OBJ)`<br>
 `kacceptor1-y:= $(ACC_OBJ)`<br>
 `kacceptor2-y:= $(ACC_OBJ)`<br>
 `kacceptor3-y:= $(ACC_OBJ)` <-- add this line<br>
 
 The makefile also creates 2 client_user applications, that can be used as client or learner.
+
+<b> The default Makefile creates 3 kclients, 1 kproposer, 3 kacceptors, 5 klearners, 3 replicas and 2 client_users. Each of these is identified by the module type + progressive id. For example, 3 kclients means there are kclient0.ko kclient1.ko and kclient2.ko. </b>
 
 ### Parameters
 
