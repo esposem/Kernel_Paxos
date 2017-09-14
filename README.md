@@ -104,7 +104,7 @@ In libpaxos, there is a config file that is read by applications at startup.
 However this is not possible/safe to be done in kernel space, so for now the
 parameters are hardcoded inside `evpaxos/config.c` line 100 -120.
 What can be changed is the ips of replicas or proposers or acceptors, the ports and the ids. However, all id must start from 0 and continue in increasing order. <br>
-Something like `0 1 3` is not accepted.
+Something like `0 1 3` is not accepted. Since replicas and proposer configurations differs, also the client in user space connectiong to the proposer/replica has different addresses. The addresses are define in user_udp.c line 10.
 
 About verbosity, there are 4 levels of verbosity: `quiet`, `debug`,`info` and `error`. Quiet prints only the module prints, info only the core prints, debug prints all printk inserted in the project, and error will print only the errors.
 
@@ -141,6 +141,8 @@ Example using scripts:<br>
 
 - The catch_up flag does not work really well because since the modules must trim every at least 100000 iids, a learner catching up values that are already trimmed never gets to reach the current iid.
 
+- If a klearner is unloaded while an user space learner is attached to its chardevice, the user learner crashes and goes in D (dead) state
+
 ## Disclaimer
 
 As any kernel module, also these modules can crash. And as current implementation, these modules will crash at some point. While the crash are not severe enough to kill your machine, they might. <br>
@@ -150,4 +152,8 @@ As any kernel module, also these modules can crash. And as current implementatio
 
 - Config file to be read by module (for now parameters are hardcoded)
 - replace uthash with fixed size circular buffer
-- use netlink instead of chardevice
+- use netlink instead of chardevice, use multicast with netlink
+- add quorum of trim inside the acceptor to effectively send trim to everybody
+- support of different message size values
+- use a persistent storage instead of trimming the values in memory
+- easier way to add objects in makefile
