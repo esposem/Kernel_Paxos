@@ -5,6 +5,7 @@ Tested on Ubuntu 17.04 zesty, kernel 4.10.0-33-generic.
 
 The logic implementation of Paxos protocol used in these modules has been taken from [libpaxos](http://libpaxos.sourceforge.net/)
 
+You need to have installed libevent2.18 or later versions.
 ## Description
 ### Kernel space
 There are 5 kind of modules: Kacceptor, Kproposer, Klearner, Kclient and Kreplica.
