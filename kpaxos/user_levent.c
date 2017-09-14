@@ -3,7 +3,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <time.h>
-#include <stdatomic.h>
 
 #include "user_levent.h"
 #include "user_udp.h"

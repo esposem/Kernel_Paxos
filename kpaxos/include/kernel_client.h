@@ -1,6 +1,8 @@
 #ifndef KERNEL_CLIENT
 #define KERNEL_CLIENT
-
+#ifdef user_space
+	#include <sys/time.h>
+#endif
 struct client_value
 {
 	int client_id;

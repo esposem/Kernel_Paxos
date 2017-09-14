@@ -3,6 +3,12 @@
 
 #include "kernel_client.h"
 #include "user_levent.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+
 
 extern void udp_send_msg(struct client_value * clv, size_t size);
 extern void init_socket(struct client * c);
