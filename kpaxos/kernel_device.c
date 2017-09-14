@@ -10,8 +10,8 @@
 #include "paxos.h"
 
 #define BUFFER_SIZE 1000
-static DEFINE_MUTEX(char_mutex);
-static DEFINE_MUTEX(buffer_mutex);
+static struct mutex char_mutex;
+static struct mutex buffer_mutex;
 static struct class * charClass  = NULL;   //< The device-driver class struct pointer
 static struct device * charDevice = NULL;  //< The device-driver device struct pointer
 static char * de_name, * clas_name;
