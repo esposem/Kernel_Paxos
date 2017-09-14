@@ -142,7 +142,8 @@ void init_service(udp_service * k, char * name, int id){
   memset(k, 0, sizeof(udp_service));
   atomic_set(&k->socket_allocated, 0);
   atomic_set(&k->thread_running, 0);
-  for(int i = 0; i < N_TIMER; i++){
+  int i;
+  for(i = 0; i < N_TIMER; i++){
     k->timer_cb[i] = NULL;
     k->data[i] = 0;
   }

@@ -157,7 +157,8 @@ make_client( int proposer_id, int outstanding, int value_size)
 	if (c->learner == NULL) {
 		printk(KERN_ERR "%s Could not start the learner!", kclient->name);
 	}else{
-		for (int i = 0; i < c->outstanding; ++i)
+		int i;
+		for (i = 0; i < c->outstanding; ++i)
 	    client_submit_value(c);
 		paxos_learner_listen(kclient, c->learner);
 	}

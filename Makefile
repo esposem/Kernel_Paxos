@@ -95,7 +95,7 @@ USR_FLAGS:= -Wall -D user_space
 USR_OBJ:=client_user.o user_udp.o user_levent.o user_stats.o
 
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
-ccflags-y:= $(G_COMP) -Wno-declaration-after-statement -O2
+ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -O2
 
 LFLAGS = -levent -I /usr/local/include -L /usr/local/lib
 
@@ -103,20 +103,20 @@ all: client_user
 	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 user_udp.o: kpaxos/user_udp.c
-	$(CC) $(USR_FLAGS) $(C_COMP) $(EXTRA_CFLAGS) -c $< -o $@
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
 user_levent.o: kpaxos/user_levent.c
-	$(CC) $(USR_FLAGS) $(C_COMP) $(EXTRA_CFLAGS) -c $< -o $@
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
 user_stats.o: kpaxos/user_stats.c
-	$(CC) $(USR_FLAGS) $(C_COMP) $(EXTRA_CFLAGS) -c $< -o $@
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
 client_user.o: kpaxos/client_user.c
-	$(CC) $(USR_FLAGS) $(C_COMP) $(EXTRA_CFLAGS) -c $< -o $@
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
 client_user: $(USR_OBJ)
-	$(CC) $(USR_FLAGS) $(C_COMP) $(EXTRA_CFLAGS) -o $@0 $^ $(LFLAGS)
-	$(CC) $(USR_FLAGS) $(C_COMP) $(EXTRA_CFLAGS) -o $@1 $^ $(LFLAGS)
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@0 $^ $(LFLAGS)
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@1 $^ $(LFLAGS)
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean

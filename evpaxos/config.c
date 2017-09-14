@@ -130,7 +130,8 @@ evpaxos_config_read(void)
 
 		char * 	line = kmalloc(35, GFP_ATOMIC | __GFP_REPEAT);
 		if(line){
-			for(int i = 0; i < size_config; i++){
+			int i;
+			for(i = 0; i < size_config; i++){
 				memset(line, 0, 35);
 				memcpy(line, config_file[i], strlen(config_file[i]) + 1);
 				parse_line(c, line);
