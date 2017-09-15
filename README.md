@@ -214,15 +214,15 @@ As any kernel module, also these modules can crash. And as current implementatio
  It is recommended to run these modules in a virtual machine. In case the modules crash, it is not possible to remove them anymore, unless a reboot is performed. <br>
  In case of module crash or severe kernel panic (mouse not working, screen freezed ecc...) the only thing you can do is reboot the machine. I am not responsible of any use or damage they can create.  
 ## TODO & ideas
-
-- Config file to be read by module (for now parameters are hardcoded)
 - replace uthash with fixed size circular buffer
-- use netlink instead of chardevice, use multicast with netlink (fix user learner cpu usage 100%)
+- use netlink instead of chardevice, maybe use multicast with netlink (fix user learner cpu usage 100%)
 - add quorum of trim inside the acceptor to effectively send trim to everybody
-- support of different message size values
 - use a persistent storage instead of trimming the values in memory
-- easier way to add objects in makefile, organize generated files in folders
 - improve performances <br>max n of messages received in localhost: non-stop 450'000, client in paxos 20'000
-max n of messages received in cluster: non-stop 80'000, client in paxos 3'000)
+<br>max n of messages received in cluster: non-stop 80'000, client in paxos 3'000
 - use multi-threaded roles (1 thread receives messages and puts them in rcv-queue, 1 thread sends message in send-queue, 1 get the received message, process it and puts the resulting message in sending queue)
 - proposer using 2 ports, one for receive from acceptor and one for receiving from client (if the throughput is maximum for both ports)
+
+- Config file to be read by module (for now parameters are hardcoded)
+- support of different message size values
+- easier way to add objects in makefile, organize generated files in folders
