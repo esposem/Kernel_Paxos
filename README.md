@@ -130,23 +130,24 @@ Then, since we are adding a kacceptor, add it to the kaccepttor section<br>
 
 The makefile also creates 2 user_app applications, that can be used as client or learner.
 
-<b> The default Makefile creates 3 kclients, 1 kproposer, 3 kacceptors, 5 klearners, 3 replicas and 1 user_app. Each of these is identified by the module type + progressive id. For example, 3 kclients means there are kclient0.ko kclient1.ko and kclient2.ko. </b>
+<b> The default Makefile creates 3 kclients, 1 kproposer, 3 kacceptors, 5 klearners, 3 replicas and 1 user_app. <br>
+Each of these is identified by the module type + progressive id. For example, 3 kclients means there are kclient0.ko kclient1.ko and kclient2.ko. <br> All these modules are necessary if everything has to run in one machine, while they are superflous if they run in multiple machine (1 module .ko in every machine will be fine) </b>
 
 ### Parameters
 
 Each module and user application has its parameters. Parameters info of kernel modules can be seen by calling `modinfo module_name.ko`. Parameters info of applications can be seen by calling the application with `-h` flag. All parameters can be inserted in any order.
 
-<b>Kacceptor</b>: `sudo insmod kacceptorX.ko id=X`, where `id=X` is the id of the acceptor.
+<b>Kacceptor</b>: `sudo insmod kacceptor.ko id=X`, where `id=X` is the id of the acceptor.
 
-<b>Kproposer</b>: `sudo insmod kproposerX.ko id=X`, where `id=X` is the id of the proposer.
+<b>Kproposer</b>: `sudo insmod kproposer.ko id=X`, where `id=X` is the id of the proposer.
 
-<b>Klearner</b>: `sudo insmod klearnerX.ko id=X cantrim=Y catch_up=Z`, where `id=X` is the id of learner, `cantrim=Y` is a boolean (1/0) to say whether the klearner is allowed to send trim to acceptor and proposers, and `catch_up=Z` is a boolean to say whether the learner get all the values accepted by acceptors that has missed from iid 1 (this is helpful in case a new learner is added later). If no trim is specified by user application, the module automatically calls trim for it instances % 100000 (does not send trim to anyone). <b>It is higly recommended to send the trim call to acceptors</b>. The reason for that is that the kernel memory will fill up really quickly, and once full everything will crash.
+<b>Klearner</b>: `sudo insmod klearner.ko id=X cantrim=Y catch_up=Z`, where `id=X` is the id of learner, `cantrim=Y` is a boolean (1/0) to say whether the klearner is allowed to send trim to acceptor and proposers, and `catch_up=Z` is a boolean to say whether the learner get all the values accepted by acceptors that has missed from iid 1 (this is helpful in case a new learner is added later). If no trim is specified by user application, the module automatically calls trim for it instances % 100000 (does not send trim to anyone). <b>It is higly recommended to send the trim call to acceptors</b>. The reason for that is that the kernel memory will fill up really quickly, and once full everything will crash.
 
-<b>Kclient</b>: `sudo insmod kclientX.ko id=X proposer_id=Y outstanding=W value_size=Z`, where `id=X` is the id of learner, `proposer_id=Y` is the id of the proposer that will receive the client value, `outstanding=W` set how many values should the client send each time, and the `value_size=Z` set how big the message will be.
+<b>Kclient</b>: `sudo insmod kclient.ko id=X proposer_id=Y outstanding=W value_size=Z`, where `id=X` is the id of learner, `proposer_id=Y` is the id of the proposer that will receive the client value, `outstanding=W` set how many values should the client send each time, and the `value_size=Z` set how big the message will be.
 
-<b>Kreplica</b>: `sudo insmod kreplicaX.ko id=X cantrim=Y`, where `id=X` is the id of the replica and `cantrim=Y`is a boolean (1/0) to say whether the klearner is allowed to send trim to acceptor and proposers.
+<b>Kreplica</b>: `sudo insmod kreplica.ko id=X cantrim=Y`, where `id=X` is the id of the replica and `cantrim=Y`is a boolean (1/0) to say whether the klearner is allowed to send trim to acceptor and proposers.
 
-<b>user_app</b>: `Client Usage: ./user_appX [-h] [-o] [-v] [-p] [-c] [-l] [-d] [-s]
+<b>user_app</b>: `Usage: ./user_app [-h] [-o] [-v] [-p] [-c] [-l] [-d] [-s]
 `.<br>
 `-h` display help<br>
 `-o number` set outstanding value<br>
@@ -212,7 +213,7 @@ Example using scripts:<br>
 As any kernel module, also these modules can crash. And as current implementation, these modules will crash at some point. While the crash are not severe enough to kill your machine, they might. <br>
  It is recommended to run these modules in a virtual machine. In case the modules crash, it is not possible to remove them anymore, unless a reboot is performed. <br>
  In case of module crash or severe kernel panic (mouse not working, screen freezed ecc...) the only thing you can do is reboot the machine. I am not responsible of any use or damage they can create.  
-## TODO
+## TODO & ideas
 
 - Config file to be read by module (for now parameters are hardcoded)
 - replace uthash with fixed size circular buffer
@@ -221,4 +222,7 @@ As any kernel module, also these modules can crash. And as current implementatio
 - support of different message size values
 - use a persistent storage instead of trimming the values in memory
 - easier way to add objects in makefile, organize generated files in folders
-- improve performances
+- improve performances <br>max n of messages received in localhost: non-stop 450'000, client in paxos 20'000
+max n of messages received in cluster: non-stop 80'000, client in paxos 3'000)
+- use multi-threaded roles (1 thread receives messages and puts them in rcv-queue, 1 thread sends message in send-queue, 1 get the received message, process it and puts the resulting message in sending queue)
+- proposer using 2 ports, one for receive from acceptor and one for receiving from client (if the throughput is maximum for both ports)
