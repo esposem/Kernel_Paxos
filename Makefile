@@ -92,14 +92,14 @@ kreplica2-y:= $(REP_OBJ)
 C_COMP:= -std=c99
 G_COMP:= -std=gnu99
 USR_FLAGS:= -Wall -D user_space
-USR_OBJ:=client_user.o user_udp.o user_levent.o user_stats.o
+USR_OBJ:=user_app.o user_udp.o user_levent.o user_stats.o
 
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
 ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -O2
 
 LFLAGS = -levent -I /usr/local/include -L /usr/local/lib
 
-all: client_user
+all: user_app
 	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 user_udp.o: kpaxos/user_udp.c
@@ -111,11 +111,11 @@ user_levent.o: kpaxos/user_levent.c
 user_stats.o: kpaxos/user_stats.c
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
-client_user.o: kpaxos/client_user.c
+user_app.o: kpaxos/user_app.c
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
 ############## MODIFY HERE IF YOU WANT TO ADD MORE USER SPACE APPLICATIONS
-client_user: $(USR_OBJ)
+user_app: $(USR_OBJ)
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@0 $^ $(LFLAGS)
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@1 $^ $(LFLAGS)
 
@@ -123,4 +123,4 @@ client_user: $(USR_OBJ)
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
-	rm client_user*
+	rm user_app*
