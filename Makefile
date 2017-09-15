@@ -116,9 +116,7 @@ user_app.o: kpaxos/user_app.c
 
 ############## MODIFY HERE IF YOU WANT TO ADD MORE USER SPACE APPLICATIONS
 user_app: $(USR_OBJ)
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@0 $^ $(LFLAGS)
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@1 $^ $(LFLAGS)
-
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@ $^ $(LFLAGS)
 ###########################################################################
 
 clean:

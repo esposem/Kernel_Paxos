@@ -51,7 +51,7 @@ The structure of the project is organized as follows:
 ---------------------------------
 |   |
 --------USER SPACE APPLICATIONS----------
-│   ├── client_user.c
+│   ├── user_app.c
 -----------------------------------------
 |   |
 │   └── *other files*
@@ -128,9 +128,9 @@ Then, since we are adding a kacceptor, add it to the kaccepttor section<br>
 `kacceptor2-y:= $(ACC_OBJ)`<br>
 `kacceptor3-y:= $(ACC_OBJ)` <-- add this line<br>
 
-The makefile also creates 2 client_user applications, that can be used as client or learner.
+The makefile also creates 2 user_app applications, that can be used as client or learner.
 
-<b> The default Makefile creates 3 kclients, 1 kproposer, 3 kacceptors, 5 klearners, 3 replicas and 2 client_users. Each of these is identified by the module type + progressive id. For example, 3 kclients means there are kclient0.ko kclient1.ko and kclient2.ko. </b>
+<b> The default Makefile creates 3 kclients, 1 kproposer, 3 kacceptors, 5 klearners, 3 replicas and 1 user_app. Each of these is identified by the module type + progressive id. For example, 3 kclients means there are kclient0.ko kclient1.ko and kclient2.ko. </b>
 
 ### Parameters
 
@@ -146,7 +146,7 @@ Each module and user application has its parameters. Parameters info of kernel m
 
 <b>Kreplica</b>: `sudo insmod kreplicaX.ko id=X cantrim=Y`, where `id=X` is the id of the replica and `cantrim=Y`is a boolean (1/0) to say whether the klearner is allowed to send trim to acceptor and proposers.
 
-<b>client_user</b>: `Client Usage: ./client_userX [-h] [-o] [-v] [-p] [-c] [-l] [-d] [-s]
+<b>user_app</b>: `Client Usage: ./user_appX [-h] [-o] [-v] [-p] [-c] [-l] [-d] [-s]
 `.<br>
 `-h` display help<br>
 `-o number` set outstanding value<br>
@@ -198,7 +198,7 @@ It is recommended to firstly load all kacceptors, then kproposers, and then klea
 Once they all are loaded, learner in user space can be executed, and then finally client in user space can start. <br>
 In this way, kproposers can preexecute with the kacceptors, klearners can connect to kacceptors so they know where to deliver the 2B messages, klearners  can create the chardevice so the user space learner can connect, and user space learner can create the socket that will listen for incoming connection by clients.<br>
 Example using scripts:<br>
-`./prop_acc.sh`<br>`./learn.sh 1 0`<br>`sudo ./client_user0 -l 100000 -d 0 -s 127.0.0.1 9000`<br> `./client_user1 -c -s 127.0.0.1 9000`
+`./prop_acc.sh`<br>`./learn.sh 1 0`<br>`sudo ./user_app -l 100000 -d 0 -s 127.0.0.1 9000`<br> `./user_app -c -s 127.0.0.1 9000`
 ## Known bugs
 
 - Both configurations with 3 replicas and 3 acceptors with 1 proposer connected to 3 clients crashes after ~ 2 hours of uninterrupted work.<br>
@@ -216,8 +216,9 @@ As any kernel module, also these modules can crash. And as current implementatio
 
 - Config file to be read by module (for now parameters are hardcoded)
 - replace uthash with fixed size circular buffer
-- use netlink instead of chardevice, use multicast with netlink
+- use netlink instead of chardevice, use multicast with netlink (fix user learner cpu usage 100%)
 - add quorum of trim inside the acceptor to effectively send trim to everybody
 - support of different message size values
 - use a persistent storage instead of trimming the values in memory
-- easier way to add objects in makefile
+- easier way to add objects in makefile, organize generated files in folders
+- improve performances
