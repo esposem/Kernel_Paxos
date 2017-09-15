@@ -110,7 +110,7 @@ In addition to this, there are little changes in the logic:
 You first need to compile everything. Please refer to next section to select which module to compile. Once compiled, the command to load a kernel module is `sudo insmod module_name.ko parameters`. To unload it is `sudo rmmod module_name.ko`. `module_name` is the name of the module. The command to run an application is `./application_name`.
 
 ### Compiling
-Since there are a lot of different configurations to make paxos protocol working (3 replicas and one client, 1 proposer 3 acceptor 1 client, multiple clients, multiple learners, ecc... ), it might be necessary to modify the Makefile to add/remove modules.
+Since there are a lot of different configurations to make paxos protocol working (3 replicas and one client, 1 proposer 3 acceptor 1 client, multiple clients, multiple learners, ecc... ), it might be necessary to modify the Makefile to add/remove modules. This is needed when you want for example multiple acceptors in the same machine, because you will need to compile multiple modules.
 
 To add/remove a module, you just need to modify the `obj-m` list of files. In addition, for each file added/removed, you must also modify the filename-y entry.<br> For example, let's say a new acceptor is needed:<br>
 Go to `obj-m` list and add to the last line the entry kacceptor3.ko<br>
@@ -178,7 +178,7 @@ About verbosity, there are 4 levels of verbosity: `quiet`, `debug`,`info` and `e
 
 ### Scripts
 
-Since there are a lot of modules and parameters, I created some scripts to automatically run them. Parameters in square brackets are optionals. Ther scripts are:
+Since there are a lot of modules and parameters, I created some scripts to automatically run them. Parameters in square brackets are optionals. These scripts are useful when there are multiple modules to be loaded in the same machine, otherwise do not help a lot. The scripts are:
 
 <b>run.sh</b>: <br>Usage `./run.sh module_name number [module_name number] [module_name number]`.<br>`module_name` is the name of module and `number` is the number of modules with that name you want. You must provide at least one module_name and one number. <br>Example: <br>`./run.sh kclient 3` Load 3 kclient modules, more specifically it will perform <br>`sudo insmod kclient0.ko id=0`<br>`sudo insmod kclient1.ko id=1` <br>`sudo insmod kclient2.ko id=2`. If a module is already loaded, it will be unloaded first. If one module cannot be loaded, unload all the others. The script compile everything before loading modules.
 
