@@ -5,7 +5,7 @@ Tested on Ubuntu 17.04 zesty, kernel 4.10.0-33-generic.
 
 The logic implementation of Paxos protocol used in these modules has been taken from [libpaxos](http://libpaxos.sourceforge.net/)
 
-You need to have libevent2.18 or later versions.
+You need to have libevent-2.18 or later versions.
 ## Description
 ### Kernel space
 There are 5 kind of modules: Kacceptor, Kproposer, Klearner, Kclient and Kreplica.
@@ -214,6 +214,7 @@ As any kernel module, also these modules can crash. And as current implementatio
  It is recommended to run these modules in a virtual machine. In case the modules crash, it is not possible to remove them anymore, unless a reboot is performed. <br>
  In case of module crash or severe kernel panic (mouse not working, screen freezed ecc...) the only thing you can do is reboot the machine. I am not responsible of any use or damage they can create.  
 ## TODO & ideas
+- resend the value if it is not delivered to the proposer, (now it's sending a new one)
 - replace uthash with fixed size circular buffer
 - use netlink instead of chardevice, maybe use multicast with netlink (fix user learner cpu usage 100%)
 - add quorum of trim inside the acceptor to effectively send trim to everybody
