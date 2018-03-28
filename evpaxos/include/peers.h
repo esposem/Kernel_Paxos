@@ -36,33 +36,32 @@ extern "C" {
 #include "paxos.h"
 #include "evpaxos.h"
 #include "paxos_types.h"
-#include "kernel_udp.h"
+
 
 struct peer;
 struct peers;
 
-typedef void (*peer_cb)(struct peer* p, paxos_message* m, void* arg);
-typedef void (*peer_iter_cb)(struct peer* p, void* arg);
+typedef void (*peer_cb)(paxos_message* m, void* arg, eth_address * src);
+typedef void (*peer_iter_cb)(struct net_device *dev, struct peer *p,
+                              void *arg);
 
-struct peers* peers_new(struct sockaddr_in * send_addr, struct evpaxos_config* config, int id);
+struct peers* peers_new(struct evpaxos_config *config, int id, char *if_name);
 void peers_free(struct peers* p);
 int peers_count(struct peers* p);
-int peers_sock_init(struct peers* p, udp_service * k);
-int peers_listen(struct peers* p, udp_service * k);
-void peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg);
+eth_address *get_addr(struct peer *p);
 void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);
 void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
 struct peer* peers_get_acceptor(struct peers* p, int id);
 void add_acceptors_from_config(int myid, struct peers * p);
-struct socket * get_send_socket(struct peer * p);
-struct sockaddr_in * get_sockaddr(struct peer * p);
-struct peer * get_me_send(struct peers * p);
-int peer_get_id(struct peer* p);
 void printall(struct peers * p, char * name);
-void peers_delete_learner(struct peer * del);
+void add_or_update_client(eth_address *addr, struct peers *p);
+int peer_get_id(struct peer* p);
+void peer_send_del(struct peer *p, void *arg);
+struct net_device *get_dev(struct peers *p);
 int peers_missing_ok(struct peers * p);
-void peers_update_ok(struct peer * p, struct sockaddr_in * addr);
-
+void peers_update_ok(struct peers * p, eth_address * addr);
+void peers_delete_learner(struct peers *p, eth_address *addr);
+void peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg);
 
 #ifdef __cplusplus
 }

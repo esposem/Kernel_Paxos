@@ -31,7 +31,8 @@
 
 #include <linux/types.h>
 #include <net/sock.h>
-#include "kernel_udp.h"
+
+#include "common.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,7 +69,7 @@ typedef void (*deliver_function)(
  * @see evpaxos_replica_free()
  */
 struct evpaxos_replica* evpaxos_replica_init(int id,
-	deliver_function cb, void* arg, udp_service * k);
+	deliver_function cb, void* arg, char * if_name);
 
 /**
  * Destroy a Paxos replica and free all its memory.
@@ -102,8 +103,8 @@ void evlearner_auto_trim(struct evlearner* l, unsigned iid);
 /**
  * Used by replicas to submit values.
  */
-void evpaxos_replica_submit(struct evpaxos_replica* replica,
-	char* value, int size);
+// void evpaxos_replica_submit(struct evpaxos_replica* replica,
+// 	char* value, int size);
 
 /**
  * Returns the number of replicas in the configuration.
@@ -115,8 +116,8 @@ int evpaxos_replica_count(struct evpaxos_replica* replica);
  * an optional argument to that is passed to the callback, and
  * a libevent event_base.
  */
-struct evlearner* evlearner_init( deliver_function f,
-	void* arg, udp_service * k);
+ struct evlearner *evlearner_init(deliver_function f, void *arg, char *if_name);
+
 
 /**
  * Release the memory allocated by the learner
@@ -144,7 +145,7 @@ void evlearner_send_trim(struct evlearner* l, unsigned iid);
  * Initializes a acceptor with a given id (which MUST be unique),
  * a config file and a libevent event_base.
  */
-struct evacceptor* evacceptor_init(int id, udp_service * k);
+struct evacceptor* evacceptor_init(int id, char * if_name);
 
 /**
  * Frees the memory allocated by the acceptor.
@@ -158,7 +159,7 @@ void evacceptor_free(struct evacceptor* a);
  *
  * @param id a unique identifier, must be in the range [0...(MAX_N_OF_PROPOSERS-1)]
  */
-struct evproposer* evproposer_init(int id,  udp_service * k);
+struct evproposer* evproposer_init(int id,  char * if_name);
 
 /**
  * Release the memory allocated by the proposer
@@ -175,16 +176,10 @@ void evproposer_set_instance_id(struct evproposer* p, unsigned iid);
 /**
  * Used by clients to submit values to proposers.
  */
-void paxos_submit(struct socket * s, struct sockaddr_in* bev, char* data, int size);
+void paxos_submit(struct net_device *dev, eth_address *addr, char *data,
+                  int size);
 
-void paxos_learner_listen(udp_service * k, struct evlearner * ev);
-void paxos_acceptor_listen(udp_service * k, struct evacceptor * ev);
-void paxos_proposer_listen(udp_service * k, struct evproposer * ev);
-void paxos_replica_listen(udp_service * k, struct evpaxos_replica * ev);
-
-struct socket * get_sock(struct evlearner * l);
-struct sockaddr_in * get_sockad(struct evlearner * l);
-
+struct net_device *get_learn_dev(struct evlearner *ev) ;
 
 
 #ifdef __cplusplus

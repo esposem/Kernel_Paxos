@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 #include "paxos_types.h"
+#include "common.h"
 
 long msgpack_pack_paxos_prepare(msgpack_packer** p, paxos_prepare* v);
 void msgpack_unpack_paxos_prepare(msgpack_packer* o, paxos_prepare* v);
@@ -56,7 +57,7 @@ int msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v, 
 long msgpack_pack_paxos_learner(msgpack_packer** p, void * v, int enum_type);
 int msgpack_unpack_paxos_learner(msgpack_packer* o, void * v, int packet_len);
 long msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v);
-int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size);
+int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size, paxos_message_type p);
 
 #ifdef __cplusplus
 }

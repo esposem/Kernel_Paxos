@@ -34,20 +34,32 @@ extern "C" {
 #endif
 
 #include "paxos_types.h"
+#include "common.h"
+#include "eth.h"
 #include <linux/udp.h>
 
-void send_paxos_message(struct socket * s, struct sockaddr_in* bev, paxos_message* msg, char * name);
-void send_paxos_prepare(struct socket * s, struct sockaddr_in* bev, void * msg);
-void send_paxos_promise(struct socket * s, struct sockaddr_in* bev, paxos_promise* msg);
-void send_paxos_accept(struct socket * s, struct sockaddr_in* bev, void * msg);
-void send_paxos_accepted(struct socket * s, struct sockaddr_in* bev, void * msg);
-void send_paxos_preempted(struct socket * s, struct sockaddr_in* bev, paxos_preempted* msg);
-void send_paxos_repeat(struct socket * s, struct sockaddr_in* bev, paxos_repeat* msg);
-void send_paxos_trim(struct socket * s, struct sockaddr_in* bev, paxos_trim* msg);
-int recv_paxos_message(char * data, paxos_message* out, int size);
-void send_paxos_learner_hi(struct socket * s,struct sockaddr_in* bev, paxos_learner_hi* p);
-void send_paxos_learner_del(struct socket * s,struct sockaddr_in* bev, paxos_learner_del* p);
-void send_paxos_acceptor_ok(struct socket * s,struct sockaddr_in* bev, void * p);
+void send_paxos_message(struct net_device *dev, eth_address *addr,
+                        paxos_message *msg);
+void send_paxos_prepare(struct net_device *dev, eth_address *addr,
+                        paxos_prepare *pp);
+void send_paxos_promise(struct net_device *dev, eth_address *addr,
+                        paxos_promise *p);
+void send_paxos_accept(struct net_device *dev, eth_address *addr, paxos_accept *pa);
+void send_paxos_accepted(struct net_device *dev, eth_address *addr,
+                         paxos_accepted *p);
+void send_paxos_preempted(struct net_device *dev, eth_address *addr,
+                          paxos_preempted *p);
+void send_paxos_repeat(struct net_device *dev, eth_address *addr,
+                       paxos_repeat *p);
+void send_paxos_trim(struct net_device *dev, eth_address *addr, paxos_trim *t);
+int recv_paxos_message(paxos_message *out, paxos_message_type p, char *data,
+                       size_t size);
+void send_paxos_learner_hi(struct net_device *dev, eth_address *addr,
+                           paxos_learner_hi *p);
+void send_paxos_learner_del(struct net_device *dev, eth_address *addr,
+                            paxos_learner_del *p);
+void send_paxos_acceptor_ok(struct net_device *dev, eth_address *addr,
+                            void *p);
 #ifdef __cplusplus
 }
 #endif
