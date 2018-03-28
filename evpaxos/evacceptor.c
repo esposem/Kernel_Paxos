@@ -35,6 +35,8 @@
 struct evacceptor {
   struct peers *peers;
   struct acceptor *state;
+  struct timer_list stats_ev;
+  struct timeval stats_interval;
 };
 
 static void send_acceptor_paxos_message(struct net_device *dev, struct peer *p,
@@ -127,6 +129,7 @@ static void send_acceptor_state(unsigned long arg) {
   paxos_message msg = {.type = PAXOS_ACCEPTOR_STATE};
   acceptor_set_current_state(a->state, &msg.u.state);
   peers_foreach_client(a->peers, send_acceptor_paxos_message, &msg);
+  mod_timer(&a->stats_ev, jiffies + timeval_to_jiffies(&a->stats_interval));
 }
 
 struct evacceptor *evacceptor_init_internal(int id, struct evpaxos_config *c,
@@ -148,9 +151,12 @@ struct evacceptor *evacceptor_init_internal(int id, struct evpaxos_config *c,
   peers_subscribe(p, PAXOS_LEARNER_HI, evacceptor_handle_hi, acceptor);
   peers_subscribe(p, PAXOS_LEARNER_DEL, evacceptor_handle_del, acceptor);
 
-  // k->timer_cb[ACC_TIM] = send_acceptor_state;
-  // k->data[ACC_TIM] = (unsigned long)acceptor;
-  // k->timeout_jiffies[ACC_TIM] = msecs_to_jiffies(1000);
+  setup_timer(&acceptor->stats_ev, send_acceptor_state,
+              (unsigned long)acceptor);
+  acceptor->stats_interval = (struct timeval){1, 0};
+  mod_timer(&acceptor->stats_ev,
+            jiffies + timeval_to_jiffies(&acceptor->stats_interval));
+
   return acceptor;
 }
 
@@ -167,7 +173,6 @@ struct evacceptor *evacceptor_init(int id, char *if_name) {
     return NULL;
   }
 
-  // struct sockaddr_in send_add = evpaxos_acceptor_address(config, id);
   struct peers *peers = peers_new(config, id, if_name);
   printall(peers, "Acceptor");
   struct evacceptor *acceptor = evacceptor_init_internal(id, config, peers);
@@ -177,6 +182,7 @@ struct evacceptor *evacceptor_init(int id, char *if_name) {
 
 void evacceptor_free_internal(struct evacceptor *a) {
   acceptor_free(a->state);
+  del_timer(&a->stats_ev);
   kfree(a);
 }
 
