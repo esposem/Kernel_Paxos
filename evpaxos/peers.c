@@ -163,11 +163,12 @@ void printall(struct peers *p, char *name) {
 
 int peer_get_id(struct peer *p) { return p->id; }
 
-void add_or_update_client(eth_address *addr, struct peers *p) {
+// 0 if known, 1 if new
+int add_or_update_client(eth_address *addr, struct peers *p) {
   int i;
   for (i = 0; i < p->clients_count; ++i) {
     if (memcmp(addr, p->clients[i]->addr, eth_size) == 0) {
-      return;
+      return 0;
     }
   }
   paxos_log_info("Added a new client, now %d clients", p->clients_count + 1);
@@ -175,6 +176,7 @@ void add_or_update_client(eth_address *addr, struct peers *p) {
       prealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1));
   p->clients[p->clients_count] = make_peer(p, p->clients_count, addr);
   p->clients_count++;
+  return 1;
 }
 
 void peer_send_del(struct peer *p, void *arg) {

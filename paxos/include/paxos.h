@@ -36,6 +36,8 @@ extern "C" {
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include "paxos_types.h"
+#include "common.h"
+
 
 /* Paxos instance ids and ballots */
 typedef uint32_t iid_t;

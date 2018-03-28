@@ -25,175 +25,140 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "storage.h"
-#include <linux/slab.h>
 #include "uthash.h"
+#include <linux/slab.h>
 
 #ifndef HASH_FIND_IID
-	#define HASH_FIND_IID(head,findint,out)                                          \
-	    HASH_FIND(hh,head,findint,sizeof(iid_t),out)
+#define HASH_FIND_IID(head, findint, out)                                      \
+  HASH_FIND(hh, head, findint, sizeof(iid_t), out)
 #endif
 
 #ifndef HASH_ADD_IID
-	#define HASH_ADD_IID(head,intfield,add)                                          \
-	    HASH_ADD(hh,head,intfield,sizeof(iid_t),add)
+#define HASH_ADD_IID(head, intfield, add)                                      \
+  HASH_ADD(hh, head, intfield, sizeof(iid_t), add)
 #endif
 
 // KHASH_MAP_INIT_INT(record, paxos_accepted*);
 
 struct hash_item {
-	iid_t iid;
-	paxos_accepted *value;
-	UT_hash_handle hh;
+  iid_t iid;
+  paxos_accepted *value;
+  UT_hash_handle hh;
 };
 
-struct mem_storage //db
+struct mem_storage // db
 {
-	iid_t trim_iid;
-	struct hash_item * record;
+  iid_t trim_iid;
+  struct hash_item *record;
 };
 
+static void paxos_accepted_copy(paxos_accepted *dst, paxos_accepted *src);
 
-static void paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src);
-
-static struct mem_storage*
-mem_storage_new(int acceptor_id)
-{
-	struct mem_storage* s = kmalloc(sizeof(struct mem_storage), GFP_ATOMIC | __GFP_REPEAT);
-	if (s == NULL)
-		return s;
-	s->trim_iid = 0;
-	s->record = NULL;
-	return s;
+static struct mem_storage *mem_storage_new(int acceptor_id) {
+  struct mem_storage *s = pmalloc(sizeof(struct mem_storage));
+  if (s == NULL)
+    return s;
+  s->trim_iid = 0;
+  s->record = NULL;
+  return s;
 }
 
-static int
-mem_storage_open(void* handle)
-{
-	return 0;
+static int mem_storage_open(void *handle) { return 0; }
+
+static void mem_storage_close(void *handle) {
+  struct mem_storage *s = handle;
+  struct hash_item *current_hash;
+  struct hash_item *tmp;
+  HASH_ITER(hh, s->record, current_hash, tmp) {
+    HASH_DEL(s->record, current_hash);
+    paxos_accepted_free(current_hash->value);
+    kfree(current_hash);
+  }
+
+  kfree(s);
 }
 
-static void
-mem_storage_close(void* handle)
-{
-	struct mem_storage* s = handle;
-	struct hash_item * current_hash;
-	struct hash_item * tmp;
- HASH_ITER(hh , s->record, current_hash, tmp) {
-	  HASH_DEL(s->record, current_hash);
-	  paxos_accepted_free(current_hash->value);
-		kfree(current_hash);
- }
+static int mem_storage_tx_begin(void *handle) { return 0; }
 
- kfree(s);
+static int mem_storage_tx_commit(void *handle) { return 0; }
 
-}
+static void mem_storage_tx_abort(void *handle) {}
 
-static int
-mem_storage_tx_begin(void* handle)
-{
-	return 0;
-}
-
-static int
-mem_storage_tx_commit(void* handle)
-{
-	return 0;
-}
-
-static void
-mem_storage_tx_abort(void* handle) { }
-
-static int
-mem_storage_get(void* handle, iid_t iids, paxos_accepted* out)
-{
-	struct mem_storage* s = handle;
-	struct hash_item * h;
-  HASH_FIND_IID( s->record, &iids, h);
-	if(h == NULL){
-		return 0;
-	}
-	paxos_accepted_copy(out, h->value);
+static int mem_storage_get(void *handle, iid_t iids, paxos_accepted *out) {
+  struct mem_storage *s = handle;
+  struct hash_item *h;
+  HASH_FIND_IID(s->record, &iids, h);
+  if (h == NULL) {
+    return 0;
+  }
+  paxos_accepted_copy(out, h->value);
   return 1;
 }
 
-static int
-mem_storage_put(void* handle, paxos_accepted* acc)
-{
-	struct mem_storage* s = handle;
-	struct hash_item * a;
+static int mem_storage_put(void *handle, paxos_accepted *acc) {
+  struct mem_storage *s = handle;
+  struct hash_item *a;
 
-	paxos_accepted* val = kmalloc(sizeof(paxos_accepted), GFP_ATOMIC | __GFP_REPEAT);
-	if(val){
-		paxos_accepted_copy(val, acc);
+  paxos_accepted *val = pmalloc(sizeof(paxos_accepted));
+  if (val) {
+    paxos_accepted_copy(val, acc);
 
-		HASH_FIND_IID(s->record, &(acc->iid), a);
-		if (a) {
-			paxos_accepted_free(a->value);
-			a->value = val;
-			a->iid = acc->iid;
-		}
-		else {
-			a = kmalloc(sizeof(struct hash_item), GFP_ATOMIC | __GFP_REPEAT);
-			if(a){
-				a->value = val;
-				a->iid = acc->iid;
-				HASH_ADD_IID(s->record, iid, a);
-			}
-		}
-	}
+    HASH_FIND_IID(s->record, &(acc->iid), a);
+    if (a) {
+      paxos_accepted_free(a->value);
+      a->value = val;
+      a->iid = acc->iid;
+    } else {
+      a = pmalloc(sizeof(struct hash_item));
+      if (a) {
+        a->value = val;
+        a->iid = acc->iid;
+        HASH_ADD_IID(s->record, iid, a);
+      }
+    }
+  }
 
-
-	return 0;
-
+  return 0;
 }
 
-static int
-mem_storage_trim(void* handle, iid_t iid)
-{
-	struct mem_storage* s = handle;
-	struct hash_item *hash_el, *tmp;
-	HASH_ITER(hh, s->record, hash_el, tmp) {
-		if(hash_el->iid <= (int) iid){
-			HASH_DEL(s->record, hash_el);
-			paxos_accepted_free(hash_el->value);
-			kfree(hash_el);
-		}
-	}
-	s->trim_iid = iid;
-	return 0;
+static int mem_storage_trim(void *handle, iid_t iid) {
+  struct mem_storage *s = handle;
+  struct hash_item *hash_el, *tmp;
+  HASH_ITER(hh, s->record, hash_el, tmp) {
+    if (hash_el->iid <= (int)iid) {
+      HASH_DEL(s->record, hash_el);
+      paxos_accepted_free(hash_el->value);
+      kfree(hash_el);
+    }
+  }
+  s->trim_iid = iid;
+  return 0;
 }
 
-static iid_t
-mem_storage_get_trim_instance(void* handle)
-{
-	struct mem_storage* s = handle;
-	return s->trim_iid;
+static iid_t mem_storage_get_trim_instance(void *handle) {
+  struct mem_storage *s = handle;
+  return s->trim_iid;
 }
 
-static void
-paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src)
-{
-	memcpy(dst, src, sizeof(paxos_accepted));
-	if (dst->value.paxos_value_len > 0) {
-		dst->value.paxos_value_val = kmalloc(src->value.paxos_value_len, GFP_ATOMIC | __GFP_REPEAT);
-		memcpy(dst->value.paxos_value_val, src->value.paxos_value_val,
-			src->value.paxos_value_len);
-	}
+static void paxos_accepted_copy(paxos_accepted *dst, paxos_accepted *src) {
+  memcpy(dst, src, sizeof(paxos_accepted));
+  if (dst->value.paxos_value_len > 0) {
+    dst->value.paxos_value_val = pmalloc(src->value.paxos_value_len);
+    memcpy(dst->value.paxos_value_val, src->value.paxos_value_val,
+           src->value.paxos_value_len);
+  }
 }
 
-void
-storage_init_mem(struct storage* s, int acceptor_id)
-{
-	s->handle = mem_storage_new(acceptor_id);
-	s->api.open = mem_storage_open;
-	s->api.close = mem_storage_close;
-	s->api.tx_begin = mem_storage_tx_begin;
-	s->api.tx_commit = mem_storage_tx_commit;
-	s->api.tx_abort = mem_storage_tx_abort;
-	s->api.get = mem_storage_get;
-	s->api.put = mem_storage_put;
-	s->api.trim = mem_storage_trim;
-	s->api.get_trim_instance = mem_storage_get_trim_instance;
+void storage_init_mem(struct storage *s, int acceptor_id) {
+  s->handle = mem_storage_new(acceptor_id);
+  s->api.open = mem_storage_open;
+  s->api.close = mem_storage_close;
+  s->api.tx_begin = mem_storage_tx_begin;
+  s->api.tx_commit = mem_storage_tx_commit;
+  s->api.tx_abort = mem_storage_tx_abort;
+  s->api.get = mem_storage_get;
+  s->api.put = mem_storage_put;
+  s->api.trim = mem_storage_trim;
+  s->api.get_trim_instance = mem_storage_get_trim_instance;
 }

@@ -25,120 +25,88 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "carray.h"
-// #include <stdlib.h>
 
-#include <linux/slab.h>
-
-// #include <assert.h>
-
-struct carray
-{
-	int head;
-	int tail;
-	int size;
-	int count;
-	void** array;
+struct carray {
+  int head;
+  int tail;
+  int size;
+  int count;
+  void **array;
 };
 
-static int carray_full(struct carray* a);
-static void carray_grow(struct carray* a);
-static void* carray_at(struct carray* a, int i);
+static int carray_full(struct carray *a);
+static void carray_grow(struct carray *a);
+static void *carray_at(struct carray *a, int i);
 
-struct carray*
-carray_new(int size)
-{
-	struct carray* a;
-	a = kmalloc(sizeof(struct carray), GFP_ATOMIC | __GFP_REPEAT);
-	// assert(a != NULL);
-	// WARN_ON(a == NULL);
-	if(a == NULL)
-		printk(KERN_ALERT "A IS NULL");
-	a->head = 0;
-	a->tail = 0;
-	a->size = size;
-	a->count = 0;
-	a->array = kmalloc(sizeof(void*)*a->size, GFP_ATOMIC | __GFP_REPEAT);
-	if(a == NULL)
-		printk(KERN_ALERT "ARRAY IS NULL");
-	// assert(a->array != NULL);
-	// WARN_ON(a->array == NULL);
-	return a;
+struct carray *carray_new(int size) {
+  struct carray *a;
+  a = pmalloc(sizeof(struct carray));
+  // assert(a != NULL);
+  // WARN_ON(a == NULL);
+  if (a == NULL)
+    printk(KERN_ALERT "A IS NULL");
+  a->head = 0;
+  a->tail = 0;
+  a->size = size;
+  a->count = 0;
+  a->array = pmalloc(sizeof(void *) * a->size);
+  if (a == NULL)
+    printk(KERN_ALERT "ARRAY IS NULL");
+  // assert(a->array != NULL);
+  // WARN_ON(a->array == NULL);
+  return a;
 }
 
-void
-carray_free(struct carray* a)
-{
-	kfree(a->array);
-	kfree(a);
+void carray_free(struct carray *a) {
+  kfree(a->array);
+  kfree(a);
 }
 
-int
-carray_empty(struct carray* a)
-{
-	return a->count == 0;
+int carray_empty(struct carray *a) { return a->count == 0; }
+
+int carray_size(struct carray *a) { return a->size; }
+
+int carray_push_back(struct carray *a, void *p) {
+  if (carray_full(a))
+    carray_grow(a);
+  a->array[a->tail] = p;
+  a->tail = (a->tail + 1) % a->size;
+  a->count++;
+  return 0;
 }
 
-int
-carray_size(struct carray* a)
-{
-	return a->size;
+void *carray_pop_front(struct carray *a) {
+  void *p;
+  if (carray_empty(a))
+    return NULL;
+  p = a->array[a->head];
+  a->head = (a->head + 1) % a->size;
+  a->count--;
+  return p;
 }
 
-int
-carray_push_back(struct carray* a, void* p)
-{
-	if (carray_full(a))
-		carray_grow(a);
-	a->array[a->tail] = p;
-	a->tail = (a->tail + 1) % a->size;
-	a->count++;
-	return 0;
+void carray_foreach(struct carray *a, void (*carray_cb)(void *)) {
+  int i;
+  for (i = 0; i < a->count; ++i)
+    carray_cb(carray_at(a, i));
 }
 
-void*
-carray_pop_front(struct carray* a)
-{
-	void* p;
-	if (carray_empty(a)) return NULL;
-	p = a->array[a->head];
-	a->head = (a->head + 1) % a->size;
-	a->count--;
-	return p;
+static int carray_full(struct carray *a) { return a->count == a->size; }
+
+static void carray_grow(struct carray *a) {
+  int i;
+  struct carray *tmp = carray_new(a->size * 2);
+  for (i = 0; i < a->count; i++)
+    carray_push_back(tmp, carray_at(a, i));
+  kfree(a->array);
+  a->head = 0;
+  a->tail = tmp->tail;
+  a->size = tmp->size;
+  a->array = tmp->array;
+  kfree(tmp);
 }
 
-void
-carray_foreach(struct carray* a, void (*carray_cb)(void*))
-{
-	int i;
-	for (i = 0; i < a->count; ++i)
-		carray_cb(carray_at(a, i));
-}
-
-static int
-carray_full(struct carray* a)
-{
-	return a->count == a->size;
-}
-
-static void
-carray_grow(struct carray* a)
-{
-	int i;
-	struct carray* tmp = carray_new(a->size * 2);
-	for (i = 0; i < a->count; i++)
-		carray_push_back(tmp, carray_at(a, i));
-	kfree(a->array);
-	a->head = 0;
-	a->tail = tmp->tail;
-	a->size = tmp->size;
-	a->array = tmp->array;
-	kfree(tmp);
-}
-
-static void*
-carray_at(struct carray* a, int i)
-{
-	return a->array[(a->head+i) % a->size];
+static void *carray_at(struct carray *a, int i) {
+  return a->array[(a->head + i) % a->size];
 }

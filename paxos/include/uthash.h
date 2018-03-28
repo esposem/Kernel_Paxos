@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // #include <string.h>   /* memcmp, memset, strlen */
 // #include <stddef.h>   /* ptrdiff_t */
 #include <linux/stddef.h>
+#include "common.h"
 
 // #include <stdlib.h>   /* exit */
 
@@ -87,7 +88,7 @@ typedef unsigned char uint8_t;
 #define uthash_fatal(msg)  // printk(KERN_ERR msg)         /* fatal error (out of memory,etc) */
 #endif
 #ifndef uthash_malloc
-#define uthash_malloc(sz) kmalloc(sz, GFP_ATOMIC | __GFP_REPEAT)      /* malloc fcn                      */
+#define uthash_malloc(sz) pmalloc(sz)      /* malloc fcn                      */
 #endif
 #ifndef uthash_free
 #define uthash_free(ptr,sz) kfree(ptr)     /* free fcn                        */

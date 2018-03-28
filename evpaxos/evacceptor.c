@@ -112,8 +112,8 @@ static void evacceptor_handle_hi(paxos_message *msg, void *arg,
                                  eth_address *src) {
   paxos_log_info("Acceptor: Received PAXOS_LEARNER_HI. Sending OK");
   struct evacceptor *a = (struct evacceptor *)arg;
-  add_or_update_client(src, a->peers);
-  send_paxos_acceptor_ok(get_dev(a->peers), src, NULL);
+  if (add_or_update_client(src, a->peers))
+    send_paxos_acceptor_ok(get_dev(a->peers), src, NULL);
 }
 
 static void evacceptor_handle_del(paxos_message *msg, void *arg,

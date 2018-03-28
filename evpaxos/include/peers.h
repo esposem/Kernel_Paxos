@@ -54,7 +54,7 @@ void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
 struct peer* peers_get_acceptor(struct peers* p, int id);
 void add_acceptors_from_config(int myid, struct peers * p);
 void printall(struct peers * p, char * name);
-void add_or_update_client(eth_address *addr, struct peers *p);
+int add_or_update_client(eth_address *addr, struct peers *p);
 int peer_get_id(struct peer* p);
 void peer_send_del(struct peer *p, void *arg);
 struct net_device *get_dev(struct peers *p);
