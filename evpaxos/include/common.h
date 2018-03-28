@@ -9,9 +9,4 @@
 typedef uint8_t eth_address;
 #define eth_size ETH_ALEN * sizeof(uint8_t)
 
-// all kmalloc in pmalloc
-// check timeout
-// hartbeat for learners
-// check missing free
-// check input
 #endif
