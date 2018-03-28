@@ -37,6 +37,8 @@ struct evproposer {
   int preexec_window;
   struct proposer *state;
   struct peers *peers;
+  struct timer_list stats_ev;
+  struct timeval stats_interval;
 };
 
 static void peer_send_prepare(struct net_device *dev, struct peer *p,
@@ -157,6 +159,7 @@ static void evproposer_check_timeouts(unsigned long arg) {
   }
 
   timeout_iterator_free(iter);
+  mod_timer(&p->stats_ev, jiffies + timeval_to_jiffies(&p->stats_interval));
 }
 
 struct evproposer *evproposer_init_internal(int id, struct evpaxos_config *c,
@@ -179,11 +182,9 @@ struct evproposer *evproposer_init_internal(int id, struct evpaxos_config *c,
   peers_subscribe(peers, PAXOS_ACCEPTOR_STATE, evproposer_handle_acceptor_state,
                   p);
 
-  // TODO check timeout
-  // k->timer_cb[PROP_TIM] = evproposer_check_timeouts;
-  // k->data[PROP_TIM] = (unsigned long)p;
-  // k->timeout_jiffies[PROP_TIM] =
-  //     msecs_to_jiffies(paxos_config.proposer_timeout * 1000);
+  setup_timer(&p->stats_ev, evproposer_check_timeouts, (unsigned long)p);
+  p->stats_interval = (struct timeval){paxos_config.proposer_timeout, 0};
+  mod_timer(&p->stats_ev, jiffies + timeval_to_jiffies(&p->stats_interval));
 
   p->state = proposer_new(p->id, acceptor_count);
   p->peers = peers;
@@ -203,7 +204,6 @@ struct evproposer *evproposer_init(int id, char *if_name) {
     return NULL;
   }
 
-  // eth_address *my_addr = evpaxos_proposer_address(config, id);
   struct peers *peers = peers_new(config, id, if_name);
   if (peers == NULL) {
     return NULL;
@@ -217,6 +217,7 @@ struct evproposer *evproposer_init(int id, char *if_name) {
 
 void evproposer_free_internal(struct evproposer *p) {
   proposer_free(p->state);
+  del_timer(&p->stats_ev);
   kfree(p);
 }
 

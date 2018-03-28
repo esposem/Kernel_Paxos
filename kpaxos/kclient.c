@@ -160,7 +160,6 @@ static struct client *make_client(int proposer_id, int outstanding,
 
 static void client_free(struct client *c) {
   del_timer(&c->stats_ev);
-
   kfree(c->send_buffer);
   if (c->learner)
     evlearner_free(c->learner);
@@ -178,9 +177,9 @@ static int __init init_client(void) {
 
 static void __exit client_exit(void) {
   if (c != NULL) {
-    del_timer(&c->stats_ev);
     client_free(c);
   }
+  printk("Module unloaded\n\n");
 }
 
 module_init(init_client) module_exit(client_exit) MODULE_LICENSE("GPL");

@@ -36,6 +36,8 @@ struct evlearner {
   deliver_function delfun; /* Delivery callback */
   void *delarg;            /* The argument to the delivery callback */
   struct peers *acceptors; /* Connections to acceptors */
+  struct timer_list stats_ev;
+  struct timeval stats_interval;
 };
 
 struct net_device *get_learn_dev(struct evlearner *ev) {
@@ -69,6 +71,7 @@ static void evlearner_check_holes(unsigned long arg) {
     paxos_log_info("Missing some ok, resending");
     peers_foreach_acceptor(l->acceptors, peer_send_hi, NULL);
   }
+  mod_timer(&l->stats_ev, jiffies + timeval_to_jiffies(&l->stats_interval));
 }
 
 static void evlearner_deliver_next_closed(struct evlearner *l) {
@@ -118,11 +121,11 @@ struct evlearner *evlearner_init_internal(struct evpaxos_config *config,
   paxos_log_debug("Learner: Sent HI to all acceptors");
   peers_foreach_acceptor(peers, peer_send_hi, NULL);
 
-  // TODO fix this
-  // k->timer_cb[LEA_TIM] = evlearner_check_holes;
-  // k->data[LEA_TIM] = (unsigned long)learner;
-  // k->timeout_jiffies[LEA_TIM] = msecs_to_jiffies(100);
-
+  setup_timer(&learner->stats_ev, evlearner_check_holes,
+              (unsigned long)learner);
+  learner->stats_interval = (struct timeval){0, 100000}; // 100 ms
+  mod_timer(&learner->stats_ev,
+            jiffies + timeval_to_jiffies(&learner->stats_interval));
   return learner;
 }
 
@@ -146,6 +149,7 @@ struct evlearner *evlearner_init(deliver_function f, void *arg, char *if_name) {
 
 void evlearner_free_internal(struct evlearner *l) {
   learner_free(l->state);
+  del_timer(&l->stats_ev);
   kfree(l);
 }
 
