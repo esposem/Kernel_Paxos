@@ -104,7 +104,7 @@ void paxos_log_debug(const char* format, ...);
 	The proposers must be started with different IDs.
 	This number MUST be a power of 10.
 */
-#define MAX_N_OF_PROPOSERS 10
+#define MAX_N_OF_PROPOSERS 100
 // #define MAX_N_OF_LEARNERS 10
 
 #ifdef __cplusplus

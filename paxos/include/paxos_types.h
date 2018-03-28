@@ -32,7 +32,7 @@
 #include <linux/types.h>
 
 
-typedef unsigned char msgpack_packer;
+typedef char msgpack_packer;
 
 struct paxos_value
 {

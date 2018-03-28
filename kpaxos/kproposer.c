@@ -1,68 +1,42 @@
-#include <linux/module.h>
+#include <asm/atomic.h>
 #include <linux/init.h>
 #include <linux/kthread.h>
-#include <linux/udp.h>
-#include <asm/atomic.h>
+#include <linux/module.h>
 #include <linux/time.h>
+#include <linux/udp.h>
 #include <net/sock.h>
 
 #include "evpaxos.h"
-#include "kernel_udp.h"
 
-static udp_service * kproposer;
-static struct evproposer* prop = NULL;
+static char *if_name = "enp0s3";
+module_param(if_name, charp, 0000);
+MODULE_PARM_DESC(if_name, "The interface name, default enp0s3");
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
-MODULE_PARM_DESC(id,"The proposer id, default 0");
+MODULE_PARM_DESC(id, "The proposer id, default 0");
 
-static void
-start_proposer(int id)
-{
-	prop = evproposer_init(id, kproposer);
-	if (prop == NULL) {
-		printk(KERN_ERR "%s Could not start the proposer!", kproposer->name);
-	}else{
-		paxos_proposer_listen(kproposer, prop);
-		evproposer_free(prop);
-	}
+static struct evproposer *prop = NULL;
+
+static void start_proposer(int id) {
+  prop = evproposer_init(id, if_name);
+  if (prop == NULL) {
+    printk(KERN_ERR "Could not start the proposer\n");
+  }
 }
 
-static int run_proposer(void)
-{
+static int __init init_prop(void) {
   start_proposer(id);
-	atomic_set(&kproposer->thread_running, 0);
   return 0;
 }
 
-static void start_prop_thread(void){
-  kproposer->u_thread = kthread_run((void *)run_proposer, NULL, kproposer->name);
-  if(kproposer->u_thread >= 0){
-    atomic_set(&kproposer->thread_running,1);
-    printk(KERN_INFO "%s Thread running", kproposer->name);
-  }else{
-    printk(KERN_ERR "%s Error in starting thread", kproposer->name);
-  }
+static void __exit prop_exit(void) {
+  if (prop != NULL)
+    evproposer_free(prop);
+  printk("Module unloaded\n\n");
 }
 
-static int __init init_prop(void)
-{
-  kproposer = kmalloc(sizeof(udp_service), GFP_ATOMIC | __GFP_REPEAT);
-  if(!kproposer){
-    printk(KERN_ERR "Failed to initialize server");
-  }else{
-    init_service(kproposer, "Proposer", id);
-    start_prop_thread();
-  }
-  return 0;
-}
-
-static void __exit prop_exit(void)
-{
-  udp_server_quit(kproposer);
-}
-
-module_init(init_prop)
-module_exit(prop_exit)
+module_init(init_prop);
+module_exit(prop_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

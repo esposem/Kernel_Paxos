@@ -1,4 +1,4 @@
-PAX_OBJ= kpaxos/kernel_udp.o \
+PAX_OBJ= \
 paxos/carray.o \
 paxos/paxos.o \
 paxos/quorum.o \
@@ -8,7 +8,8 @@ paxos/storage.o \
 evpaxos/message.o \
 evpaxos/paxos_types_pack.o \
 evpaxos/config.o \
-evpaxos/peers.o
+evpaxos/peers.o \
+evpaxos/eth.o
 
 CL_OBJ= \
 kpaxos/kclient.o \
@@ -49,45 +50,33 @@ REP_OBJ= \
 
 ########################################### MODIFY HERE ###########
 obj-m += \
-kclient0.o \
-kclient1.o \
-kclient2.o \
-kacceptor0.o \
-kacceptor1.o \
-kacceptor2.o \
-kproposer0.o \
-klearner0.o \
-klearner1.o \
-klearner2.o \
-klearner3.o \
-klearner4.o \
-kreplica0.o \
-kreplica1.o \
-kreplica2.o #\
-kproposer1.o \
-kproposer2.o
+kproposer.o \
+klearner.o \
+kacceptor.o \
+kreplica.o \
+kclient.o
 
-kclient0-y:= $(CL_OBJ)
-kclient1-y:= $(CL_OBJ)
-kclient2-y:= $(CL_OBJ)
+kclient-y:= $(CL_OBJ)
+# kclient1-y:= $(CL_OBJ)
+# kclient2-y:= $(CL_OBJ)
 
-kproposer0-y:= $(PROP_OBJ)
+kproposer-y:= $(PROP_OBJ)
 # kproposer1-y:= $(PROP_OBJ)
 # kproposer2-y:= $(PROP_OBJ)
 
-kacceptor0-y:= $(ACC_OBJ)
-kacceptor1-y:= $(ACC_OBJ)
-kacceptor2-y:= $(ACC_OBJ)
-
-klearner0-y:= $(LEARN_OBJ)
-klearner1-y:= $(LEARN_OBJ)
-klearner2-y:= $(LEARN_OBJ)
-klearner3-y:= $(LEARN_OBJ)
-klearner4-y:= $(LEARN_OBJ)
-
-kreplica0-y:= $(REP_OBJ)
-kreplica1-y:= $(REP_OBJ)
-kreplica2-y:= $(REP_OBJ)
+kacceptor-y:= $(ACC_OBJ)
+# kacceptor1-y:= $(ACC_OBJ)
+# kacceptor2-y:= $(ACC_OBJ)
+#
+klearner-y:= $(LEARN_OBJ)
+# klearner1-y:= $(LEARN_OBJ)
+# klearner2-y:= $(LEARN_OBJ)
+# klearner3-y:= $(LEARN_OBJ)
+# klearner4-y:= $(LEARN_OBJ)
+#
+kreplica-y:= $(REP_OBJ)
+# kreplica1-y:= $(REP_OBJ)
+# kreplica2-y:= $(REP_OBJ)
 ##############################################################
 C_COMP:= -std=c99
 G_COMP:= -std=gnu99
@@ -99,7 +88,8 @@ ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -O2
 
 LFLAGS = -levent -I /usr/local/include -L /usr/local/lib
 
-all: user_app
+# user_app
+all:
 	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 user_udp.o: kpaxos/user_udp.c
