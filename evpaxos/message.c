@@ -35,10 +35,7 @@ void send_paxos_message(struct net_device *dev, eth_address *addr,
                         paxos_message *msg) {
   msgpack_packer *packer;
   long size_msg = msgpack_pack_paxos_message(&packer, msg);
-  int num = msg->type;
-  char hex[5];
-  sprintf(hex, "%x", num);
-  eth_send(dev, addr, (uint16_t)*hex, packer, size_msg);
+  eth_send(dev, addr, (uint16_t)msg->type, packer, size_msg);
   kfree(packer);
 }
 
@@ -75,48 +72,53 @@ void send_paxos_prepare(struct net_device *dev, eth_address *addr,
   paxos_message msg = {.type = PAXOS_PREPARE, .u.prepare = *pp};
 
   send_paxos_message(dev, addr, &msg);
-  printk("Proposer: Send prepare for iid %d ballot %d\n", pp->iid, pp->ballot);
+  paxos_log_debug("Proposer: Send prepare for iid %d ballot %d", pp->iid,
+                  pp->ballot);
 }
 
 void send_paxos_promise(struct net_device *dev, eth_address *addr,
                         paxos_promise *p) {
   paxos_message msg = {.type = PAXOS_PROMISE, .u.promise = *p};
   send_paxos_message(dev, addr, &msg);
-  printk("Acceptor: Send promise for iid %d ballot %d\n", p->iid, p->ballot);
+  paxos_log_debug("Acceptor: Send promise for iid %d ballot %d", p->iid,
+                  p->ballot);
 }
 
 void send_paxos_accept(struct net_device *dev, eth_address *addr,
                        paxos_accept *pa) {
   paxos_message msg = {.type = PAXOS_ACCEPT, .u.accept = *pa};
   send_paxos_message(dev, addr, &msg);
-  printk("Proposer: Send accept for iid %d ballot %d\n", pa->iid, pa->ballot);
+  paxos_log_debug("Proposer: Send accept for iid %d ballot %d", pa->iid,
+                  pa->ballot);
 }
 
 void send_paxos_accepted(struct net_device *dev, eth_address *addr,
                          paxos_accepted *p) {
   paxos_message msg = {.type = PAXOS_ACCEPTED, .u.accepted = *p};
   send_paxos_message(dev, addr, &msg);
-  printk("Acceptor: Send accepted for inst %d ballot %d\n", p->iid, p->ballot);
+  paxos_log_debug("Acceptor: Send accepted for inst %d ballot %d", p->iid,
+                  p->ballot);
 }
 
 void send_paxos_preempted(struct net_device *dev, eth_address *addr,
                           paxos_preempted *p) {
   paxos_message msg = {.type = PAXOS_PREEMPTED, .u.preempted = *p};
   send_paxos_message(dev, addr, &msg);
-  printk("Acceptor Send preempted for inst %d ballot %d\n", p->iid, p->ballot);
+  paxos_log_debug("Acceptor Send preempted for inst %d ballot %d", p->iid,
+                  p->ballot);
 }
 
 void send_paxos_repeat(struct net_device *dev, eth_address *addr,
                        paxos_repeat *p) {
   paxos_message msg = {.type = PAXOS_REPEAT, .u.repeat = *p};
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send repeat for inst %d-%d\n", p->from, p->to);
+  paxos_log_debug("Learner: Send repeat for inst %d-%d", p->from, p->to);
 }
 
 void send_paxos_trim(struct net_device *dev, eth_address *addr, paxos_trim *t) {
   paxos_message msg = {.type = PAXOS_TRIM, .u.trim = *t};
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send trim for inst %d\n", t->iid);
+  paxos_log_debug("Learner: Send trim for inst %d", t->iid);
 }
 
 void paxos_submit(struct net_device *dev, eth_address *addr, char *data,
