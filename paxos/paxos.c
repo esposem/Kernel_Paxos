@@ -111,13 +111,13 @@ void paxos_log(int level, const char *format, va_list ap) {
   vsnprintf(msg + off, sizeof(msg) - off, format, ap);
   switch (level) {
   case PAXOS_LOG_ERROR:
-    printk(KERN_ERR "%s", msg);
+    printk(KERN_ERR "%s\n", msg);
     break;
   case PAXOS_LOG_INFO:
-    printk("%s", msg);
+    printk("%s\n", msg);
     break;
   case PAXOS_LOG_DEBUG:
-    printk(KERN_INFO "%s", msg);
+    printk(KERN_INFO "%s\n", msg);
     break;
   }
 }

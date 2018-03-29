@@ -291,10 +291,7 @@ void peers_delete_learner(struct peers *p, eth_address *addr) {
 
 void peers_subscribe(struct peers *p, paxos_message_type type, peer_cb cb,
                      void *arg) {
-  int num = type;
-  char hex[5];
-  sprintf(hex, "%x", num);
-  eth_listen(p->dev, (uint16_t)*hex, cb, arg);
+  eth_listen(p->dev, (uint16_t)type, cb, arg);
 }
 
 static struct peer *make_peer(struct peers *peers, int id, eth_address *addr) {

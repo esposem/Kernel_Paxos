@@ -132,18 +132,18 @@ typedef struct paxos_acceptor_ok paxos_acceptor_ok;
 
 enum paxos_message_type
 {
-	PAXOS_PREPARE,
-	PAXOS_PROMISE,
-	PAXOS_ACCEPT,
-	PAXOS_ACCEPTED,
-	PAXOS_PREEMPTED,
-	PAXOS_REPEAT,
-	PAXOS_TRIM,
-	PAXOS_ACCEPTOR_STATE,
-	PAXOS_CLIENT_VALUE,
-	PAXOS_LEARNER_HI,
-	PAXOS_LEARNER_DEL,
-	PAXOS_ACCEPTOR_OK
+	PAXOS_PREPARE = 0xcafa,
+	PAXOS_PROMISE = 0xcafb,
+	PAXOS_ACCEPT = 0xcafc,
+	PAXOS_ACCEPTED = 0xcafd,
+	PAXOS_PREEMPTED = 0xcafe,
+	PAXOS_REPEAT = 0xcaff,
+	PAXOS_TRIM = 0xcb01,
+	PAXOS_ACCEPTOR_STATE = 0xcb02,
+	PAXOS_CLIENT_VALUE = 0xcb03,
+	PAXOS_LEARNER_HI = 0xcb04,
+	PAXOS_LEARNER_DEL = 0xcb05,
+	PAXOS_ACCEPTOR_OK = 0xcb06
 };
 typedef enum paxos_message_type paxos_message_type;
 
