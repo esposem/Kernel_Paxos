@@ -72,9 +72,8 @@ static int packet_recv(struct sk_buff *skb, struct net_device *dev,
       // goto free_skb;
     }
   }
-  printk(KERN_ERR "no callback for protocol number %d %d %d %d %d %d ", proto,
-         PAXOS_PROMISE, PAXOS_ACCEPTED, PAXOS_PREEMPTED, PAXOS_CLIENT_VALUE,
-         PAXOS_ACCEPTOR_STATE);
+  if (i == cbs_count)
+    printk(KERN_ERR "no callback for protocol number %d\n", ntohs(proto));
   // free_skb:
   kfree_skb(skb);
   kfree(data);
