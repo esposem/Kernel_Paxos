@@ -97,7 +97,7 @@ static void evlearner_handle_accepted(paxos_message *msg, void *arg,
 
 static void evlearner_handle_ok(paxos_message *msg, void *arg,
                                 eth_address *src) {
-  paxos_log_info("Learner: Received PAXOS_ACCEPTOR_OK");
+  printk("Learner: Received PAXOS_ACCEPTOR_OK");
   struct evlearner *ev = (struct evlearner *)arg;
   peers_update_ok(ev->acceptors, src);
 }
