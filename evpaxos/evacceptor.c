@@ -174,6 +174,8 @@ struct evacceptor *evacceptor_init(int id, char *if_name) {
   }
 
   struct peers *peers = peers_new(config, id, if_name);
+  if (peers == NULL)
+    return NULL;
   printall(peers, "Acceptor");
   struct evacceptor *acceptor = evacceptor_init_internal(id, config, peers);
   evpaxos_config_free(config);

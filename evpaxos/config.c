@@ -92,7 +92,7 @@ unsigned int inet_addr(char *str) {
 struct evpaxos_config *evpaxos_config_read(void) {
 #if 1
   int size_config = 7;
-  char *config_file[] = {"acceptor 0 ff:ff:ff:ff:ff:ff",
+  char *config_file[] = {"acceptor 0 00:24:81:b4:3c:c",
                          "acceptor 1 ff:ff:ff:ff:ff:ff",
                          "acceptor 2 ff:ff:ff:ff:ff:ff",
                          "proposer 0 ff:ff:ff:ff:ff:ff",
