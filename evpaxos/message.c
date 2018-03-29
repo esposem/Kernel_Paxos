@@ -54,7 +54,7 @@ void send_paxos_acceptor_ok(struct net_device *dev, eth_address *addr,
                        .u.learner_hi.value.paxos_value_len = 0,
                        .u.learner_hi.value.paxos_value_val = NULL};
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send ok to the learners\n");
+  printk("Learner: Send ok to the learner\n");
 }
 
 void send_paxos_learner_del(struct net_device *dev, eth_address *addr,

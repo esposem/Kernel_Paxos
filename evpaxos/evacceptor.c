@@ -110,10 +110,12 @@ static void evacceptor_handle_trim(paxos_message *msg, void *arg,
 
 static void evacceptor_handle_hi(paxos_message *msg, void *arg,
                                  eth_address *src) {
-  printk("Acceptor: Received PAXOS_LEARNER_HI. Sending OK\n");
+
   struct evacceptor *a = (struct evacceptor *)arg;
-  if (add_or_update_client(src, a->peers))
+  if (add_or_update_client(src, a->peers)) {
+    printk("Acceptor: Received PAXOS_LEARNER_HI. Sending OK\n");
     send_paxos_acceptor_ok(get_dev(a->peers), src, NULL);
+  }
 }
 
 static void evacceptor_handle_del(paxos_message *msg, void *arg,
