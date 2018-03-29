@@ -48,7 +48,7 @@ void send_paxos_learner_hi(struct net_device *dev, eth_address *addr,
                        .u.learner_hi.value.paxos_value_len = 0,
                        .u.learner_hi.value.paxos_value_val = NULL};
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send hi to the acceptors");
+  printk("Learner: Send hi to the acceptors\n");
 }
 
 void send_paxos_acceptor_ok(struct net_device *dev, eth_address *addr,
@@ -57,7 +57,7 @@ void send_paxos_acceptor_ok(struct net_device *dev, eth_address *addr,
                        .u.learner_hi.value.paxos_value_len = 0,
                        .u.learner_hi.value.paxos_value_val = NULL};
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send ok to the learners");
+  printk("Learner: Send ok to the learners\n");
 }
 
 void send_paxos_learner_del(struct net_device *dev, eth_address *addr,
@@ -66,7 +66,7 @@ void send_paxos_learner_del(struct net_device *dev, eth_address *addr,
                        .u.learner_del.value.paxos_value_len = 0,
                        .u.learner_del.value.paxos_value_val = NULL};
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send del to the acceptors");
+  printk("Learner: Send del to the acceptors\n");
 }
 
 void send_paxos_prepare(struct net_device *dev, eth_address *addr,
@@ -75,48 +75,48 @@ void send_paxos_prepare(struct net_device *dev, eth_address *addr,
   paxos_message msg = {.type = PAXOS_PREPARE, .u.prepare = *pp};
 
   send_paxos_message(dev, addr, &msg);
-  printk("Proposer: Send prepare for iid %d ballot %d", pp->iid, pp->ballot);
+  printk("Proposer: Send prepare for iid %d ballot %d\n", pp->iid, pp->ballot);
 }
 
 void send_paxos_promise(struct net_device *dev, eth_address *addr,
                         paxos_promise *p) {
   paxos_message msg = {.type = PAXOS_PROMISE, .u.promise = *p};
   send_paxos_message(dev, addr, &msg);
-  printk("Acceptor: Send promise for iid %d ballot %d", p->iid, p->ballot);
+  printk("Acceptor: Send promise for iid %d ballot %d\n", p->iid, p->ballot);
 }
 
 void send_paxos_accept(struct net_device *dev, eth_address *addr,
                        paxos_accept *pa) {
   paxos_message msg = {.type = PAXOS_ACCEPT, .u.accept = *pa};
   send_paxos_message(dev, addr, &msg);
-  printk("Proposer: Send accept for iid %d ballot %d", pa->iid, pa->ballot);
+  printk("Proposer: Send accept for iid %d ballot %d\n", pa->iid, pa->ballot);
 }
 
 void send_paxos_accepted(struct net_device *dev, eth_address *addr,
                          paxos_accepted *p) {
   paxos_message msg = {.type = PAXOS_ACCEPTED, .u.accepted = *p};
   send_paxos_message(dev, addr, &msg);
-  printk("Acceptor: Send accepted for inst %d ballot %d", p->iid, p->ballot);
+  printk("Acceptor: Send accepted for inst %d ballot %d\n", p->iid, p->ballot);
 }
 
 void send_paxos_preempted(struct net_device *dev, eth_address *addr,
                           paxos_preempted *p) {
   paxos_message msg = {.type = PAXOS_PREEMPTED, .u.preempted = *p};
   send_paxos_message(dev, addr, &msg);
-  printk("Acceptor Send preempted for inst %d ballot %d", p->iid, p->ballot);
+  printk("Acceptor Send preempted for inst %d ballot %d\n", p->iid, p->ballot);
 }
 
 void send_paxos_repeat(struct net_device *dev, eth_address *addr,
                        paxos_repeat *p) {
   paxos_message msg = {.type = PAXOS_REPEAT, .u.repeat = *p};
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send repeat for inst %d-%d", p->from, p->to);
+  printk("Learner: Send repeat for inst %d-%d\n", p->from, p->to);
 }
 
 void send_paxos_trim(struct net_device *dev, eth_address *addr, paxos_trim *t) {
   paxos_message msg = {.type = PAXOS_TRIM, .u.trim = *t};
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send trim for inst %d", t->iid);
+  printk("Learner: Send trim for inst %d\n", t->iid);
 }
 
 void paxos_submit(struct net_device *dev, eth_address *addr, char *data,
@@ -125,7 +125,7 @@ void paxos_submit(struct net_device *dev, eth_address *addr, char *data,
                        .u.client_value.value.paxos_value_len = size,
                        .u.client_value.value.paxos_value_val = data};
   send_paxos_message(dev, addr, &msg);
-  printk("Client: Sent client value");
+  printk("Client: Sent client value\n");
 }
 
 int recv_paxos_message(paxos_message *out, paxos_message_type p, char *data,
