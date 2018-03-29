@@ -77,6 +77,7 @@ struct peers *peers_new(struct evpaxos_config *config, int id, char *if_name) {
   p->dev = eth_init(if_name);
   if (p->dev == NULL) {
     printk(KERN_ERR "Interface not found: %s.", if_name);
+    kfree(p);
     return NULL;
   }
   p->me_send = make_peer(p, id, p->dev->dev_addr);
