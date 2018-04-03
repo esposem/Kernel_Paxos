@@ -37,7 +37,7 @@ extern "C" {
 
 struct evpaxos_config;
 
-struct evpaxos_config* evpaxos_config_read(void);
+struct evpaxos_config* evpaxos_config_read(char * name);
 void evpaxos_config_free(struct evpaxos_config* config);
 eth_address * evpaxos_proposer_address(struct evpaxos_config* c, int i);
 int evpaxos_proposer_listen_port(struct evpaxos_config* c, int i);

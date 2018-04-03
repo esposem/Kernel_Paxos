@@ -29,33 +29,39 @@
 #include "message.h"
 #include <linux/slab.h>
 
-struct evpaxos_replica {
-  struct peers *peers;
-  struct evlearner *learner;
-  struct evproposer *proposer;
-  struct evacceptor *acceptor;
-  deliver_function deliver;
-  void *arg;
+struct evpaxos_replica
+{
+  struct peers*      peers;
+  struct evlearner*  learner;
+  struct evproposer* proposer;
+  struct evacceptor* acceptor;
+  deliver_function   deliver;
+  void*              arg;
 };
 
-static void evpaxos_replica_deliver(unsigned iid, char *value, size_t size,
-                                    void *arg) {
-  struct evpaxos_replica *r = arg;
+static void
+evpaxos_replica_deliver(unsigned iid, char* value, size_t size, void* arg)
+{
+  struct evpaxos_replica* r = arg;
   evproposer_set_instance_id(r->proposer, iid);
   if (r->deliver) {
     r->deliver(iid, value, size, r->arg);
   }
 }
 
-struct evpaxos_replica *evpaxos_replica_init(int id, deliver_function f,
-                                             void *arg, char *if_name) {
-  struct evpaxos_replica *r;
-  struct evpaxos_config *config;
+struct evpaxos_replica*
+evpaxos_replica_init(int id, deliver_function f, void* arg, char* if_name,
+                     char* path)
+{
+  struct evpaxos_replica* r;
+  struct evpaxos_config*  config;
   r = pmalloc(sizeof(struct evpaxos_replica));
   if (r == NULL) {
     return NULL;
   }
-  config = evpaxos_config_read();
+  config = evpaxos_config_read(path);
+  if (config == NULL)
+    return NULL;
 
   r->peers = peers_new(config, id, if_name);
   if (r->peers == NULL)
@@ -66,13 +72,15 @@ struct evpaxos_replica *evpaxos_replica_init(int id, deliver_function f,
   r->acceptor = evacceptor_init_internal(id, config, r->peers);
   r->proposer = evproposer_init_internal(id, config, r->peers);
   r->learner =
-      evlearner_init_internal(config, r->peers, evpaxos_replica_deliver, r);
+    evlearner_init_internal(config, r->peers, evpaxos_replica_deliver, r);
   r->arg = arg;
   evpaxos_config_free(config);
   return r;
 }
 
-void evpaxos_replica_free(struct evpaxos_replica *r) {
+void
+evpaxos_replica_free(struct evpaxos_replica* r)
+{
   printall(r->peers, "REPLICA");
   if (r->learner)
     evlearner_free_internal(r->learner);
@@ -85,22 +93,30 @@ void evpaxos_replica_free(struct evpaxos_replica *r) {
   kfree(r);
 }
 
-void evpaxos_replica_set_instance_id(struct evpaxos_replica *r, unsigned iid) {
+void
+evpaxos_replica_set_instance_id(struct evpaxos_replica* r, unsigned iid)
+{
   if (r->learner)
     evlearner_set_instance_id(r->learner, iid);
   evproposer_set_instance_id(r->proposer, iid);
 }
 
-static void peer_send_trim(struct net_device *dev, struct peer *p, void *arg) {
+static void
+peer_send_trim(struct net_device* dev, struct peer* p, void* arg)
+{
   send_paxos_trim(dev, get_addr(p), arg);
 }
 
-void evpaxos_replica_send_trim(struct evpaxos_replica *r, unsigned iid) {
-  paxos_trim trim = {iid};
+void
+evpaxos_replica_send_trim(struct evpaxos_replica* r, unsigned iid)
+{
+  paxos_trim trim = { iid };
   peers_foreach_acceptor(r->peers, peer_send_trim, &trim);
 }
 
-void evpaxos_replica_internal_trim(struct evpaxos_replica *r, unsigned iid) {
+void
+evpaxos_replica_internal_trim(struct evpaxos_replica* r, unsigned iid)
+{
   evlearner_auto_trim(r->learner, iid);
 }
 
@@ -115,6 +131,8 @@ void evpaxos_replica_internal_trim(struct evpaxos_replica *r, unsigned iid) {
 //   }
 // }
 
-int evpaxos_replica_count(struct evpaxos_replica *r) {
+int
+evpaxos_replica_count(struct evpaxos_replica* r)
+{
   return peers_count(r->peers);
 }

@@ -8,29 +8,39 @@
 
 #include "evpaxos.h"
 
-static char *if_name = "enp0s3";
+static char* if_name = "enp1s0";
 module_param(if_name, charp, 0000);
-MODULE_PARM_DESC(if_name, "The interface name, default enp0s3");
+MODULE_PARM_DESC(if_name, "The interface name, default enp1s0");
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
 MODULE_PARM_DESC(id, "The proposer id, default 0");
 
-static struct evproposer *prop = NULL;
+static char* path = "./paxos.conf";
+module_param(path, charp, S_IRUGO);
+MODULE_PARM_DESC(path, "The config file position, default ./paxos.conf");
 
-static void start_proposer(int id) {
-  prop = evproposer_init(id, if_name);
+static struct evproposer* prop = NULL;
+
+static void
+start_proposer(int id)
+{
+  prop = evproposer_init(id, if_name, path);
   if (prop == NULL) {
     printk(KERN_ERR "Could not start the proposer\n");
   }
 }
 
-static int __init init_prop(void) {
+static int __init
+           init_prop(void)
+{
   start_proposer(id);
   return 0;
 }
 
-static void __exit prop_exit(void) {
+static void __exit
+            prop_exit(void)
+{
   if (prop != NULL)
     evproposer_free(prop);
   printk("Module unloaded\n\n");
