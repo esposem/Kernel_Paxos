@@ -9,7 +9,8 @@ evpaxos/message.o \
 evpaxos/paxos_types_pack.o \
 evpaxos/config.o \
 evpaxos/peers.o \
-evpaxos/eth.o
+evpaxos/eth.o \
+kpaxos/kfile.o
 
 CL_OBJ= \
 kpaxos/kclient.o \

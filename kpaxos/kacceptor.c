@@ -8,29 +8,39 @@
 
 #include "evpaxos.h"
 
-static char *if_name = "enp0s3";
+static char* if_name = "enp1s0";
 module_param(if_name, charp, 0000);
-MODULE_PARM_DESC(if_name, "The interface name, default enp0s3");
+MODULE_PARM_DESC(if_name, "The interface name, default enp1s0");
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
 MODULE_PARM_DESC(id, "The acceptor id, default 0");
 
-static struct evacceptor *acc = NULL;
+static char* path = "./paxos.conf";
+module_param(path, charp, S_IRUGO);
+MODULE_PARM_DESC(path, "The config file position, default ./paxos.conf");
 
-static void start_acceptor(int id) {
-  acc = evacceptor_init(id, if_name);
+static struct evacceptor* acc = NULL;
+
+static void
+start_acceptor(int id)
+{
+  acc = evacceptor_init(id, if_name, path);
   if (acc == NULL) {
     printk(KERN_ERR "Could not start the acceptor\n");
   }
 }
 
-static int __init init_acceptor(void) {
+static int __init
+           init_acceptor(void)
+{
   start_acceptor(id);
   return 0;
 }
 
-static void __exit acceptor_exit(void) {
+static void __exit
+            acceptor_exit(void)
+{
   if (acc != NULL)
     evacceptor_free(acc);
   printk("Module unloaded\n\n");

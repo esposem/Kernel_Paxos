@@ -53,6 +53,7 @@ int eth_listen(struct net_device *dev, uint16_t proto, peer_cb cb, void *arg) {
 static int packet_recv(struct sk_buff *skb, struct net_device *dev,
                        struct packet_type *pt, struct net_device *src_dev) {
   int i;
+  int found = 0;
   uint16_t proto = skb->protocol;
   struct ethhdr *eth = eth_hdr(skb);
   char *data = pmalloc(ETH_FRAME_LEN - ETH_HLEN);
@@ -64,15 +65,15 @@ static int packet_recv(struct sk_buff *skb, struct net_device *dev,
   for (i = 0; i < cbs_count; ++i) {
     if (cbs[i].pt.type == proto) {
       paxos_message msg;
-      recv_paxos_message(&msg, (paxos_message_type)proto, data, len);
-      // if arg is NULL, write the source address, otherwise the arg
+      recv_paxos_message(&msg, (paxos_message_type)ntohs(proto), data, len);
       cbs[i].cb(&msg, cbs[i].arg, eth->h_source);
       paxos_message_destroy(&msg);
+      found++;
       // cbs[i].cb(dev, eth->h_source, data, len);
       // goto free_skb;
     }
   }
-  if (i == cbs_count)
+  if (!found)
     printk(KERN_ERR "no callback for protocol number %d\n", ntohs(proto));
   // free_skb:
   kfree_skb(skb);

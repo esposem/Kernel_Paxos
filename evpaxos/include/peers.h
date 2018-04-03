@@ -56,7 +56,7 @@ void add_acceptors_from_config(int myid, struct peers * p);
 void printall(struct peers * p, char * name);
 int add_or_update_client(eth_address *addr, struct peers *p);
 int peer_get_id(struct peer* p);
-void peer_send_del(struct peer *p, void *arg);
+void peer_send_del(struct net_device* dev, struct peer* p, void* arg);
 struct net_device *get_dev(struct peers *p);
 int peers_missing_ok(struct peers * p);
 void peers_update_ok(struct peers * p, eth_address * addr);

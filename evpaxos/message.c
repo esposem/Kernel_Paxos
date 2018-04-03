@@ -31,106 +31,126 @@
 
 #include <linux/slab.h>
 
-void send_paxos_message(struct net_device *dev, eth_address *addr,
-                        paxos_message *msg) {
-  msgpack_packer *packer;
-  long size_msg = msgpack_pack_paxos_message(&packer, msg);
+void
+send_paxos_message(struct net_device* dev, eth_address* addr,
+                   paxos_message* msg)
+{
+  msgpack_packer* packer;
+  long            size_msg = msgpack_pack_paxos_message(&packer, msg);
   eth_send(dev, addr, (uint16_t)msg->type, packer, size_msg);
   kfree(packer);
 }
 
-void send_paxos_learner_hi(struct net_device *dev, eth_address *addr,
-                           paxos_learner_hi *p) {
-  paxos_message msg = {.type = PAXOS_LEARNER_HI,
-                       .u.learner_hi.value.paxos_value_len = 0,
-                       .u.learner_hi.value.paxos_value_val = NULL};
+void
+send_paxos_learner_hi(struct net_device* dev, eth_address* addr,
+                      paxos_learner_hi* p)
+{
+  paxos_message msg = { .type = PAXOS_LEARNER_HI,
+                        .u.learner_hi.value.paxos_value_len = 0,
+                        .u.learner_hi.value.paxos_value_val = NULL };
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send hi to the acceptors\n");
+  paxos_log_debug("Learner: Send hi to the acceptors");
 }
 
-void send_paxos_acceptor_ok(struct net_device *dev, eth_address *addr,
-                            void *p) {
-  paxos_message msg = {.type = PAXOS_ACCEPTOR_OK,
-                       .u.learner_hi.value.paxos_value_len = 0,
-                       .u.learner_hi.value.paxos_value_val = NULL};
+void
+send_paxos_acceptor_ok(struct net_device* dev, eth_address* addr, void* p)
+{
+  paxos_message msg = { .type = PAXOS_ACCEPTOR_OK,
+                        .u.learner_hi.value.paxos_value_len = 0,
+                        .u.learner_hi.value.paxos_value_val = NULL };
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send ok to the learner\n");
+  paxos_log_debug("Acceptor: Send ok to the learner");
 }
 
-void send_paxos_learner_del(struct net_device *dev, eth_address *addr,
-                            paxos_learner_del *p) {
-  paxos_message msg = {.type = PAXOS_LEARNER_DEL,
-                       .u.learner_del.value.paxos_value_len = 0,
-                       .u.learner_del.value.paxos_value_val = NULL};
+void
+send_paxos_learner_del(struct net_device* dev, eth_address* addr,
+                       paxos_learner_del* p)
+{
+  paxos_message msg = { .type = PAXOS_LEARNER_DEL,
+                        .u.learner_del.value.paxos_value_len = 0,
+                        .u.learner_del.value.paxos_value_val = NULL };
   send_paxos_message(dev, addr, &msg);
-  printk("Learner: Send del to the acceptors\n");
+  paxos_log_debug("Learner: Send del to the acceptors");
 }
 
-void send_paxos_prepare(struct net_device *dev, eth_address *addr,
-                        paxos_prepare *pp) {
+void
+send_paxos_prepare(struct net_device* dev, eth_address* addr, paxos_prepare* pp)
+{
 
-  paxos_message msg = {.type = PAXOS_PREPARE, .u.prepare = *pp};
+  paxos_message msg = { .type = PAXOS_PREPARE, .u.prepare = *pp };
 
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Proposer: Send prepare for iid %d ballot %d", pp->iid,
                   pp->ballot);
 }
 
-void send_paxos_promise(struct net_device *dev, eth_address *addr,
-                        paxos_promise *p) {
-  paxos_message msg = {.type = PAXOS_PROMISE, .u.promise = *p};
+void
+send_paxos_promise(struct net_device* dev, eth_address* addr, paxos_promise* p)
+{
+  paxos_message msg = { .type = PAXOS_PROMISE, .u.promise = *p };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Acceptor: Send promise for iid %d ballot %d", p->iid,
                   p->ballot);
 }
 
-void send_paxos_accept(struct net_device *dev, eth_address *addr,
-                       paxos_accept *pa) {
-  paxos_message msg = {.type = PAXOS_ACCEPT, .u.accept = *pa};
+void
+send_paxos_accept(struct net_device* dev, eth_address* addr, paxos_accept* pa)
+{
+  paxos_message msg = { .type = PAXOS_ACCEPT, .u.accept = *pa };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Proposer: Send accept for iid %d ballot %d", pa->iid,
                   pa->ballot);
 }
 
-void send_paxos_accepted(struct net_device *dev, eth_address *addr,
-                         paxos_accepted *p) {
-  paxos_message msg = {.type = PAXOS_ACCEPTED, .u.accepted = *p};
+void
+send_paxos_accepted(struct net_device* dev, eth_address* addr,
+                    paxos_accepted* p)
+{
+  paxos_message msg = { .type = PAXOS_ACCEPTED, .u.accepted = *p };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Acceptor: Send accepted for inst %d ballot %d", p->iid,
                   p->ballot);
 }
 
-void send_paxos_preempted(struct net_device *dev, eth_address *addr,
-                          paxos_preempted *p) {
-  paxos_message msg = {.type = PAXOS_PREEMPTED, .u.preempted = *p};
+void
+send_paxos_preempted(struct net_device* dev, eth_address* addr,
+                     paxos_preempted* p)
+{
+  paxos_message msg = { .type = PAXOS_PREEMPTED, .u.preempted = *p };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Acceptor Send preempted for inst %d ballot %d", p->iid,
                   p->ballot);
 }
 
-void send_paxos_repeat(struct net_device *dev, eth_address *addr,
-                       paxos_repeat *p) {
-  paxos_message msg = {.type = PAXOS_REPEAT, .u.repeat = *p};
+void
+send_paxos_repeat(struct net_device* dev, eth_address* addr, paxos_repeat* p)
+{
+  paxos_message msg = { .type = PAXOS_REPEAT, .u.repeat = *p };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Learner: Send repeat for inst %d-%d", p->from, p->to);
 }
 
-void send_paxos_trim(struct net_device *dev, eth_address *addr, paxos_trim *t) {
-  paxos_message msg = {.type = PAXOS_TRIM, .u.trim = *t};
+void
+send_paxos_trim(struct net_device* dev, eth_address* addr, paxos_trim* t)
+{
+  paxos_message msg = { .type = PAXOS_TRIM, .u.trim = *t };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Learner: Send trim for inst %d", t->iid);
 }
 
-void paxos_submit(struct net_device *dev, eth_address *addr, char *data,
-                  int size) {
-  paxos_message msg = {.type = PAXOS_CLIENT_VALUE,
-                       .u.client_value.value.paxos_value_len = size,
-                       .u.client_value.value.paxos_value_val = data};
+void
+paxos_submit(struct net_device* dev, eth_address* addr, char* data, int size)
+{
+  paxos_message msg = { .type = PAXOS_CLIENT_VALUE,
+                        .u.client_value.value.paxos_value_len = size,
+                        .u.client_value.value.paxos_value_val = data };
   send_paxos_message(dev, addr, &msg);
-  printk("Client: Sent client value\n");
+  paxos_log_debug("Client: Sent client value");
 }
 
-int recv_paxos_message(paxos_message *out, paxos_message_type p, char *data,
-                       size_t size) {
+int
+recv_paxos_message(paxos_message* out, paxos_message_type p, char* data,
+                   size_t size)
+{
   return msgpack_unpack_paxos_message(data, out, size, p);
 }

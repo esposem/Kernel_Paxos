@@ -26,6 +26,7 @@
  */
 
 #include "evpaxos.h"
+#include "kfile.h"
 #include "paxos.h"
 
 #include <linux/ctype.h>
@@ -36,99 +37,125 @@
 #include <linux/unistd.h>
 #include <net/sock.h>
 
-struct address {
-  char *addr;
-  int port;
+struct address
+{
+  char* addr;
+  int   port;
 };
 
-struct evpaxos_config {
-  int proposers_count;
-  int acceptors_count;
-  eth_address *proposers[MAX_N_OF_PROPOSERS];
-  eth_address *acceptors[MAX_N_OF_PROPOSERS];
+struct evpaxos_config
+{
+  int          proposers_count;
+  int          acceptors_count;
+  eth_address* proposers[MAX_N_OF_PROPOSERS];
+  eth_address* acceptors[MAX_N_OF_PROPOSERS];
 };
 
-enum option_type {
+enum option_type
+{
   option_boolean,
   option_integer,
   option_string,
   option_verbosity,
 };
 
-struct option {
-  const char *name;
-  void *value;
+struct option
+{
+  const char*      name;
+  void*            value;
   enum option_type type;
 };
 
 struct option options[] = {
-    {"verbosity", &paxos_config.verbosity, option_verbosity},
-    {"tcp-nodelay", &paxos_config.tcp_nodelay, option_boolean},
-    {"learner-catch-up", &paxos_config.learner_catch_up, option_boolean},
-    {"proposer-timeout", &paxos_config.proposer_timeout, option_integer},
-    {"proposer-preexec-window", &paxos_config.proposer_preexec_window,
-     option_integer},
-    {"acceptor-trash-files", &paxos_config.trash_files, option_boolean},
-    {0}};
+  { "verbosity", &paxos_config.verbosity, option_verbosity },
+  { "tcp-nodelay", &paxos_config.tcp_nodelay, option_boolean },
+  { "learner-catch-up", &paxos_config.learner_catch_up, option_boolean },
+  { "proposer-timeout", &paxos_config.proposer_timeout, option_integer },
+  { "proposer-preexec-window", &paxos_config.proposer_preexec_window,
+    option_integer },
+  { "acceptor-trash-files", &paxos_config.trash_files, option_boolean },
+  { 0 }
+};
 
-static int parse_line(struct evpaxos_config *c, char *line);
-// static void address_init(struct address *a, char *addr, int port);
-static void address_free(eth_address *a);
-// static void address_copy(struct address *src, struct address *dst);
-// static struct sockaddr_in address_to_sockaddr(struct address *a);
-static int str_to_mac(const char *str, eth_address *daddr);
+static int  parse_line(struct evpaxos_config* c, char* line);
+static int  str_to_mac(const char* str, eth_address* daddr);
+static void address_free(eth_address* a);
 
-unsigned int inet_addr(char *str) {
-  int a, b, c, d;
+unsigned int
+inet_addr(char* str)
+{
+  int  a, b, c, d;
   char arr[4];
   sscanf(str, "%d.%d.%d.%d", &a, &b, &c, &d);
   arr[0] = a;
   arr[1] = b;
   arr[2] = c;
   arr[3] = d;
-  return *(unsigned int *)arr;
+  return *(unsigned int*)arr;
 }
 
-struct evpaxos_config *evpaxos_config_read(void) {
-#if 1
-  int size_config = 7;
-  char *config_file[] = {"acceptor 0 00:24:81:b4:3c:c8",
-                         "acceptor 1 ff:ff:ff:ff:ff:ff",
-                         "acceptor 2 ff:ff:ff:ff:ff:ff",
-                         "proposer 0 ff:ff:ff:ff:ff:ff",
-                         "proposer 1 ff:ff:ff:ff:ff:ff",
-                         "proposer 2 ff:ff:ff:ff:ff:ff",
-                         "verbosity quiet"};
-#else
-  int size_config = 4;
-  char *config_file[] = {"replica 0 127.0.0.3 3003", "replica 1 127.0.0.3 4003",
-                         "replica 2 127.0.0.3 5003", "verbosity quiet"};
-#endif
-
-  // 8(acceptor/proposer) + 1( ) + 2(0-10) + 1( )+ 17
-  // = 25
-  struct evpaxos_config *c = NULL;
+struct evpaxos_config*
+evpaxos_config_read(char* name)
+{
+  struct file*           f;
+  struct evpaxos_config* c = NULL;
 
   c = pmalloc(sizeof(struct evpaxos_config));
-  if (c) {
-    memset(c, 0, sizeof(struct evpaxos_config));
+  if (c == NULL)
+    return NULL;
+  memset(c, 0, sizeof(struct evpaxos_config));
 
-    char *line = pmalloc(25);
-    if (line) {
-      int i;
-      for (i = 0; i < size_config; i++) {
-        memset(line, 0, 25);
-        memcpy(line, config_file[i], strlen(config_file[i]) + 1);
+  int   SIZE_LINE = 512;
+  char* line = pmalloc(SIZE_LINE);
+  memset(line, 0, SIZE_LINE);
+
+  f = file_open(name, O_RDONLY, S_IRUSR | S_IRGRP);
+  if (line && f) {
+    int offset = 0, read = 0, line_pos = 0;
+
+    while ((read = file_read(f, offset, &(line[line_pos]), 1)) != 0) {
+      offset += read;
+
+      // if new line
+      if (line[line_pos] == '\n') {
+        line[line_pos] = '\0';
         parse_line(c, line);
+        memset(line, 0, SIZE_LINE);
+        line_pos = 0;
+        continue;
       }
-      kfree(line);
+
+      line_pos++;
+
+      // if comment or line too long
+      if (line_pos == SIZE_LINE || line[line_pos - 1] == '#') {
+        line_pos = 0;
+        char c;
+        // skip rest of the line
+        while ((read = file_read(f, offset, &c, 1)) != 0) {
+          offset += read;
+          if (c == '\n') {
+            break;
+          }
+        }
+      }
     }
-    return c;
+
+    // safety check in case the file does not end with \n
+    if (line_pos > 0) {
+      line[line_pos] = '\0';
+      parse_line(c, line);
+    }
+
+    kfree(line);
+    file_close(f);
   }
-  return NULL;
+  return c;
 }
 
-void evpaxos_config_free(struct evpaxos_config *config) {
+void
+evpaxos_config_free(struct evpaxos_config* config)
+{
   int i;
   for (i = 0; i < config->proposers_count; ++i)
     address_free(config->proposers[i]);
@@ -137,32 +164,34 @@ void evpaxos_config_free(struct evpaxos_config *config) {
   kfree(config);
 }
 
-eth_address *evpaxos_proposer_address(struct evpaxos_config *config, int i) {
+eth_address*
+evpaxos_proposer_address(struct evpaxos_config* config, int i)
+{
   return config->proposers[i];
 }
 
-// int evpaxos_proposer_listen_port(struct evpaxos_config *config, int i) {
-//   return config->proposers[i].port;
-// }
-
-int evpaxos_acceptor_count(struct evpaxos_config *config) {
+int
+evpaxos_acceptor_count(struct evpaxos_config* config)
+{
   return config->acceptors_count;
 }
 
-int evpaxos_proposer_count(struct evpaxos_config *config) {
+int
+evpaxos_proposer_count(struct evpaxos_config* config)
+{
   return config->proposers_count;
 }
 
-eth_address *evpaxos_acceptor_address(struct evpaxos_config *config, int i) {
+eth_address*
+evpaxos_acceptor_address(struct evpaxos_config* config, int i)
+{
   return config->acceptors[i];
 }
 
-// int evpaxos_acceptor_listen_port(struct evpaxos_config *config, int i) {
-//   return config->acceptors[i].port;
-// }
-
 // a string "   ciao   " becomes "ciao"
-static char *strtrim(char *string) {
+static char*
+strtrim(char* string)
+{
   char *s, *t;
   for (s = string; isspace(*s); s++)
     ;
@@ -175,7 +204,9 @@ static char *strtrim(char *string) {
   return s;
 }
 
-static int parse_boolean(char *str, int *boolean) {
+static int
+parse_boolean(char* str, int* boolean)
+{
   if (str == NULL)
     return 0;
   if (strcasecmp(str, "yes") == 0) {
@@ -189,7 +220,9 @@ static int parse_boolean(char *str, int *boolean) {
   return 0;
 }
 
-static int parse_integer(char *str, int *integer) {
+static int
+parse_integer(char* str, int* integer)
+{
   long n;
   if (str == NULL)
     return 0;
@@ -199,7 +232,9 @@ static int parse_integer(char *str, int *integer) {
   return 1;
 }
 
-static int parse_string(char *str, char **string) {
+static int
+parse_string(char* str, char** string)
+{
   if (str == NULL || str[0] == '\0' || str[0] == '\n')
     return 0;
   *string = pmalloc(strlen(str) + 1);
@@ -208,7 +243,9 @@ static int parse_string(char *str, char **string) {
   return 1;
 }
 
-static int str_to_mac(const char *str, eth_address *daddr) {
+static int
+str_to_mac(const char* str, eth_address* daddr)
+{
   int values[6], i;
   if (6 == sscanf(str, "%x:%x:%x:%x:%x:%x", &values[0], &values[1], &values[2],
                   &values[3], &values[4], &values[5])) {
@@ -220,10 +257,12 @@ static int str_to_mac(const char *str, eth_address *daddr) {
   return 0;
 }
 
-static int parse_address(char *str, eth_address *addr) {
-  int id;
+static int
+parse_address(char* str, eth_address* addr)
+{
+  int  id;
   char address[128];
-  int rv = sscanf(str, "%d %s", &id, address);
+  int  rv = sscanf(str, "%d %s", &id, address);
   if (rv == 2) {
     str_to_mac(address, addr);
     return 1;
@@ -231,7 +270,9 @@ static int parse_address(char *str, eth_address *addr) {
   return 0;
 }
 
-static int parse_verbosity(char *str, paxos_log_level *verbosity) {
+static int
+parse_verbosity(char* str, paxos_log_level* verbosity)
+{
   if (strcasecmp(str, "quiet") == 0)
     *verbosity = PAXOS_LOG_QUIET;
   else if (strcasecmp(str, "error") == 0)
@@ -245,7 +286,9 @@ static int parse_verbosity(char *str, paxos_log_level *verbosity) {
   return 1;
 }
 
-static struct option *lookup_option(char *opt) {
+static struct option*
+lookup_option(char* opt)
+{
   int i = 0;
   while (options[i].name != NULL) {
     if (strcasecmp(options[i].name, opt) == 0)
@@ -255,11 +298,13 @@ static struct option *lookup_option(char *opt) {
   return NULL;
 }
 
-static int parse_line(struct evpaxos_config *c, char *line) {
-  int rv = 0;
-  char *tok;
-  char *sep = " ";
-  struct option *opt;
+static int
+parse_line(struct evpaxos_config* c, char* line)
+{
+  int            rv = 0;
+  char*          tok;
+  char*          sep = " ";
+  struct option* opt;
 
   line = strtrim(line);
   tok = strsep(&line, sep);
@@ -271,7 +316,7 @@ static int parse_line(struct evpaxos_config *c, char *line) {
       return 0;
     }
     c->acceptors[c->acceptors_count] = pmalloc(eth_size);
-    eth_address *addr = c->acceptors[c->acceptors_count++];
+    eth_address* addr = c->acceptors[c->acceptors_count++];
 
     return parse_address(line, addr);
   }
@@ -283,7 +328,7 @@ static int parse_line(struct evpaxos_config *c, char *line) {
       return 0;
     }
     c->proposers[c->proposers_count] = pmalloc(eth_size);
-    eth_address *addr = c->proposers[c->proposers_count++];
+    eth_address* addr = c->proposers[c->proposers_count++];
     return parse_address(line, addr);
   }
 
@@ -295,9 +340,9 @@ static int parse_line(struct evpaxos_config *c, char *line) {
       return 0;
     }
     c->acceptors[c->acceptors_count] = pmalloc(eth_size);
-    eth_address *acc_addr = c->acceptors[c->acceptors_count++];
+    eth_address* acc_addr = c->acceptors[c->acceptors_count++];
     c->proposers[c->proposers_count] = pmalloc(eth_size);
-    eth_address *pro_addr = c->proposers[c->proposers_count++];
+    eth_address* pro_addr = c->proposers[c->proposers_count++];
     rv = parse_address(line, pro_addr);
     memcpy(acc_addr, pro_addr, eth_size);
     return rv;
@@ -309,49 +354,33 @@ static int parse_line(struct evpaxos_config *c, char *line) {
     return 0;
 
   switch (opt->type) {
-  case option_boolean:
-    rv = parse_boolean(line, opt->value);
-    if (rv == 0)
-      paxos_log_error("Expected 'yes' or 'no'\n");
-    break;
-  case option_integer:
-    rv = parse_integer(line, opt->value);
-    if (rv == 0)
-      paxos_log_error("Expected number\n");
-    break;
-  case option_string:
-    rv = parse_string(line, opt->value);
-    if (rv == 0)
-      paxos_log_error("Expected string\n");
-    break;
-  case option_verbosity:
-    rv = parse_verbosity(line, opt->value);
-    if (rv == 0)
-      paxos_log_error("Expected quiet, error, info, or debug\n");
-    break;
+    case option_boolean:
+      rv = parse_boolean(line, opt->value);
+      if (rv == 0)
+        paxos_log_error("Expected 'yes' or 'no'\n");
+      break;
+    case option_integer:
+      rv = parse_integer(line, opt->value);
+      if (rv == 0)
+        paxos_log_error("Expected number\n");
+      break;
+    case option_string:
+      rv = parse_string(line, opt->value);
+      if (rv == 0)
+        paxos_log_error("Expected string\n");
+      break;
+    case option_verbosity:
+      rv = parse_verbosity(line, opt->value);
+      if (rv == 0)
+        paxos_log_error("Expected quiet, error, info, or debug\n");
+      break;
   }
 
   return rv;
 }
 
-// static void address_init(struct address *a, char *addr, int port) {
-//   a->addr = pmalloc(strlen(addr) + 1);
-//   if (a->addr)
-//     strcpy(a->addr, addr);
-//   a->port = port;
-// }
-
-static void address_free(eth_address *a) { kfree(a); }
-
-// static void address_copy(struct address *src, struct address *dst) {
-//   address_init(dst, src->addr, src->port);
-// }
-
-// static struct sockaddr_in address_to_sockaddr(struct address *a) {
-//   struct sockaddr_in addr;
-//   memset(&addr, 0, sizeof(struct sockaddr_in));
-//   addr.sin_family = AF_INET;
-//   addr.sin_port = htons(a->port);
-//   addr.sin_addr.s_addr = inet_addr(a->addr);
-//   return addr;
-// }
+static void
+address_free(eth_address* a)
+{
+  kfree(a);
+}

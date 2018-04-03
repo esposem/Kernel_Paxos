@@ -38,36 +38,41 @@
 
 #define HANDLE_BIG_PKG 0
 
-struct peer {
-  int id;
-  eth_address addr[ETH_ALEN];
-  struct peers *peers;
+struct peer
+{
+  int           id;
+  eth_address   addr[ETH_ALEN];
+  struct peers* peers;
 };
 
-struct subscription {
+struct subscription
+{
   paxos_message_type type;
-  peer_cb callback;
-  void *arg;
+  peer_cb            callback;
+  void*              arg;
 };
 
-struct peers {
-  int peers_count, clients_count;
-  struct peer **peers;   /* peers we connected to */
-  struct peer **clients; /* peers we accepted connections from */
-  struct peer *me_send;
-  struct evpaxos_config *config;
-  struct net_device *dev;
+struct peers
+{
+  int                    peers_count, clients_count;
+  struct peer**          peers;   /* peers we connected to */
+  struct peer**          clients; /* peers we accepted connections from */
+  struct peer*           me_send;
+  struct evpaxos_config* config;
+  struct net_device*     dev;
 };
 
-int *peers_received_ok = NULL;
-int ok_received;
+int* peers_received_ok = NULL;
+int  ok_received;
 
-static struct peer *make_peer(struct peers *p, int id, eth_address *in);
-static void free_peer(struct peer *p);
-static void free_all_peers(struct peer **p, int count);
+static struct peer* make_peer(struct peers* p, int id, eth_address* in);
+static void         free_peer(struct peer* p);
+static void         free_all_peers(struct peer** p, int count);
 
-struct peers *peers_new(struct evpaxos_config *config, int id, char *if_name) {
-  struct peers *p = pmalloc(sizeof(struct peers));
+struct peers*
+peers_new(struct evpaxos_config* config, int id, char* if_name)
+{
+  struct peers* p = pmalloc(sizeof(struct peers));
   p->peers_count = 0;
   p->clients_count = 0;
   p->peers = NULL;
@@ -76,7 +81,7 @@ struct peers *peers_new(struct evpaxos_config *config, int id, char *if_name) {
   p->config = config;
   p->dev = eth_init(if_name);
   if (p->dev == NULL) {
-    printk(KERN_ERR "Interface not found: %s.", if_name);
+    printk(KERN_ERR "Interface not found: %s\n", if_name);
     kfree(p);
     return NULL;
   }
@@ -84,7 +89,9 @@ struct peers *peers_new(struct evpaxos_config *config, int id, char *if_name) {
   return p;
 }
 
-void peers_free(struct peers *p) {
+void
+peers_free(struct peers* p)
+{
   eth_destroy(p->dev);
   free_all_peers(p->peers, p->peers_count);
   free_all_peers(p->clients, p->clients_count);
@@ -92,24 +99,38 @@ void peers_free(struct peers *p) {
   kfree(p);
 }
 
-int peers_count(struct peers *p) { return p->peers_count; }
+int
+peers_count(struct peers* p)
+{
+  return p->peers_count;
+}
 
-eth_address *get_addr(struct peer *p) { return p->addr; }
+eth_address*
+get_addr(struct peer* p)
+{
+  return p->addr;
+}
 
-void peers_foreach_acceptor(struct peers *p, peer_iter_cb cb, void *arg) {
+void
+peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg)
+{
   int i;
   for (i = 0; i < p->peers_count; ++i) {
     cb(p->dev, p->peers[i], arg);
   }
 }
 
-void peers_foreach_client(struct peers *p, peer_iter_cb cb, void *arg) {
+void
+peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg)
+{
   int i;
   for (i = 0; i < p->clients_count; ++i)
     cb(p->dev, p->clients[i], arg);
 }
 
-struct peer *peers_get_acceptor(struct peers *p, int id) {
+struct peer*
+peers_get_acceptor(struct peers* p, int id)
+{
   int i;
   for (i = 0; p->peers_count; ++i)
     if (p->peers[i]->id == id)
@@ -118,10 +139,12 @@ struct peer *peers_get_acceptor(struct peers *p, int id) {
 }
 
 // add all acceptors in the peers
-void add_acceptors_from_config(int myid, struct peers *p) {
-  eth_address *addr;
-  int n = evpaxos_acceptor_count(p->config);
-  p->peers = prealloc(p->peers, sizeof(struct peer *) * n);
+void
+add_acceptors_from_config(int myid, struct peers* p)
+{
+  eth_address* addr;
+  int          n = evpaxos_acceptor_count(p->config);
+  p->peers = prealloc(p->peers, sizeof(struct peer*) * n);
   int i;
   for (i = 0; i < n; i++) {
     if (i != myid) {
@@ -135,7 +158,9 @@ void add_acceptors_from_config(int myid, struct peers *p) {
   memset(peers_received_ok, 0, sizeof(int) * p->peers_count);
 }
 
-void printall(struct peers *p, char *name) {
+void
+printall(struct peers* p, char* name)
+{
   printk(KERN_INFO "\t%s\n", name);
   printk(KERN_INFO "\t\tME id=%d address %02x:%02x:%02x:%02x:%02x:%02x\n",
          p->me_send->id, p->me_send->addr[0], p->me_send->addr[1],
@@ -162,10 +187,16 @@ void printall(struct peers *p, char *name) {
   }
 }
 
-int peer_get_id(struct peer *p) { return p->id; }
+int
+peer_get_id(struct peer* p)
+{
+  return p->id;
+}
 
 // 0 if known, 1 if new
-int add_or_update_client(eth_address *addr, struct peers *p) {
+int
+add_or_update_client(eth_address* addr, struct peers* p)
+{
   int i;
   for (i = 0; i < p->clients_count; ++i) {
     if (memcmp(addr, p->clients[i]->addr, eth_size) == 0) {
@@ -174,25 +205,34 @@ int add_or_update_client(eth_address *addr, struct peers *p) {
   }
   paxos_log_info("Added a new client, now %d clients", p->clients_count + 1);
   p->clients =
-      prealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1));
+    prealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1));
   p->clients[p->clients_count] = make_peer(p, p->clients_count, addr);
   p->clients_count++;
+  printall(p, "TMP");
   return 1;
 }
 
-void peer_send_del(struct peer *p, void *arg) {
-  send_paxos_learner_del(p->peers->dev, get_addr(p), NULL);
+void
+peer_send_del(struct net_device* dev, struct peer* p, void* arg)
+{
+  send_paxos_learner_del(dev, get_addr(p), NULL);
 }
 
-struct net_device *get_dev(struct peers *p) {
+struct net_device*
+get_dev(struct peers* p)
+{
   return p->dev;
 }
 
-int peers_missing_ok(struct peers *p) {
+int
+peers_missing_ok(struct peers* p)
+{
   return (ok_received != p->peers_count);
 }
 
-void peers_update_ok(struct peers *p, eth_address *addr) {
+void
+peers_update_ok(struct peers* p, eth_address* addr)
+{
   int i;
   for (i = 0; i < p->peers_count; ++i) {
     if (memcmp(addr, p->peers[i]->addr, eth_size) == 0 &&
@@ -205,7 +245,9 @@ void peers_update_ok(struct peers *p, eth_address *addr) {
   }
 }
 
-void peers_delete_learner(struct peers *p, eth_address *addr) {
+void
+peers_delete_learner(struct peers* p, eth_address* addr)
+{
   int i, j;
   for (i = 0; i < p->clients_count; ++i) {
     if (memcmp(addr, p->clients[i]->addr, eth_size) == 0) {
@@ -216,7 +258,7 @@ void peers_delete_learner(struct peers *p, eth_address *addr) {
       }
       p->clients_count--;
       p->clients =
-          prealloc(p->clients, sizeof(struct peer *) * (p->clients_count));
+        prealloc(p->clients, sizeof(struct peer*) * (p->clients_count));
       break;
     }
   }
@@ -289,20 +331,25 @@ void peers_delete_learner(struct peers *p, eth_address *addr) {
 //   return 1;
 // }
 
-void peers_subscribe(struct peers *p, paxos_message_type type, peer_cb cb,
-                     void *arg) {
+void
+peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg)
+{
   eth_listen(p->dev, (uint16_t)type, cb, arg);
 }
 
-static struct peer *make_peer(struct peers *peers, int id, eth_address *addr) {
-  struct peer *p = pmalloc(sizeof(struct peer));
+static struct peer*
+make_peer(struct peers* peers, int id, eth_address* addr)
+{
+  struct peer* p = pmalloc(sizeof(struct peer));
   p->id = id;
   memcpy(p->addr, addr, eth_size);
   p->peers = peers;
   return p;
 }
 
-static void free_all_peers(struct peer **p, int count) {
+static void
+free_all_peers(struct peer** p, int count)
+{
   int i;
   for (i = 0; i < count; i++)
     free_peer(p[i]);
@@ -310,4 +357,8 @@ static void free_all_peers(struct peer **p, int count) {
     kfree(p);
 }
 
-static void free_peer(struct peer *p) { kfree(p); }
+static void
+free_peer(struct peer* p)
+{
+  kfree(p);
+}

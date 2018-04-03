@@ -26,25 +26,30 @@
  */
 
 #include "paxos.h"
-// stdlib, string, limits
 #include <linux/slab.h>
 #include <linux/time.h>
 
-struct paxos_config paxos_config = {.verbosity = PAXOS_LOG_INFO,
-                                    .tcp_nodelay = 1,
-                                    .learner_catch_up = 1,
-                                    .proposer_timeout = 1,
-                                    .proposer_preexec_window = 128,
-                                    .storage_backend = PAXOS_MEM_STORAGE,
-                                    .trash_files = 0,
-                                    .lmdb_sync = 0,
-                                    .lmdb_env_path = "/tmp/acceptor",
-                                    .lmdb_mapsize = 10 * 1024 * 1024};
+struct paxos_config paxos_config = { .verbosity = PAXOS_LOG_INFO,
+                                     .tcp_nodelay = 1,
+                                     .learner_catch_up = 1,
+                                     .proposer_timeout = 1,
+                                     .proposer_preexec_window = 128,
+                                     .storage_backend = PAXOS_MEM_STORAGE,
+                                     .trash_files = 0,
+                                     .lmdb_sync = 0,
+                                     .lmdb_env_path = "/tmp/acceptor",
+                                     .lmdb_mapsize = 10 * 1024 * 1024 };
 
-int paxos_quorum(int acceptors) { return (acceptors / 2) + 1; }
+int
+paxos_quorum(int acceptors)
+{
+  return (acceptors / 2) + 1;
+}
 
-paxos_value *paxos_value_new(const char *value, size_t size) {
-  paxos_value *v;
+paxos_value*
+paxos_value_new(const char* value, size_t size)
+{
+  paxos_value* v;
   v = pmalloc(sizeof(paxos_value));
   v->paxos_value_len = size;
   v->paxos_value_val = pmalloc(size);
@@ -52,55 +57,77 @@ paxos_value *paxos_value_new(const char *value, size_t size) {
   return v;
 }
 
-void paxos_value_free(paxos_value *v) {
+void
+paxos_value_free(paxos_value* v)
+{
   kfree(v->paxos_value_val);
   kfree(v);
 }
 
-static void paxos_value_destroy(paxos_value *v) {
+static void
+paxos_value_destroy(paxos_value* v)
+{
   if (v->paxos_value_len > 0)
     kfree(v->paxos_value_val);
 }
 
-void paxos_accepted_free(paxos_accepted *a) {
+void
+paxos_accepted_free(paxos_accepted* a)
+{
   paxos_accepted_destroy(a);
   kfree(a);
 }
 
-void paxos_promise_destroy(paxos_promise *p) { paxos_value_destroy(&p->value); }
-
-void paxos_accept_destroy(paxos_accept *p) { paxos_value_destroy(&p->value); }
-
-void paxos_accepted_destroy(paxos_accepted *p) {
+void
+paxos_promise_destroy(paxos_promise* p)
+{
   paxos_value_destroy(&p->value);
 }
 
-void paxos_client_value_destroy(paxos_client_value *p) {
+void
+paxos_accept_destroy(paxos_accept* p)
+{
   paxos_value_destroy(&p->value);
 }
 
-void paxos_message_destroy(paxos_message *m) {
+void
+paxos_accepted_destroy(paxos_accepted* p)
+{
+  paxos_value_destroy(&p->value);
+}
+
+void
+paxos_client_value_destroy(paxos_client_value* p)
+{
+  paxos_value_destroy(&p->value);
+}
+
+void
+paxos_message_destroy(paxos_message* m)
+{
   switch (m->type) {
-  case PAXOS_PROMISE:
-    paxos_promise_destroy(&m->u.promise);
-    break;
-  case PAXOS_ACCEPT:
-    paxos_accept_destroy(&m->u.accept);
-    break;
-  case PAXOS_ACCEPTED:
-    paxos_accepted_destroy(&m->u.accepted);
-    break;
-  case PAXOS_CLIENT_VALUE:
-    paxos_client_value_destroy(&m->u.client_value);
-    break;
-  default:
-    break;
+    case PAXOS_PROMISE:
+      paxos_promise_destroy(&m->u.promise);
+      break;
+    case PAXOS_ACCEPT:
+      paxos_accept_destroy(&m->u.accept);
+      break;
+    case PAXOS_ACCEPTED:
+      paxos_accepted_destroy(&m->u.accepted);
+      break;
+    case PAXOS_CLIENT_VALUE:
+      paxos_client_value_destroy(&m->u.client_value);
+      break;
+    default:
+      break;
   }
 }
 
-void paxos_log(int level, const char *format, va_list ap) {
-  int off = 0;
-  char msg[1000];
+void
+paxos_log(int level, const char* format, va_list ap)
+{
+  int            off = 0;
+  char           msg[1000];
   struct timeval tv;
 
   if (level > paxos_config.verbosity) {
@@ -110,33 +137,39 @@ void paxos_log(int level, const char *format, va_list ap) {
   do_gettimeofday(&tv);
   vsnprintf(msg + off, sizeof(msg) - off, format, ap);
   switch (level) {
-  case PAXOS_LOG_ERROR:
-    printk(KERN_ERR "%s\n", msg);
-    break;
-  case PAXOS_LOG_INFO:
-    printk("%s\n", msg);
-    break;
-  case PAXOS_LOG_DEBUG:
-    printk(KERN_INFO "%s\n", msg);
-    break;
+    case PAXOS_LOG_ERROR:
+      printk(KERN_ERR "%s\n", msg);
+      break;
+    case PAXOS_LOG_INFO:
+      printk("%s\n", msg);
+      break;
+    case PAXOS_LOG_DEBUG:
+      printk(KERN_INFO "%s\n", msg);
+      break;
   }
 }
 
-void paxos_log_error(const char *format, ...) {
+void
+paxos_log_error(const char* format, ...)
+{
   va_list ap;
   va_start(ap, format);
   paxos_log(PAXOS_LOG_ERROR, format, ap);
   va_end(ap);
 }
 
-void paxos_log_info(const char *format, ...) {
+void
+paxos_log_info(const char* format, ...)
+{
   va_list ap;
   va_start(ap, format);
   paxos_log(PAXOS_LOG_INFO, format, ap);
   va_end(ap);
 }
 
-void paxos_log_debug(const char *format, ...) {
+void
+paxos_log_debug(const char* format, ...)
+{
   va_list ap;
   va_start(ap, format);
   paxos_log(PAXOS_LOG_DEBUG, format, ap);
