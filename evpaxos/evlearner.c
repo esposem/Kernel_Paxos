@@ -143,11 +143,15 @@ evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
 }
 
 struct evlearner*
-evlearner_init(deliver_function f, void* arg, char* if_name, char* path)
+evlearner_init(deliver_function f, void* arg, char* if_name, char* path,
+               int isclient)
 {
   struct evpaxos_config* c = evpaxos_config_read(path);
   if (c == NULL)
     return NULL;
+
+  if (isclient)
+    paxos_config.learner_catch_up = 0;
 
   struct peers* peers = peers_new(c, -1, if_name);
   if (peers == NULL) {

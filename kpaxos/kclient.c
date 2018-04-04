@@ -116,7 +116,6 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
   struct client*       c = arg;
   struct client_value* v = (struct client_value*)value;
-  // printk("Received id %d, I am %d\n", v->client_id, c->id);
   if (v->client_id == c->id) {
     update_stats(&c->stats, v, size);
     if (iid % 100000 == 0) {
@@ -128,9 +127,6 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
     // paxos_log_info(KERN_INFO "Client: On deliver iid:%d value:%.16s", iid,
     //                v->value);
   }
-  //  else {
-  //   printk("%d == %d?\n", v->client_id, c->id);
-  // }
 }
 
 static void
@@ -166,8 +162,7 @@ make_client(int proposer_id, int outstanding, int value_size)
   c->outstanding = outstanding;
   c->send_buffer = pmalloc(sizeof(struct client_value) + value_size);
 
-  paxos_config.learner_catch_up = 0;
-  c->learner = evlearner_init(on_deliver, c, if_name, path);
+  c->learner = evlearner_init(on_deliver, c, if_name, path, 1);
 
   if (c->learner == NULL) {
     printk(KERN_ERR "Client: Could not start the learner!");

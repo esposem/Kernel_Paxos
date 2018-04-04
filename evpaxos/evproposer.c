@@ -126,14 +126,6 @@ evproposer_handle_preempted(paxos_message* msg, void* arg, eth_address* src)
   }
 }
 
-// struct client_value
-// {
-//   int            client_id;
-//   struct timeval t;
-//   size_t         size;
-//   char           value[0];
-// };
-
 static void
 evproposer_handle_client_value(paxos_message* msg, void* arg, eth_address* src)
 {
@@ -143,11 +135,6 @@ evproposer_handle_client_value(paxos_message* msg, void* arg, eth_address* src)
   proposer_propose(proposer->state, v->value.paxos_value_val,
                    v->value.paxos_value_len);
   paxos_log_debug("Proposer: received a CLIENT VALUE");
-  // struct client_value* c = (struct client_value*)v->value.paxos_value_val;
-  // if (c->client_id != 0)
-  //   paxos_log_info("Received PAXOS_CLIENT_VALUE clid %d size data %zu value
-  //   %s",
-  //                  c->client_id, c->size, c->value);
   try_accept(proposer);
 }
 
@@ -166,7 +153,6 @@ evproposer_preexec_once(struct evproposer* arg)
 {
   struct evproposer* p = arg;
   proposer_preexecute(p);
-  // printk("Preexcuted once\n");
 }
 
 static void
