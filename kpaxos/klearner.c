@@ -80,7 +80,7 @@ start_learner(void)
   //   paxos_config.learner_catch_up = 0;
   // }
 
-  lea = evlearner_init(on_deliver, NULL, if_name, path);
+  lea = evlearner_init(on_deliver, NULL, if_name, path, 0);
 
   if (lea == NULL) {
     printk(KERN_ERR "Could not start the learner!\n");
