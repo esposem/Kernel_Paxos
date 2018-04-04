@@ -38,6 +38,8 @@ send_paxos_message(struct net_device* dev, eth_address* addr,
   msgpack_packer* packer;
   long            size_msg = msgpack_pack_paxos_message(&packer, msg);
   eth_send(dev, addr, (uint16_t)msg->type, packer, size_msg);
+  // if (msg->type == PAXOS_PROMISE)
+  //   printk("sent %ld\n", size_msg);
   kfree(packer);
 }
 
@@ -145,12 +147,14 @@ paxos_submit(struct net_device* dev, eth_address* addr, char* data, int size)
                         .u.client_value.value.paxos_value_len = size,
                         .u.client_value.value.paxos_value_val = data };
   send_paxos_message(dev, addr, &msg);
-  paxos_log_debug("Client: Sent client value");
+  paxos_log_debug("Client: Sent client value size data %d", size);
 }
 
 int
 recv_paxos_message(paxos_message* out, paxos_message_type p, char* data,
                    size_t size)
 {
+  // if (p == PAXOS_PROMISE)
+  //   printk("Received %zu\n", size);
   return msgpack_unpack_paxos_message(data, out, size, p);
 }
