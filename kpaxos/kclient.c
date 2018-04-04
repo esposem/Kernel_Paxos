@@ -56,11 +56,14 @@ struct client
 static void
 random_string(char* s, const int len)
 {
-  int               i, j;
+  int               i; //, j;
   static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+  // for (i = 0; i < len - 1; ++i) {
+  //   get_random_bytes(&j, (sizeof j));
+  //   s[i] = alphanum[j % (sizeof(alphanum) - 1)];
+  // }
   for (i = 0; i < len - 1; ++i) {
-    get_random_bytes(&j, (sizeof j));
-    s[i] = alphanum[j % (sizeof(alphanum) - 1)];
+    s[i] = alphanum[i % (sizeof(alphanum) - 1)];
   }
 
   s[len - 1] = 0;
@@ -76,8 +79,9 @@ client_submit_value(struct client* c)
   random_string(v->value, v->size);
   size_t size = sizeof(struct client_value) + v->size;
   paxos_submit(get_learn_dev(c->learner), c->proposeradd, c->send_buffer, size);
-  paxos_log_debug("Client submitted PAXOS_CLIENT_VALUE len %zu value %s",
-                  v->size, v->value);
+  paxos_log_debug(
+    "Client submitted PAXOS_CLIENT_VALUE size data %zu total size %zu value %s",
+    v->size, size, v->value);
 }
 
 static long
@@ -112,7 +116,7 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
   struct client*       c = arg;
   struct client_value* v = (struct client_value*)value;
-
+  // printk("Received id %d, I am %d\n", v->client_id, c->id);
   if (v->client_id == c->id) {
     update_stats(&c->stats, v, size);
     if (iid % 100000 == 0) {
@@ -120,9 +124,13 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
       evlearner_send_trim(c->learner, iid - 100000 + 1);
     }
     client_submit_value(c);
+
     // paxos_log_info(KERN_INFO "Client: On deliver iid:%d value:%.16s", iid,
     //                v->value);
   }
+  //  else {
+  //   printk("%d == %d?\n", v->client_id, c->id);
+  // }
 }
 
 static void
@@ -150,7 +158,6 @@ make_client(int proposer_id, int outstanding, int value_size)
     printk(KERN_ERR "Client: Failed to read config file\n");
     return NULL;
   }
-  // c->proposeradd = evpaxos_proposer_address(conf, proposer_id);
   memcpy(c->proposeradd, evpaxos_proposer_address(conf, proposer_id), eth_size);
   // get_random_bytes(&c->id, sizeof(int));
   c->id = id;
@@ -179,12 +186,11 @@ make_client(int proposer_id, int outstanding, int value_size)
 static void
 client_free(struct client* c)
 {
-
-  kfree(c->send_buffer);
   if (c->learner) {
     del_timer(&c->stats_ev);
     evlearner_free(c->learner);
   }
+  kfree(c->send_buffer);
   kfree(c);
 }
 
@@ -192,7 +198,7 @@ static int __init
            init_client(void)
 {
   if (id < 0 || id > 10) {
-    printk(KERN_ERR "you must give an id!");
+    printk(KERN_ERR "you must give an id!\n");
     return 0;
   }
   c = make_client(proposer_id, outstanding, value_size);

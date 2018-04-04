@@ -64,6 +64,14 @@ evacceptor_handle_prepare(paxos_message* msg, void* arg, eth_address* src)
   }
 }
 
+// struct client_value
+// {
+//   int            client_id;
+//   struct timeval t;
+//   size_t         size;
+//   char           value[0];
+// };
+
 /*
         Received a accept request (phase 2a).
 */
@@ -77,9 +85,12 @@ evacceptor_handle_accept(paxos_message* msg, void* arg, eth_address* src)
   if (acceptor_receive_accept(a->state, accept, &out) != 0) {
     if (out.type == PAXOS_ACCEPTED) {
       paxos_log_debug("Acceptor: Sent ACCEPTED to all proposers and learners");
+      // struct client_value* c =
+      //   (struct client_value*)accept->value.paxos_value_val;
+      // printk("Sending accept id %d\n", c->client_id);
       peers_foreach_client(a->peers, send_acceptor_paxos_message, &out);
     } else if (out.type == PAXOS_PREEMPTED) {
-      paxos_log_debug("Acceptor: Sent PREEMPTED to all proposers ");
+      paxos_log_debug("Acceptor: Sent PREEMPTED to the proposer ");
       send_paxos_message(get_dev(a->peers), src, &out);
     }
     paxos_message_destroy(&out);

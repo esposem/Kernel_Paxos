@@ -25,42 +25,51 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ #ifndef _BIG_ENDIAN
+  Machine is little endian
+ #else
+  Machine is big endian
+ #endif
+ */
+
 #include "paxos_types_pack.h"
 #include <linux/slab.h>
 
 static void
-serialize_int_to_big(unsigned int* n, unsigned char** buffer)
+serialize_int_to_big(uint32_t n, unsigned char** buffer)
 {
-  (*buffer)[0] = *n >> 24;
-  (*buffer)[1] = *n >> 16;
-  (*buffer)[2] = *n >> 8;
-  (*buffer)[3] = *n;
-  *buffer += sizeof(unsigned int);
+  unsigned char* res = (unsigned char*)&n;
+  (*buffer)[0] = res[3];
+  (*buffer)[1] = res[2];
+  (*buffer)[2] = res[1];
+  (*buffer)[3] = res[0];
+  *buffer += sizeof(uint32_t);
 }
 
 static void
-deserialize_int_to_big(unsigned int* intres, unsigned char** buffer)
+deserialize_int_to_big(uint32_t* intres, unsigned char** buffer)
 {
   unsigned char* res = (unsigned char*)intres;
   res[0] = (*buffer)[3];
   res[1] = (*buffer)[2];
   res[2] = (*buffer)[1];
   res[3] = (*buffer)[0];
-  *buffer += sizeof(unsigned int);
+  *buffer += sizeof(uint32_t);
 }
 
 void
-cp_int_packet(unsigned int* n, unsigned char** buffer)
+cp_int_packet(uint32_t n, unsigned char** buffer)
 {
-  memcpy(*buffer, n, sizeof(unsigned int));
-  *buffer += sizeof(unsigned int);
+  memcpy(*buffer, &n, sizeof(uint32_t));
+  *buffer += sizeof(uint32_t);
 }
 
 void
-dcp_int_packet(unsigned int* n, unsigned char** buffer)
+dcp_int_packet(uint32_t* n, unsigned char** buffer)
 {
-  memcpy(n, *buffer, sizeof(unsigned int));
-  *buffer += sizeof(unsigned int);
+  memcpy(n, *buffer, sizeof(uint32_t));
+  *buffer += sizeof(uint32_t);
 }
 
 long
@@ -70,20 +79,15 @@ msgpack_pack_paxos_prepare(msgpack_packer** p, paxos_prepare* v)
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  // unsigned int type = PAXOS_PREPARE;
   unsigned int iid = v->iid;
   unsigned int ballot = v->ballot;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&iid, &tmp);
-  serialize_int_to_big(&ballot, &tmp);
+  serialize_int_to_big(iid, &tmp);
+  serialize_int_to_big(ballot, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&iid, &tmp);
-  cp_int_packet(&ballot, &tmp);
+  cp_int_packet(iid, &tmp);
+  cp_int_packet(ballot, &tmp);
 #endif
 
   return size;
@@ -93,9 +97,7 @@ void
 msgpack_unpack_paxos_prepare(msgpack_packer* o, paxos_prepare* v)
 {
   unsigned char* buffer = (unsigned char*)o;
-// buffer+=sizeof(unsigned int); //skip type
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&v->iid, &buffer);
   deserialize_int_to_big(&v->ballot, &buffer);
 #else
@@ -112,7 +114,6 @@ msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v)
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  // unsigned int type = PAXOS_PROMISE;
   unsigned int aid = v->aid;
   unsigned int iid = v->iid;
   unsigned int ballot = v->ballot;
@@ -120,23 +121,23 @@ msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v)
   char*        value = v->value.paxos_value_val;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&aid, &tmp);
-  serialize_int_to_big(&iid, &tmp);
-  serialize_int_to_big(&ballot, &tmp);
-  serialize_int_to_big(&value_ballot, &tmp);
-  serialize_int_to_big(&len, &tmp);
+  serialize_int_to_big(aid, &tmp);
+  serialize_int_to_big(iid, &tmp);
+  serialize_int_to_big(ballot, &tmp);
+  serialize_int_to_big(value_ballot, &tmp);
+  serialize_int_to_big(len, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&aid, &tmp);
-  cp_int_packet(&iid, &tmp);
-  cp_int_packet(&ballot, &tmp);
-  cp_int_packet(&value_ballot, &tmp);
-  cp_int_packet(&len, &tmp);
+  cp_int_packet(aid, &tmp);
+  cp_int_packet(iid, &tmp);
+  cp_int_packet(ballot, &tmp);
+  cp_int_packet(value_ballot, &tmp);
+  cp_int_packet(len, &tmp);
 #endif
-  memcpy(tmp, value, len);
+  // printk("Sent data size %d, tot packet size %ld\n", len, size);
+  if (size > 0)
+    memcpy(tmp, value, len);
+  // printk("%u %u %u %u %u %s\n", aid, iid, ballot, value_ballot, len, tmp);
+
   return size;
 }
 
@@ -147,7 +148,6 @@ msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v,
   unsigned char* buffer = (unsigned char*)o;
   int            size;
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&v->aid, &buffer);
   deserialize_int_to_big(&v->iid, &buffer);
   deserialize_int_to_big(&v->ballot, &buffer);
@@ -160,16 +160,24 @@ msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v,
   dcp_int_packet(&v->value_ballot, &buffer);
   dcp_int_packet(&size, &buffer);
 #endif
-  v->value.paxos_value_len = size;
-  // buffer now is pointing to the beginning of value.
-  // check with the len if match
-  // packet_len -= 5 * (sizeof (unsigned int));
-  // if(size > packet_len){
-  // 	memcpy(v->value.paxos_value_val, buffer,packet_len);
-  // 	return size-packet_len;
+  // printk("Received %d, data size %d\n", packet_len, size);
+
+  // if ((packet_len - (sizeof(int) * 5)) != size) {
+  //   printk("%s Error! packet length %d differs from supposed size of %d\n",
+  //          __func__, packet_len, size);
   // }
-  v->value.paxos_value_val = pmalloc(size);
-  memcpy(v->value.paxos_value_val, buffer, size);
+  v->value.paxos_value_len = size;
+  if (size > 0) {
+    v->value.paxos_value_val = pmalloc(size);
+    memset(v->value.paxos_value_val, 0, size);
+    memcpy(v->value.paxos_value_val, buffer, size);
+  } else {
+    v->value.paxos_value_val = NULL;
+  }
+
+  // printk("%u %u %u %u %u %s\n", v->aid, v->iid, v->ballot, v->value_ballot,
+  //        size, v->value.paxos_value_val);
+
   return 0;
 }
 
@@ -181,23 +189,18 @@ msgpack_pack_paxos_accept(msgpack_packer** p, paxos_accept* v)
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  // unsigned int type = PAXOS_ACCEPT;
   unsigned int iid = v->iid;
   unsigned int ballot = v->ballot;
   char*        value = v->value.paxos_value_val;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&iid, &tmp);
-  serialize_int_to_big(&ballot, &tmp);
-  serialize_int_to_big(&len, &tmp);
+  serialize_int_to_big(iid, &tmp);
+  serialize_int_to_big(ballot, &tmp);
+  serialize_int_to_big(len, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&iid, &tmp);
-  cp_int_packet(&ballot, &tmp);
-  cp_int_packet(&len, &tmp);
+  cp_int_packet(iid, &tmp);
+  cp_int_packet(ballot, &tmp);
+  cp_int_packet(len, &tmp);
 #endif
   memcpy(tmp, value, len);
   return size;
@@ -207,10 +210,9 @@ int
 msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int packet_len)
 {
   unsigned char* buffer = (unsigned char*)o;
-  // buffer+=sizeof(unsigned int); //skip type
-  int size;
+  int            size;
+
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&v->iid, &buffer);
   deserialize_int_to_big(&v->ballot, &buffer);
   deserialize_int_to_big(&size, &buffer);
@@ -219,16 +221,18 @@ msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int packet_len)
   dcp_int_packet(&v->ballot, &buffer);
   dcp_int_packet(&size, &buffer);
 #endif
-  v->value.paxos_value_len = size;
-  // buffer now is pointing to the beginning of value.
-  // check with the len if match
-  // packet_len -= 3 * (sizeof (unsigned int));
-  // if(size > packet_len){
-  // 	memcpy(v->value.paxos_value_val, buffer,packet_len);
-  // 	return size-packet_len;
+  // if ((packet_len - (sizeof(int) * 3)) != size) {
+  //   printk("%s Error! packet length %d differs from supposed size of %d\n",
+  //          __func__, packet_len, size);
   // }
-  v->value.paxos_value_val = pmalloc(size);
-  memcpy(v->value.paxos_value_val, buffer, size);
+  v->value.paxos_value_len = size;
+  if (size > 0) {
+    v->value.paxos_value_val = pmalloc(size);
+    memcpy(v->value.paxos_value_val, buffer, size);
+  } else {
+    v->value.paxos_value_val = NULL;
+  }
+
   return 0;
 }
 
@@ -240,7 +244,6 @@ msgpack_pack_paxos_accepted(msgpack_packer** p, paxos_accepted* v)
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  // unsigned int type = PAXOS_ACCEPTED;
   unsigned int aid = v->aid;
   unsigned int iid = v->iid;
   unsigned int ballot = v->ballot;
@@ -248,21 +251,17 @@ msgpack_pack_paxos_accepted(msgpack_packer** p, paxos_accepted* v)
   char*        value = v->value.paxos_value_val;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&aid, &tmp);
-  serialize_int_to_big(&iid, &tmp);
-  serialize_int_to_big(&ballot, &tmp);
-  serialize_int_to_big(&value_ballot, &tmp);
-  serialize_int_to_big(&len, &tmp);
+  serialize_int_to_big(aid, &tmp);
+  serialize_int_to_big(iid, &tmp);
+  serialize_int_to_big(ballot, &tmp);
+  serialize_int_to_big(value_ballot, &tmp);
+  serialize_int_to_big(len, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&aid, &tmp);
-  cp_int_packet(&iid, &tmp);
-  cp_int_packet(&ballot, &tmp);
-  cp_int_packet(&value_ballot, &tmp);
-  cp_int_packet(&len, &tmp);
+  cp_int_packet(aid, &tmp);
+  cp_int_packet(iid, &tmp);
+  cp_int_packet(ballot, &tmp);
+  cp_int_packet(value_ballot, &tmp);
+  cp_int_packet(len, &tmp);
 #endif
   memcpy(tmp, value, len);
   return size;
@@ -275,7 +274,6 @@ msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v,
   unsigned char* buffer = (unsigned char*)o;
   int            size;
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&v->aid, &buffer);
   deserialize_int_to_big(&v->iid, &buffer);
   deserialize_int_to_big(&v->ballot, &buffer);
@@ -288,14 +286,18 @@ msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v,
   dcp_int_packet(&v->value_ballot, &buffer);
   dcp_int_packet(&size, &buffer);
 #endif
-  v->value.paxos_value_len = size;
-  // packet_len -= 5 * (sizeof (unsigned int));
-  // if(size > packet_len){
-  // 	memcpy(v->value.paxos_value_val, buffer,packet_len);
-  // 	return size-packet_len;
+  // if ((packet_len - (sizeof(int) * 5)) != size) {
+  //   printk("%s Error! packet length %d differs from supposed size of %d\n",
+  //          __func__, packet_len, size);
   // }
-  v->value.paxos_value_val = pmalloc(size);
-  memcpy(v->value.paxos_value_val, buffer, size);
+  v->value.paxos_value_len = size;
+  if (size > 0) {
+    v->value.paxos_value_val = pmalloc(size);
+    memcpy(v->value.paxos_value_val, buffer, size);
+  } else {
+    v->value.paxos_value_val = NULL;
+  }
+
   return 0;
 }
 
@@ -306,23 +308,18 @@ msgpack_pack_paxos_preempted(msgpack_packer** p, paxos_preempted* v)
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  // unsigned int type = PAXOS_PREEMPTED;
   unsigned int aid = v->aid;
   unsigned int iid = v->iid;
   unsigned int ballot = v->ballot;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&aid, &tmp);
-  serialize_int_to_big(&iid, &tmp);
-  serialize_int_to_big(&ballot, &tmp);
+  serialize_int_to_big(aid, &tmp);
+  serialize_int_to_big(iid, &tmp);
+  serialize_int_to_big(ballot, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&aid, &tmp);
-  cp_int_packet(&iid, &tmp);
-  cp_int_packet(&ballot, &tmp);
+  cp_int_packet(aid, &tmp);
+  cp_int_packet(iid, &tmp);
+  cp_int_packet(ballot, &tmp);
 #endif
 
   return size;
@@ -334,7 +331,6 @@ msgpack_unpack_paxos_preempted(msgpack_packer* o, paxos_preempted* v)
   unsigned char* buffer = (unsigned char*)o;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&v->aid, &buffer);
   deserialize_int_to_big(&v->iid, &buffer);
   deserialize_int_to_big(&v->ballot, &buffer);
@@ -352,20 +348,15 @@ msgpack_pack_paxos_repeat(msgpack_packer** p, paxos_repeat* v)
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  // unsigned int type = PAXOS_REPEAT;
   unsigned int from = v->from;
   unsigned int to = v->to;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&from, &tmp);
-  serialize_int_to_big(&to, &tmp);
+  serialize_int_to_big(from, &tmp);
+  serialize_int_to_big(to, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&from, &tmp);
-  cp_int_packet(&to, &tmp);
+  cp_int_packet(from, &tmp);
+  cp_int_packet(to, &tmp);
 #endif
 
   return size;
@@ -375,10 +366,8 @@ void
 msgpack_unpack_paxos_repeat(msgpack_packer* o, paxos_repeat* v)
 {
   unsigned char* buffer = (unsigned char*)o;
-  // buffer+=sizeof(unsigned int); //skip type
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&v->from, &buffer);
   deserialize_int_to_big(&v->to, &buffer);
 #else
@@ -394,17 +383,12 @@ msgpack_pack_paxos_trim(msgpack_packer** p, paxos_trim* v)
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  // unsigned int type = PAXOS_TRIM;
   unsigned int iid = v->iid;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&iid, &tmp);
+  serialize_int_to_big(iid, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&iid, &tmp);
+  cp_int_packet(iid, &tmp);
 #endif
   return size;
 }
@@ -415,7 +399,6 @@ msgpack_unpack_paxos_trim(msgpack_packer* o, paxos_trim* v)
   unsigned char* buffer = (unsigned char*)o;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&v->iid, &buffer);
 #else
   dcp_int_packet(&v->iid, &buffer);
@@ -429,20 +412,15 @@ msgpack_pack_paxos_acceptor_state(msgpack_packer** p, paxos_acceptor_state* v)
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  // unsigned int type = PAXOS_ACCEPTOR_STATE;
   unsigned int aid = v->aid;
   unsigned int trim_iid = v->trim_iid;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&aid, &tmp);
-  serialize_int_to_big(&trim_iid, &tmp);
+  serialize_int_to_big(aid, &tmp);
+  serialize_int_to_big(trim_iid, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&aid, &tmp);
-  cp_int_packet(&trim_iid, &tmp);
+  cp_int_packet(aid, &tmp);
+  cp_int_packet(trim_iid, &tmp);
 #endif
 
   return size;
@@ -452,10 +430,8 @@ void
 msgpack_unpack_paxos_acceptor_state(msgpack_packer* o, paxos_acceptor_state* v)
 {
   unsigned char* buffer = (unsigned char*)o;
-  // buffer+=sizeof(unsigned int); //skip type
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&v->aid, &buffer);
   deserialize_int_to_big(&v->trim_iid, &buffer);
 #else
@@ -468,21 +444,16 @@ long
 msgpack_pack_paxos_client_value(msgpack_packer** p, paxos_client_value* v)
 {
   int  len = v->value.paxos_value_len;
-  long size = (sizeof(unsigned int) * 1) + len;
+  long size = sizeof(uint32_t) + len;
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
-
-  // unsigned int type = PAXOS_CLIENT_VALUE;
+  // printk("Sending size data %d tot size %ld\n", len, size);
   char* value = v->value.paxos_value_val;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  // serialize_int_to_big(&type, &tmp);
-  serialize_int_to_big(&len, &tmp);
+  serialize_int_to_big(len, &tmp);
 #else
-  // cp_int_packet(&type, &tmp);
-  cp_int_packet(&len, &tmp);
+  cp_int_packet(len, &tmp);
 #endif
   memcpy(tmp, value, len);
   return size;
@@ -495,22 +466,24 @@ msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v,
   unsigned char* buffer = (unsigned char*)o;
   int            size;
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet from big to little endian
   deserialize_int_to_big(&size, &buffer);
 #else
   dcp_int_packet(&size, &buffer);
 #endif
-  v->value.paxos_value_len = size;
+  // printk("Receved %d, size data %d\n", packet_len, size);
 
-  // buffer now is pointing to the beginning of value.
-  // check with the len if match
-  // packet_len -= (sizeof (unsigned int));
-  // if(size > packet_len){
-  // 	memcpy(v->value.paxos_value_val, buffer,packet_len);
-  // 	return size-packet_len;
+  // if ((packet_len - sizeof(int)) != size) {
+  //   printk("%s Error! packet length %d differs from supposed size of %d\n",
+  //          __func__, packet_len, size);
   // }
-  v->value.paxos_value_val = pmalloc(size);
-  memcpy(v->value.paxos_value_val, buffer, size);
+  v->value.paxos_value_len = size;
+  if (size > 0) {
+    v->value.paxos_value_val = pmalloc(size);
+    memcpy(v->value.paxos_value_val, buffer, size);
+  } else {
+    v->value.paxos_value_val = NULL;
+  }
+
   return 0;
 }
 
@@ -524,11 +497,9 @@ msgpack_pack_paxos_learner(msgpack_packer** p, void* v, int enum_type)
   unsigned int type = enum_type;
 
 #ifndef _BIG_ENDIAN
-  // Machine is little endian, transform the packet data from little to big
-  // endian
-  serialize_int_to_big(&type, &tmp);
+  serialize_int_to_big(type, &tmp);
 #else
-  cp_int_packet(&type, &tmp);
+  cp_int_packet(type, &tmp);
 #endif
   return size;
 }
@@ -589,14 +560,7 @@ msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size,
                              paxos_message_type p)
 {
   int partial_message = 0;
-  // #ifndef _BIG_ENDIAN
-  //   // Machine is little endian, transform the packet from big to little
-  //   endian deserialize_int_to_big(&v->type, &o);
-  // #else
-  //   dcp_int_packet(&v->type, &o);
-  // #endif
   v->type = p;
-  // size -= sizeof(unsigned int);
 
   switch (p) {
     case PAXOS_PREPARE:

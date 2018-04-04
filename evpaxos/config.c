@@ -167,7 +167,9 @@ evpaxos_config_free(struct evpaxos_config* config)
 eth_address*
 evpaxos_proposer_address(struct evpaxos_config* config, int i)
 {
-  return config->proposers[i];
+  if (i < evpaxos_proposer_count(config))
+    return config->proposers[i];
+  return NULL;
 }
 
 int
@@ -185,7 +187,9 @@ evpaxos_proposer_count(struct evpaxos_config* config)
 eth_address*
 evpaxos_acceptor_address(struct evpaxos_config* config, int i)
 {
-  return config->acceptors[i];
+  if (i < evpaxos_acceptor_count(config))
+    return config->acceptors[i];
+  return NULL;
 }
 
 // a string "   ciao   " becomes "ciao"

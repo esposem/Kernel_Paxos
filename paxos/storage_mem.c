@@ -41,22 +41,25 @@
 
 // KHASH_MAP_INIT_INT(record, paxos_accepted*);
 
-struct hash_item {
-  iid_t iid;
-  paxos_accepted *value;
-  UT_hash_handle hh;
+struct hash_item
+{
+  iid_t           iid;
+  paxos_accepted* value;
+  UT_hash_handle  hh;
 };
 
 struct mem_storage // db
 {
-  iid_t trim_iid;
-  struct hash_item *record;
+  iid_t             trim_iid;
+  struct hash_item* record;
 };
 
-static void paxos_accepted_copy(paxos_accepted *dst, paxos_accepted *src);
+static void paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src);
 
-static struct mem_storage *mem_storage_new(int acceptor_id) {
-  struct mem_storage *s = pmalloc(sizeof(struct mem_storage));
+static struct mem_storage*
+mem_storage_new(int acceptor_id)
+{
+  struct mem_storage* s = pmalloc(sizeof(struct mem_storage));
   if (s == NULL)
     return s;
   s->trim_iid = 0;
@@ -64,13 +67,20 @@ static struct mem_storage *mem_storage_new(int acceptor_id) {
   return s;
 }
 
-static int mem_storage_open(void *handle) { return 0; }
+static int
+mem_storage_open(void* handle)
+{
+  return 0;
+}
 
-static void mem_storage_close(void *handle) {
-  struct mem_storage *s = handle;
-  struct hash_item *current_hash;
-  struct hash_item *tmp;
-  HASH_ITER(hh, s->record, current_hash, tmp) {
+static void
+mem_storage_close(void* handle)
+{
+  struct mem_storage* s = handle;
+  struct hash_item*   current_hash;
+  struct hash_item*   tmp;
+  HASH_ITER(hh, s->record, current_hash, tmp)
+  {
     HASH_DEL(s->record, current_hash);
     paxos_accepted_free(current_hash->value);
     kfree(current_hash);
@@ -79,15 +89,27 @@ static void mem_storage_close(void *handle) {
   kfree(s);
 }
 
-static int mem_storage_tx_begin(void *handle) { return 0; }
+static int
+mem_storage_tx_begin(void* handle)
+{
+  return 0;
+}
 
-static int mem_storage_tx_commit(void *handle) { return 0; }
+static int
+mem_storage_tx_commit(void* handle)
+{
+  return 0;
+}
 
-static void mem_storage_tx_abort(void *handle) {}
+static void
+mem_storage_tx_abort(void* handle)
+{}
 
-static int mem_storage_get(void *handle, iid_t iids, paxos_accepted *out) {
-  struct mem_storage *s = handle;
-  struct hash_item *h;
+static int
+mem_storage_get(void* handle, iid_t iids, paxos_accepted* out)
+{
+  struct mem_storage* s = handle;
+  struct hash_item*   h;
   HASH_FIND_IID(s->record, &iids, h);
   if (h == NULL) {
     return 0;
@@ -96,22 +118,24 @@ static int mem_storage_get(void *handle, iid_t iids, paxos_accepted *out) {
   return 1;
 }
 
-static int mem_storage_put(void *handle, paxos_accepted *acc) {
-  struct mem_storage *s = handle;
-  struct hash_item *a;
+static int
+mem_storage_put(void* handle, paxos_accepted* acc)
+{
+  struct mem_storage* s = handle;
+  struct hash_item*   a;
 
-  paxos_accepted *val = pmalloc(sizeof(paxos_accepted));
-  if (val) {
+  paxos_accepted* val = pmalloc(sizeof(paxos_accepted));
+  if (val != NULL) {
     paxos_accepted_copy(val, acc);
 
     HASH_FIND_IID(s->record, &(acc->iid), a);
-    if (a) {
+    if (a != NULL) {
       paxos_accepted_free(a->value);
       a->value = val;
       a->iid = acc->iid;
     } else {
       a = pmalloc(sizeof(struct hash_item));
-      if (a) {
+      if (a != NULL) {
         a->value = val;
         a->iid = acc->iid;
         HASH_ADD_IID(s->record, iid, a);
@@ -122,10 +146,13 @@ static int mem_storage_put(void *handle, paxos_accepted *acc) {
   return 0;
 }
 
-static int mem_storage_trim(void *handle, iid_t iid) {
-  struct mem_storage *s = handle;
-  struct hash_item *hash_el, *tmp;
-  HASH_ITER(hh, s->record, hash_el, tmp) {
+static int
+mem_storage_trim(void* handle, iid_t iid)
+{
+  struct mem_storage* s = handle;
+  struct hash_item *  hash_el, *tmp;
+  HASH_ITER(hh, s->record, hash_el, tmp)
+  {
     if (hash_el->iid <= (int)iid) {
       HASH_DEL(s->record, hash_el);
       paxos_accepted_free(hash_el->value);
@@ -136,12 +163,16 @@ static int mem_storage_trim(void *handle, iid_t iid) {
   return 0;
 }
 
-static iid_t mem_storage_get_trim_instance(void *handle) {
-  struct mem_storage *s = handle;
+static iid_t
+mem_storage_get_trim_instance(void* handle)
+{
+  struct mem_storage* s = handle;
   return s->trim_iid;
 }
 
-static void paxos_accepted_copy(paxos_accepted *dst, paxos_accepted *src) {
+static void
+paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src)
+{
   memcpy(dst, src, sizeof(paxos_accepted));
   if (dst->value.paxos_value_len > 0) {
     dst->value.paxos_value_val = pmalloc(src->value.paxos_value_len);
@@ -150,7 +181,9 @@ static void paxos_accepted_copy(paxos_accepted *dst, paxos_accepted *src) {
   }
 }
 
-void storage_init_mem(struct storage *s, int acceptor_id) {
+void
+storage_init_mem(struct storage* s, int acceptor_id)
+{
   s->handle = mem_storage_new(acceptor_id);
   s->api.open = mem_storage_open;
   s->api.close = mem_storage_close;

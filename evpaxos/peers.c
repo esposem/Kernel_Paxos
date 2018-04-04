@@ -36,8 +36,6 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
-#define HANDLE_BIG_PKG 0
-
 struct peer
 {
   int           id;
@@ -69,6 +67,43 @@ static struct peer* make_peer(struct peers* p, int id, eth_address* in);
 static void         free_peer(struct peer* p);
 static void         free_all_peers(struct peer** p, int count);
 
+static void
+check_id(struct peers* p, struct evpaxos_config* config, int id)
+{
+  paxos_log_debug("Id %d\n", id);
+  if (id < 0)
+    return;
+
+  eth_address* ad1 = evpaxos_acceptor_address(config, id);
+  eth_address* ad2 = evpaxos_proposer_address(config, id);
+  if (ad1 != NULL) {
+    paxos_log_debug(
+      "Comparing "
+      "\n%02x:%02x:%02x:%02x:%02x:%02x\n%02x:%02x:%02x:%02x:%02x:%02x\n",
+      p->dev->dev_addr[0], p->dev->dev_addr[1], p->dev->dev_addr[2],
+      p->dev->dev_addr[3], p->dev->dev_addr[4], p->dev->dev_addr[5], ad1[0],
+      ad1[1], ad1[2], ad1[3], ad1[4], ad1[5]);
+    if (memcmp(p->dev->dev_addr, ad1, eth_size) == 0)
+      return;
+  }
+
+  if (ad2 != NULL) {
+    paxos_log_debug(
+      "Comparing "
+      "\n%02x:%02x:%02x:%02x:%02x:%02x\n%02x:%02x:%02x:%02x:%02x:%02x\n",
+      p->dev->dev_addr[0], p->dev->dev_addr[1], p->dev->dev_addr[2],
+      p->dev->dev_addr[3], p->dev->dev_addr[4], p->dev->dev_addr[5], ad2[0],
+      ad2[1], ad2[2], ad2[3], ad2[4], ad2[5]);
+    if (memcmp(p->dev->dev_addr, ad2, eth_size) == 0)
+      return;
+  }
+  paxos_log_error("Warning: address %02x:%02x:%02x:%02x:%02x:%02x is not "
+                  "present in the config file",
+                  p->dev->dev_addr[0], p->dev->dev_addr[1], p->dev->dev_addr[2],
+                  p->dev->dev_addr[3], p->dev->dev_addr[4],
+                  p->dev->dev_addr[5]);
+}
+
 struct peers*
 peers_new(struct evpaxos_config* config, int id, char* if_name)
 {
@@ -86,6 +121,7 @@ peers_new(struct evpaxos_config* config, int id, char* if_name)
     return NULL;
   }
   p->me_send = make_peer(p, id, p->dev->dev_addr);
+  check_id(p, config, id);
   return p;
 }
 
