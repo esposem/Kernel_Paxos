@@ -170,7 +170,7 @@ evlearner_free_internal(struct evlearner* l)
 {
   learner_free(l->state);
   del_timer(&l->stats_ev);
-  kfree(l);
+  pfree(l);
 }
 
 void

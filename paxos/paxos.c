@@ -60,22 +60,22 @@ paxos_value_new(const char* value, size_t size)
 void
 paxos_value_free(paxos_value* v)
 {
-  kfree(v->paxos_value_val);
-  kfree(v);
+  pfree(v->paxos_value_val);
+  pfree(v);
 }
 
 static void
 paxos_value_destroy(paxos_value* v)
 {
   if (v->paxos_value_len > 0)
-    kfree(v->paxos_value_val);
+    pfree(v->paxos_value_val);
 }
 
 void
 paxos_accepted_free(paxos_accepted* a)
 {
   paxos_accepted_destroy(a);
-  kfree(a);
+  pfree(a);
 }
 
 void

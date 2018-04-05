@@ -48,7 +48,7 @@ struct acceptor *acceptor_new(int id) {
   a = pmalloc(sizeof(struct acceptor));
   storage_init(&a->store, id);
   if (storage_open(&a->store) != 0) {
-    kfree(a);
+    pfree(a);
     return NULL;
   }
   if (storage_tx_begin(&a->store) != 0)
@@ -62,7 +62,7 @@ struct acceptor *acceptor_new(int id) {
 
 void acceptor_free(struct acceptor *a) {
   storage_close(&a->store);
-  kfree(a);
+  pfree(a);
 }
 
 int acceptor_receive_prepare(struct acceptor *a, paxos_prepare *req,

@@ -209,11 +209,11 @@ void kdevchar_exit(void) {
   class_destroy(charClass);    // remove the device class
   int i;
   for (i = 0; i < BUFFER_SIZE; i++) {
-    kfree(msg_buf[i]);
+    pfree(msg_buf[i]);
   }
 
-  kfree(de_name);
-  kfree(clas_name);
+  pfree(de_name);
+  pfree(clas_name);
   unregister_chrdev(majorNumber, de_name); // unregister the major number
   paxos_log_debug(KERN_INFO "Device Char: Unloaded\n");
 }

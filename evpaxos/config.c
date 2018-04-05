@@ -147,7 +147,7 @@ evpaxos_config_read(char* name)
       parse_line(c, line);
     }
 
-    kfree(line);
+    pfree(line);
     file_close(f);
   }
   return c;
@@ -161,7 +161,7 @@ evpaxos_config_free(struct evpaxos_config* config)
     address_free(config->proposers[i]);
   for (i = 0; i < config->acceptors_count; ++i)
     address_free(config->acceptors[i]);
-  kfree(config);
+  pfree(config);
 }
 
 eth_address*
@@ -386,5 +386,5 @@ parse_line(struct evpaxos_config* c, char* line)
 static void
 address_free(eth_address* a)
 {
-  kfree(a);
+  pfree(a);
 }

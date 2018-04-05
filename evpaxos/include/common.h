@@ -5,6 +5,7 @@
 
 #define pmalloc(size) kmalloc(size, GFP_ATOMIC)
 #define prealloc(ptr, size) krealloc(ptr, size, GFP_ATOMIC)
+#define pfree(ptr) kfree(ptr)
 
 typedef uint8_t eth_address;
 #define eth_size ETH_ALEN * sizeof(uint8_t)

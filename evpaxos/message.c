@@ -40,7 +40,7 @@ send_paxos_message(struct net_device* dev, eth_address* addr,
   eth_send(dev, addr, (uint16_t)msg->type, packer, size_msg);
   // if (msg->type == PAXOS_PROMISE)
   //   printk("sent %ld\n", size_msg);
-  kfree(packer);
+  pfree(packer);
 }
 
 void

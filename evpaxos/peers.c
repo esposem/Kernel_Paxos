@@ -117,7 +117,7 @@ peers_new(struct evpaxos_config* config, int id, char* if_name)
   p->dev = eth_init(if_name);
   if (p->dev == NULL) {
     printk(KERN_ERR "Interface not found: %s\n", if_name);
-    kfree(p);
+    pfree(p);
     return NULL;
   }
   p->me_send = make_peer(p, id, p->dev->dev_addr);
@@ -131,8 +131,8 @@ peers_free(struct peers* p)
   eth_destroy(p->dev);
   free_all_peers(p->peers, p->peers_count);
   free_all_peers(p->clients, p->clients_count);
-  kfree(p->me_send);
-  kfree(p);
+  pfree(p->me_send);
+  pfree(p);
 }
 
 int
@@ -287,7 +287,7 @@ peers_delete_learner(struct peers* p, eth_address* addr)
   int i, j;
   for (i = 0; i < p->clients_count; ++i) {
     if (memcmp(addr, p->clients[i]->addr, eth_size) == 0) {
-      kfree(p->clients[i]);
+      pfree(p->clients[i]);
       for (j = i; j < p->clients_count - 1; ++j) {
         p->clients[j] = p->clients[j + 1];
         p->clients[j]->id = j;
@@ -332,8 +332,8 @@ peers_delete_learner(struct peers* p, eth_address* addr)
 //         peers_foreach_acceptor(p, peer_send_del, NULL);
 //
 //       check_sock_allocation(k, p->sock_send, &k->socket_allocated);
-//       kfree(in_buf);
-//       kfree(peers_received_ok);
+//       pfree(in_buf);
+//       pfree(peers_received_ok);
 //
 //       return 0;
 //     }
@@ -390,11 +390,11 @@ free_all_peers(struct peer** p, int count)
   for (i = 0; i < count; i++)
     free_peer(p[i]);
   if (count > 0)
-    kfree(p);
+    pfree(p);
 }
 
 static void
 free_peer(struct peer* p)
 {
-  kfree(p);
+  pfree(p);
 }

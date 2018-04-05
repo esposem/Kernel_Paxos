@@ -90,7 +90,7 @@ evpaxos_replica_free(struct evpaxos_replica* r)
     evacceptor_free_internal(r->acceptor);
 
   peers_free(r->peers);
-  kfree(r);
+  pfree(r);
 }
 
 void
