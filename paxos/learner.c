@@ -101,7 +101,7 @@ learner_free(struct learner* l)
     HASH_DEL(l->instances, inst);
     instance_free(inst, l->acceptors);
   }
-  kfree(l);
+  pfree(l);
 }
 
 void
@@ -235,8 +235,8 @@ instance_free(struct instance* inst, int acceptors)
   for (i = 0; i < acceptors; i++)
     if (inst->acks[i] != NULL)
       paxos_accepted_free(inst->acks[i]);
-  kfree(inst->acks);
-  kfree(inst);
+  pfree(inst->acks);
+  pfree(inst);
 }
 
 static void

@@ -243,7 +243,7 @@ evproposer_free_internal(struct evproposer* p)
 {
   del_timer(&p->stats_ev);
   proposer_free(p->state);
-  kfree(p);
+  pfree(p);
 }
 
 void

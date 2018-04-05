@@ -28,6 +28,7 @@
 #include "storage.h"
 #include "uthash.h"
 #include <linux/slab.h>
+// TODO use vmalloc
 
 #ifndef HASH_FIND_IID
 #define HASH_FIND_IID(head, findint, out)                                      \
@@ -38,8 +39,6 @@
 #define HASH_ADD_IID(head, intfield, add)                                      \
   HASH_ADD(hh, head, intfield, sizeof(iid_t), add)
 #endif
-
-// KHASH_MAP_INIT_INT(record, paxos_accepted*);
 
 struct hash_item
 {

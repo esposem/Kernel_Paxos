@@ -202,7 +202,7 @@ evacceptor_free_internal(struct evacceptor* a)
 {
   acceptor_free(a->state);
   del_timer(&a->stats_ev);
-  kfree(a);
+  pfree(a);
 }
 
 void

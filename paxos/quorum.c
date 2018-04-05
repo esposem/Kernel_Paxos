@@ -41,7 +41,7 @@ void quorum_clear(struct quorum *q) {
   memset(q->acceptor_ids, 0, sizeof(int) * q->acceptors);
 }
 
-void quorum_destroy(struct quorum *q) { kfree(q->acceptor_ids); }
+void quorum_destroy(struct quorum *q) { pfree(q->acceptor_ids); }
 
 int quorum_add(struct quorum *q, int id) {
   if (q->acceptor_ids[id] == 0) {

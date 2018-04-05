@@ -59,8 +59,8 @@ struct carray *carray_new(int size) {
 }
 
 void carray_free(struct carray *a) {
-  kfree(a->array);
-  kfree(a);
+  pfree(a->array);
+  pfree(a);
 }
 
 int carray_empty(struct carray *a) { return a->count == 0; }
@@ -99,12 +99,12 @@ static void carray_grow(struct carray *a) {
   struct carray *tmp = carray_new(a->size * 2);
   for (i = 0; i < a->count; i++)
     carray_push_back(tmp, carray_at(a, i));
-  kfree(a->array);
+  pfree(a->array);
   a->head = 0;
   a->tail = tmp->tail;
   a->size = tmp->size;
   a->array = tmp->array;
-  kfree(tmp);
+  pfree(tmp);
 }
 
 static void *carray_at(struct carray *a, int i) {

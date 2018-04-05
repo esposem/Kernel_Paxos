@@ -113,7 +113,7 @@ void proposer_free(struct proposer *p) {
 
   carray_foreach(p->values, carray_paxos_value_free);
   carray_free(p->values);
-  kfree(p);
+  pfree(p);
 }
 
 void proposer_propose(struct proposer *p, const char *value, size_t size) {
@@ -341,7 +341,7 @@ int timeout_iterator_accept(struct timeout_iterator *iter, paxos_accept *out) {
   return 1;
 }
 
-void timeout_iterator_free(struct timeout_iterator *iter) { kfree(iter); }
+void timeout_iterator_free(struct timeout_iterator *iter) { pfree(iter); }
 
 static ballot_t proposer_next_ballot(struct proposer *p, ballot_t b) {
   if (b > 0)
@@ -405,7 +405,7 @@ static void instance_free(struct instance *inst) {
     paxos_value_free(inst->value);
   if (instance_has_promised_value(inst))
     paxos_value_free(inst->promised_value);
-  kfree(inst);
+  pfree(inst);
 }
 
 static int instance_has_value(struct instance *inst) {

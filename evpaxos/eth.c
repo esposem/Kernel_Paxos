@@ -82,7 +82,7 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
   if (!found)
     printk(KERN_ERR "no callback for protocol number %d\n", ntohs(proto));
   kfree_skb(skb);
-  kfree(data);
+  pfree(data);
   return 0;
 }
 

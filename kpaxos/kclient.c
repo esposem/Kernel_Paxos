@@ -29,6 +29,10 @@ static int id = 0;
 module_param(id, int, S_IRUGO);
 MODULE_PARM_DESC(id, "The client id, default 0");
 
+static int nclients = 1;
+module_param(nclients, int, S_IRUGO);
+MODULE_PARM_DESC(nclients, "The number of virtual clients");
+
 static char* if_name = "enp1s0";
 module_param(if_name, charp, 0000);
 MODULE_PARM_DESC(if_name, "The interface name, default enp1s0");
@@ -42,7 +46,8 @@ struct timeval        sk_timeout_timeval;
 
 struct client
 {
-  int               id;
+  int               id; // will create nclients from id to nclients+id
+  struct timeval*   clients_timeval;
   eth_address       proposeradd[ETH_ALEN];
   int               value_size;
   int               outstanding;
@@ -70,15 +75,17 @@ random_string(char* s, const int len)
 }
 
 static void
-client_submit_value(struct client* c)
+client_submit_value(struct client* c, int cid)
 {
   struct client_value* v = (struct client_value*)c->send_buffer;
-  v->client_id = c->id;
+  v->client_id = cid;
   do_gettimeofday(&v->t);
   v->size = c->value_size;
   random_string(v->value, v->size);
   size_t size = sizeof(struct client_value) + v->size;
   paxos_submit(get_learn_dev(c->learner), c->proposeradd, c->send_buffer, size);
+  do_gettimeofday(&c->clients_timeval[cid - id]);
+
   paxos_log_debug(
     "Client submitted PAXOS_CLIENT_VALUE size data %zu total size %zu value %s",
     v->size, size, v->value);
@@ -112,17 +119,33 @@ update_stats(struct stats* stats, struct client_value* delivered, size_t size)
 }
 
 static void
+check_timeout(void)
+{
+  struct timeval now;
+  do_gettimeofday(&now);
+  for (size_t i = 0; i < nclients; i++) {
+    if (timeval_diff(&c->clients_timeval[i], &now) > 1000000) {
+      paxos_log_debug("Client %zu sent expired", i);
+      client_submit_value(c, i + id);
+    }
+  }
+}
+
+static void
 on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
   struct client*       c = arg;
   struct client_value* v = (struct client_value*)value;
-  if (v->client_id == c->id) {
+  int                  clid = v->client_id;
+
+  if (clid >= id && clid < id + nclients) {
     update_stats(&c->stats, v, size);
     if (iid % 100000 == 0) {
-      paxos_log_info("Client%d: trim called, instance %d ", c->id, iid);
+      paxos_log_info("Client%d: trim called, instance %d ", clid, iid);
       evlearner_send_trim(c->learner, iid - 100000 + 1);
     }
-    client_submit_value(c);
+    client_submit_value(c, clid);
+    check_timeout();
 
     // paxos_log_info(KERN_INFO "Client: On deliver iid:%d value:%.16s", iid,
     //                v->value);
@@ -134,24 +157,29 @@ on_stats(unsigned long arg)
 {
   struct client* c = (struct client*)arg;
   int            mbps = (int)(c->stats.delivered_bytes * 8) / (1024 * 1024);
+
   printk(KERN_INFO "Client: %d value/sec, %d Mbps, latency min %ld us max %ld "
                    "us avg %ld us\n",
          c->stats.delivered_count, mbps, c->stats.min_latency,
          c->stats.max_latency, c->stats.avg_latency);
   memset(&c->stats, 0, sizeof(struct stats));
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
+  check_timeout();
 }
 
 static struct client*
 make_client(int proposer_id, int outstanding, int value_size)
 {
 
-  c = pmalloc(sizeof(struct client));
+  struct client* c = pmalloc(sizeof(struct client));
+  c->clients_timeval = pmalloc(sizeof(struct timeval) * nclients);
 
+  memset(c->clients_timeval, 0, sizeof(struct timeval) * nclients);
   memset(&c->stats, 0, sizeof(struct stats));
   struct evpaxos_config* conf = evpaxos_config_read(path);
   if (conf == NULL) {
     printk(KERN_ERR "Client: Failed to read config file\n");
+    kfree(c);
     return NULL;
   }
   memcpy(c->proposeradd, evpaxos_proposer_address(conf, proposer_id), eth_size);
@@ -166,13 +194,18 @@ make_client(int proposer_id, int outstanding, int value_size)
 
   if (c->learner == NULL) {
     printk(KERN_ERR "Client: Could not start the learner!");
+    kfree(c);
+    return NULL;
   } else {
     setup_timer(&c->stats_ev, on_stats, (unsigned long)c);
     c->stats_interval = (struct timeval){ 1, 0 };
     mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 
-    for (int i = 0; i < c->outstanding; ++i)
-      client_submit_value(c);
+    for (int j = 0; j < nclients; j++) {
+      for (int i = 0; i < c->outstanding; ++i) {
+        client_submit_value(c, j + id);
+      }
+    }
   }
 
   return c;
@@ -185,17 +218,13 @@ client_free(struct client* c)
     del_timer(&c->stats_ev);
     evlearner_free(c->learner);
   }
-  kfree(c->send_buffer);
-  kfree(c);
+  pfree(c->send_buffer);
+  pfree(c);
 }
 
 static int __init
            init_client(void)
 {
-  if (id < 0 || id > 10) {
-    printk(KERN_ERR "you must give an id!\n");
-    return 0;
-  }
   c = make_client(proposer_id, outstanding, value_size);
   return 0;
 }

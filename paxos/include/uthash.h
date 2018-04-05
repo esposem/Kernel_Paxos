@@ -76,8 +76,8 @@ typedef unsigned int uint32_t;
 typedef unsigned char uint8_t;
 #endif
 #elif defined(__GNUC__) && !defined(__VXWORKS__)
-// #include <stdint.h>
 #include <linux/types.h>
+#include <linux/vmalloc.h>
 
 #else
 typedef unsigned int uint32_t;
@@ -85,13 +85,13 @@ typedef unsigned char uint8_t;
 #endif
 
 #ifndef uthash_fatal
-#define uthash_fatal(msg)  // printk(KERN_ERR msg)         /* fatal error (out of memory,etc) */
+#define uthash_fatal(msg)  printk(KERN_ERR msg)         /* fatal error (out of memory,etc) */
 #endif
 #ifndef uthash_malloc
 #define uthash_malloc(sz) pmalloc(sz)      /* malloc fcn                      */
 #endif
 #ifndef uthash_free
-#define uthash_free(ptr,sz) kfree(ptr)     /* free fcn                        */
+#define uthash_free(ptr,sz) pfree(ptr)     /* free fcn                        */
 #endif
 #ifndef uthash_bzero
 #define uthash_bzero(a,n) memset(a,'\0',n)
