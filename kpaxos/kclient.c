@@ -61,10 +61,11 @@ struct client
 static void
 random_string(char* s, const int len)
 {
-  int               i; //, j;
+  int               i;
   static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
   // for (i = 0; i < len - 1; ++i) {
-  //   get_random_bytes(&j, (sizeof j));
+  //   int j;
+  //   get_random_bytes(&j, sizeof(int));
   //   s[i] = alphanum[j % (sizeof(alphanum) - 1)];
   // }
   for (i = 0; i < len - 1; ++i) {
@@ -183,6 +184,7 @@ make_client(int proposer_id, int outstanding, int value_size)
     return NULL;
   }
   memcpy(c->proposeradd, evpaxos_proposer_address(conf, proposer_id), eth_size);
+  evpaxos_config_free(conf);
   // get_random_bytes(&c->id, sizeof(int));
   c->id = id;
 
@@ -225,6 +227,7 @@ client_free(struct client* c)
 static int __init
            init_client(void)
 {
+  printk("Id: %d    Nclients: %d\n", id, nclients);
   c = make_client(proposer_id, outstanding, value_size);
   return 0;
 }

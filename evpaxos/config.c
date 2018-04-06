@@ -111,8 +111,8 @@ evpaxos_config_read(char* name)
 
   f = file_open(name, O_RDONLY, S_IRUSR | S_IRGRP);
   if (line && f) {
+#if 1
     int offset = 0, read = 0, line_pos = 0;
-
     while ((read = file_read(f, offset, &(line[line_pos]), 1)) != 0) {
       offset += read;
 
@@ -146,7 +146,48 @@ evpaxos_config_read(char* name)
       line[line_pos] = '\0';
       parse_line(c, line);
     }
+#else
+    // NOT COMPLETE!!!!!!!!!!!!!!!!!!!
+    int   offset = 0, read = 0, temp_full = 0;
+    char *l, *t;
+    char  temp[SIZE_LINE + 1];
+    while ((read = file_read(f, offset, line, SIZE_LINE)) > 0) {
+      line[read] = '~';
+      line[read + 1] = '\0';
+      printk("Read %d %s\n", read, line);
 
+      while ((l = strsep(&line, "\n")) != NULL) {
+        size_t len = (strlen(l));
+        printk("Token %s a%ca\n", l, l[len]);
+
+        if (l[len] != '~') {
+          if (temp_full) {
+            t = pmalloc(strlen(temp) + len + 1);
+            memcpy(t, temp, strlen(temp));
+            memcpy(t + strlen(temp), l, len + 1);
+            printk("PARSE %s\n", t);
+            // parse_line(c, t);
+            pfree(t);
+            temp_full = 0;
+          } else {
+            printk("PARSE %s\n", l);
+            // parse_line(c, l);
+          }
+        } else {
+          memcpy(temp, l, len + 1);
+          temp_full = 1;
+        }
+      }
+      printk("Token %s\n", l);
+      offset += read;
+    }
+    printk("Read %d\n", read);
+
+    // if (temp_full) {
+    //   printk("PARSE %s\n", temp);
+    //   // parse_line(c, temp);
+    // }
+#endif
     pfree(line);
     file_close(f);
   }

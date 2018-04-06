@@ -32,7 +32,7 @@
 #include <linux/types.h>
 
 
-typedef char msgpack_packer;
+typedef unsigned char msgpack_packer;
 
 struct paxos_value
 {
@@ -110,41 +110,34 @@ struct paxos_client_value
 };
 typedef struct paxos_client_value paxos_client_value;
 
-struct paxos_learner_hi
-{
-	paxos_value value;
-};
+struct paxos_learner_hi{};
 typedef struct paxos_learner_hi paxos_learner_hi;
 
-struct paxos_learner_del
-{
-	paxos_value value;
-};
+struct paxos_learner_del{};
 typedef struct paxos_learner_del paxos_learner_del;
 
 
-struct paxos_acceptor_ok
-{
-	paxos_value value;
-};
+struct paxos_acceptor_ok{};
 typedef struct paxos_acceptor_ok paxos_acceptor_ok;
 
 
-enum paxos_message_type
-{
-	PAXOS_PREPARE = 0xcafa,
-	PAXOS_PROMISE = 0xcafb,
-	PAXOS_ACCEPT = 0xcafc,
-	PAXOS_ACCEPTED = 0xcafd,
-	PAXOS_PREEMPTED = 0xcafe,
-	PAXOS_REPEAT = 0xcaff,
-	PAXOS_TRIM = 0xcb01,
-	PAXOS_ACCEPTOR_STATE = 0xcb02,
-	PAXOS_CLIENT_VALUE = 0xcb03,
-	PAXOS_LEARNER_HI = 0xcb04,
-	PAXOS_LEARNER_DEL = 0xcb05,
-	PAXOS_ACCEPTOR_OK = 0xcb06
+enum paxos_message_type {
+  PAXOS_PREPARE = 0xcafa,
+  PAXOS_PROMISE,
+  PAXOS_ACCEPT,
+  PAXOS_ACCEPTED,
+  PAXOS_PREEMPTED,
+  PAXOS_REPEAT,
+  PAXOS_TRIM,
+  PAXOS_ACCEPTOR_STATE,
+  PAXOS_CLIENT_VALUE,
+  PAXOS_LEARNER_HI,
+  PAXOS_LEARNER_DEL,
+  PAXOS_ACCEPTOR_OK,
+	N_ELEMENTS // this MUST be the last element of the enum
 };
+#define N_PAXOS_TYPES N_ELEMENTS - PAXOS_PREPARE
+#define GET_PAXOS_POS(n) n - PAXOS_PREPARE
 typedef enum paxos_message_type paxos_message_type;
 
 struct paxos_message

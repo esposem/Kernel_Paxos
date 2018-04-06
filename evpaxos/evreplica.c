@@ -55,26 +55,30 @@ evpaxos_replica_init(int id, deliver_function f, void* arg, char* if_name,
 {
   struct evpaxos_replica* r;
   struct evpaxos_config*  config;
+
+  config = evpaxos_config_read(path);
+  if (config == NULL) {
+    return NULL;
+  }
+
   r = pmalloc(sizeof(struct evpaxos_replica));
   if (r == NULL) {
     return NULL;
   }
-  config = evpaxos_config_read(path);
-  if (config == NULL)
-    return NULL;
 
   r->peers = peers_new(config, id, if_name);
   if (r->peers == NULL)
     return NULL;
-  add_acceptors_from_config(-1, r->peers);
+  add_acceptors_from_config(r->peers);
   printall(r->peers, "Replica");
   r->deliver = f;
   r->acceptor = evacceptor_init_internal(id, config, r->peers);
-  r->proposer = evproposer_init_internal(id, config, r->peers);
   r->learner =
     evlearner_init_internal(config, r->peers, evpaxos_replica_deliver, r);
+  r->proposer = evproposer_init_internal(id, config, r->peers);
   r->arg = arg;
   evpaxos_config_free(config);
+  evproposer_preexec_once(r->proposer);
   return r;
 }
 

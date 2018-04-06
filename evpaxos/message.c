@@ -44,33 +44,25 @@ send_paxos_message(struct net_device* dev, eth_address* addr,
 }
 
 void
-send_paxos_learner_hi(struct net_device* dev, eth_address* addr,
-                      paxos_learner_hi* p)
+send_paxos_learner_hi(struct net_device* dev, eth_address* addr)
 {
-  paxos_message msg = { .type = PAXOS_LEARNER_HI,
-                        .u.learner_hi.value.paxos_value_len = 0,
-                        .u.learner_hi.value.paxos_value_val = NULL };
+  paxos_message msg = { .type = PAXOS_LEARNER_HI };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Learner: Send hi to the acceptors");
 }
 
 void
-send_paxos_acceptor_ok(struct net_device* dev, eth_address* addr, void* p)
+send_paxos_acceptor_ok(struct net_device* dev, eth_address* addr)
 {
-  paxos_message msg = { .type = PAXOS_ACCEPTOR_OK,
-                        .u.learner_hi.value.paxos_value_len = 0,
-                        .u.learner_hi.value.paxos_value_val = NULL };
+  paxos_message msg = { .type = PAXOS_ACCEPTOR_OK };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Acceptor: Send ok to the learner");
 }
 
 void
-send_paxos_learner_del(struct net_device* dev, eth_address* addr,
-                       paxos_learner_del* p)
+send_paxos_learner_del(struct net_device* dev, eth_address* addr)
 {
-  paxos_message msg = { .type = PAXOS_LEARNER_DEL,
-                        .u.learner_del.value.paxos_value_len = 0,
-                        .u.learner_del.value.paxos_value_val = NULL };
+  paxos_message msg = { .type = PAXOS_LEARNER_DEL };
   send_paxos_message(dev, addr, &msg);
   paxos_log_debug("Learner: Send del to the acceptors");
 }

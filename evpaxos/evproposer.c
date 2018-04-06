@@ -148,11 +148,11 @@ evproposer_handle_acceptor_state(paxos_message* msg, void* arg,
   proposer_receive_acceptor_state(proposer->state, acc_state);
 }
 
-static void
+void
 evproposer_preexec_once(struct evproposer* arg)
 {
-  struct evproposer* p = arg;
-  proposer_preexecute(p);
+  if (arg)
+    proposer_preexecute(arg);
 }
 
 static void
@@ -186,15 +186,17 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers)
 
   struct evproposer* p;
   int                acceptor_count;
-
   acceptor_count = evpaxos_acceptor_count(c);
 
   p = pmalloc(sizeof(struct evproposer));
   if (p == NULL)
     return NULL;
+  memset(p, 0, sizeof(struct evproposer));
 
   p->id = id;
   p->preexec_window = paxos_config.proposer_preexec_window;
+  p->state = proposer_new(p->id, acceptor_count);
+  p->peers = peers;
 
   peers_subscribe(peers, PAXOS_PROMISE, evproposer_handle_promise, p);
   peers_subscribe(peers, PAXOS_ACCEPTED, evproposer_handle_accepted, p);
@@ -202,11 +204,6 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers)
   peers_subscribe(peers, PAXOS_CLIENT_VALUE, evproposer_handle_client_value, p);
   peers_subscribe(peers, PAXOS_ACCEPTOR_STATE, evproposer_handle_acceptor_state,
                   p);
-
-  p->state = proposer_new(p->id, acceptor_count);
-  p->peers = peers;
-
-  evproposer_preexec_once(p);
 
   setup_timer(&p->stats_ev, evproposer_check_timeouts, (unsigned long)p);
   p->stats_interval = (struct timeval){ paxos_config.proposer_timeout, 0 };
@@ -231,9 +228,10 @@ evproposer_init(int id, char* if_name, char* path)
   if (peers == NULL)
     return NULL;
 
-  add_acceptors_from_config(-1, peers);
+  add_acceptors_from_config(peers);
   printall(peers, "Proposer");
   struct evproposer* p = evproposer_init_internal(id, config, peers);
+  evproposer_preexec_once(p);
   evpaxos_config_free(config);
   return p;
 }

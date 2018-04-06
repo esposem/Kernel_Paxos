@@ -97,6 +97,7 @@ check_id(struct peers* p, struct evpaxos_config* config, int id)
     if (memcmp(p->dev->dev_addr, ad2, eth_size) == 0)
       return;
   }
+
   paxos_log_error("Warning: address %02x:%02x:%02x:%02x:%02x:%02x is not "
                   "present in the config file",
                   p->dev->dev_addr[0], p->dev->dev_addr[1], p->dev->dev_addr[2],
@@ -176,20 +177,17 @@ peers_get_acceptor(struct peers* p, int id)
 
 // add all acceptors in the peers
 void
-add_acceptors_from_config(int myid, struct peers* p)
+add_acceptors_from_config(struct peers* p)
 {
   eth_address* addr;
   int          n = evpaxos_acceptor_count(p->config);
   p->peers = prealloc(p->peers, sizeof(struct peer*) * n);
   int i;
   for (i = 0; i < n; i++) {
-    if (i != myid) {
-      addr = evpaxos_acceptor_address(p->config, i);
-      p->peers[p->peers_count] = make_peer(p, i, addr);
-      p->peers_count++;
-    }
+    addr = evpaxos_acceptor_address(p->config, i);
+    p->peers[p->peers_count] = make_peer(p, i, addr);
+    p->peers_count++;
   }
-  paxos_log_debug("ALLOCATED %d", p->peers_count);
   peers_received_ok = pmalloc(sizeof(int) * p->peers_count);
   memset(peers_received_ok, 0, sizeof(int) * p->peers_count);
 }
@@ -251,7 +249,7 @@ add_or_update_client(eth_address* addr, struct peers* p)
 void
 peer_send_del(struct net_device* dev, struct peer* p, void* arg)
 {
-  send_paxos_learner_del(dev, get_addr(p), NULL);
+  send_paxos_learner_del(dev, get_addr(p));
 }
 
 struct net_device*
@@ -300,73 +298,6 @@ peers_delete_learner(struct peers* p, eth_address* addr)
   }
 }
 
-// int peers_listen(struct peers *p, udp_service *k) {
-//   int ret, first_time = 0;
-//   eth_address address;
-//   unsigned char *in_buf = pmalloc(MAX_UDP_SIZE);
-//   struct peer tmp;
-//
-// #if HANDLE_BIG_PKG
-//   unsigned char *bigger_buff = NULL;
-//   int n_packet_toget = 0, size_bigger_buf = 0;
-// #endif
-//
-//   paxos_log_debug("%s Listening", k->name);
-//   unsigned long long time_passed[N_TIMER];
-//
-//   unsigned long long temp, first;
-//   struct timeval t1, t2;
-//
-//   do_gettimeofday(&t1);
-//   first = timeval_to_jiffies(&t1);
-//   int i;
-//   for (i = 0; i < N_TIMER; i++) {
-//     time_passed[i] = first;
-//   }
-//
-//   while (1) {
-//
-//     if (kthread_should_stop() || signal_pending(current)) {
-//       paxos_log_debug("Stopped!");
-//       if (k->timer_cb[LEA_TIM] != NULL)
-//         peers_foreach_acceptor(p, peer_send_del, NULL);
-//
-//       check_sock_allocation(k, p->sock_send, &k->socket_allocated);
-//       pfree(in_buf);
-//       pfree(peers_received_ok);
-//
-//       return 0;
-//     }
-//
-//     memset(in_buf, '\0', MAX_UDP_SIZE);
-//     memset(&address, 0, sizeof(eth_address));
-//     ret = udp_server_receive(p->sock_send, &address, in_buf, MSG_WAITALL, k);
-//     if (ret > 0) {
-//       if (first_time == 0) {
-//         memcpy(&tmp.addr, &address, sizeof(eth_address));
-//         tmp.peers = p;
-//         if (k->timer_cb[ACC_TIM] != NULL) {
-//           add_or_update_client(&address, p);
-//         }
-//         ret = on_read(in_buf, &tmp, MAX_UDP_SIZE);
-//       }
-//     }
-//
-//     do_gettimeofday(&t2);
-//     temp = timeval_to_jiffies(&t2);
-//
-//     for (i = 0; i < N_TIMER; i++) {
-//       if (k->timer_cb[i] != NULL) {
-//         if ((temp - time_passed[i]) >= k->timeout_jiffies[i]) {
-//           time_passed[i] = temp;
-//           k->timer_cb[i](k->data[i]);
-//         }
-//       }
-//     }
-//   }
-//   return 1;
-// }
-
 void
 peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg)
 {
@@ -378,6 +309,11 @@ make_peer(struct peers* peers, int id, eth_address* addr)
 {
   struct peer* p = pmalloc(sizeof(struct peer));
   p->id = id;
+  if (addr == NULL) {
+    paxos_log_error("Null address for peer %d", id);
+    kfree(p);
+    return NULL;
+  }
   memcpy(p->addr, addr, eth_size);
   p->peers = peers;
   return p;

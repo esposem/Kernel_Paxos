@@ -56,7 +56,7 @@ peer_send_repeat(struct net_device* dev, struct peer* p, void* arg)
 static void
 peer_send_hi(struct net_device* dev, struct peer* p, void* arg)
 {
-  send_paxos_learner_hi(dev, get_addr(p), NULL);
+  send_paxos_learner_hi(dev, get_addr(p));
 }
 
 static void
@@ -157,7 +157,7 @@ evlearner_init(deliver_function f, void* arg, char* if_name, char* path,
   if (peers == NULL) {
     return NULL;
   }
-  add_acceptors_from_config(-1, peers);
+  add_acceptors_from_config(peers);
   printall(peers, "Learner");
 
   struct evlearner* l = evlearner_init_internal(c, peers, f, arg);

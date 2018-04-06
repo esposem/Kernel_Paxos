@@ -36,26 +36,6 @@ extern "C" {
 #include "paxos_types.h"
 #include "common.h"
 
-long msgpack_pack_paxos_prepare(msgpack_packer** p, paxos_prepare* v);
-void msgpack_unpack_paxos_prepare(msgpack_packer* o, paxos_prepare* v);
-long msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v);
-int msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v, int size);
-long msgpack_pack_paxos_accept(msgpack_packer** p, paxos_accept* v);
-int msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int size);
-long msgpack_pack_paxos_accepted(msgpack_packer** p, paxos_accepted* v);
-int msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v, int size);
-long msgpack_pack_paxos_preempted(msgpack_packer** p, paxos_preempted* v);
-void msgpack_unpack_paxos_preempted(msgpack_packer* o, paxos_preempted* v);
-long msgpack_pack_paxos_repeat(msgpack_packer** p, paxos_repeat* v);
-void msgpack_unpack_paxos_repeat(msgpack_packer* o, paxos_repeat* v);
-long msgpack_pack_paxos_trim(msgpack_packer** p, paxos_trim* v);
-void msgpack_unpack_paxos_trim(msgpack_packer* o, paxos_trim* v);
-long msgpack_pack_paxos_acceptor_state(msgpack_packer** p, paxos_acceptor_state* v);
-void msgpack_unpack_paxos_acceptor_state(msgpack_packer* o, paxos_acceptor_state* v);
-long msgpack_pack_paxos_client_value(msgpack_packer** p, paxos_client_value* v);
-int msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v, int size);
-long msgpack_pack_paxos_learner(msgpack_packer** p, void * v, int enum_type);
-int msgpack_unpack_paxos_learner(msgpack_packer* o, void * v, int packet_len);
 long msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v);
 int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size, paxos_message_type p);
 

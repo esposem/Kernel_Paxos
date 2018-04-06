@@ -52,7 +52,7 @@ eth_address *get_addr(struct peer *p);
 void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);
 void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
 struct peer* peers_get_acceptor(struct peers* p, int id);
-void add_acceptors_from_config(int myid, struct peers * p);
+void add_acceptors_from_config(struct peers * p);
 void printall(struct peers * p, char * name);
 int add_or_update_client(eth_address *addr, struct peers *p);
 int peer_get_id(struct peer* p);

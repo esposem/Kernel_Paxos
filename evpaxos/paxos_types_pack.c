@@ -27,17 +27,18 @@
 
 /*
  #ifndef _BIG_ENDIAN
-  Machine is little endian
  #else
-  Machine is big endian
+
  #endif
  */
 
 #include "paxos_types_pack.h"
 #include <linux/slab.h>
 
+#ifndef _BIG_ENDIAN
+// Machine is little endian
 static void
-serialize_int_to_big(uint32_t n, unsigned char** buffer)
+cp_int_packet(uint32_t n, unsigned char** buffer)
 {
   unsigned char* res = (unsigned char*)&n;
   (*buffer)[0] = res[3];
@@ -48,7 +49,7 @@ serialize_int_to_big(uint32_t n, unsigned char** buffer)
 }
 
 static void
-deserialize_int_to_big(uint32_t* intres, unsigned char** buffer)
+dcp_int_packet(uint32_t* intres, unsigned char** buffer)
 {
   unsigned char* res = (unsigned char*)intres;
   res[0] = (*buffer)[3];
@@ -58,21 +59,24 @@ deserialize_int_to_big(uint32_t* intres, unsigned char** buffer)
   *buffer += sizeof(uint32_t);
 }
 
-void
+#else
+// Machine is big endian
+static void
 cp_int_packet(uint32_t n, unsigned char** buffer)
 {
   memcpy(*buffer, &n, sizeof(uint32_t));
   *buffer += sizeof(uint32_t);
 }
 
-void
+static void
 dcp_int_packet(uint32_t* n, unsigned char** buffer)
 {
   memcpy(n, *buffer, sizeof(uint32_t));
   *buffer += sizeof(uint32_t);
 }
+#endif
 
-long
+static long
 msgpack_pack_paxos_prepare(msgpack_packer** p, paxos_prepare* v)
 {
   long size = (sizeof(unsigned int) * 2);
@@ -82,31 +86,22 @@ msgpack_pack_paxos_prepare(msgpack_packer** p, paxos_prepare* v)
   unsigned int iid = v->iid;
   unsigned int ballot = v->ballot;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(iid, &tmp);
-  serialize_int_to_big(ballot, &tmp);
-#else
   cp_int_packet(iid, &tmp);
   cp_int_packet(ballot, &tmp);
-#endif
 
   return size;
 }
 
-void
+static void
 msgpack_unpack_paxos_prepare(msgpack_packer* o, paxos_prepare* v)
 {
   unsigned char* buffer = (unsigned char*)o;
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&v->iid, &buffer);
-  deserialize_int_to_big(&v->ballot, &buffer);
-#else
+
   dcp_int_packet(&v->iid, &buffer);
   dcp_int_packet(&v->ballot, &buffer);
-#endif
 }
 
-long
+static long
 msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v)
 {
   int  len = v->value.paxos_value_len;
@@ -120,19 +115,12 @@ msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v)
   unsigned int value_ballot = v->value_ballot;
   char*        value = v->value.paxos_value_val;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(aid, &tmp);
-  serialize_int_to_big(iid, &tmp);
-  serialize_int_to_big(ballot, &tmp);
-  serialize_int_to_big(value_ballot, &tmp);
-  serialize_int_to_big(len, &tmp);
-#else
   cp_int_packet(aid, &tmp);
   cp_int_packet(iid, &tmp);
   cp_int_packet(ballot, &tmp);
   cp_int_packet(value_ballot, &tmp);
   cp_int_packet(len, &tmp);
-#endif
+
   // printk("Sent data size %d, tot packet size %ld\n", len, size);
   if (size > 0)
     memcpy(tmp, value, len);
@@ -141,25 +129,19 @@ msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v)
   return size;
 }
 
-int
+static int
 msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v,
                              int packet_len)
 {
   unsigned char* buffer = (unsigned char*)o;
   int            size;
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&v->aid, &buffer);
-  deserialize_int_to_big(&v->iid, &buffer);
-  deserialize_int_to_big(&v->ballot, &buffer);
-  deserialize_int_to_big(&v->value_ballot, &buffer);
-  deserialize_int_to_big(&size, &buffer);
-#else
+
   dcp_int_packet(&v->aid, &buffer);
   dcp_int_packet(&v->iid, &buffer);
   dcp_int_packet(&v->ballot, &buffer);
   dcp_int_packet(&v->value_ballot, &buffer);
   dcp_int_packet(&size, &buffer);
-#endif
+
   // printk("Received %d, data size %d\n", packet_len, size);
 
   // if ((packet_len - (sizeof(int) * 5)) != size) {
@@ -181,7 +163,7 @@ msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v,
   return 0;
 }
 
-long
+static long
 msgpack_pack_paxos_accept(msgpack_packer** p, paxos_accept* v)
 {
   int  len = v->value.paxos_value_len;
@@ -193,38 +175,24 @@ msgpack_pack_paxos_accept(msgpack_packer** p, paxos_accept* v)
   unsigned int ballot = v->ballot;
   char*        value = v->value.paxos_value_val;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(iid, &tmp);
-  serialize_int_to_big(ballot, &tmp);
-  serialize_int_to_big(len, &tmp);
-#else
   cp_int_packet(iid, &tmp);
   cp_int_packet(ballot, &tmp);
   cp_int_packet(len, &tmp);
-#endif
+
   memcpy(tmp, value, len);
   return size;
 }
 
-int
+static int
 msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int packet_len)
 {
   unsigned char* buffer = (unsigned char*)o;
   int            size;
 
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&v->iid, &buffer);
-  deserialize_int_to_big(&v->ballot, &buffer);
-  deserialize_int_to_big(&size, &buffer);
-#else
   dcp_int_packet(&v->iid, &buffer);
   dcp_int_packet(&v->ballot, &buffer);
   dcp_int_packet(&size, &buffer);
-#endif
-  // if ((packet_len - (sizeof(int) * 3)) != size) {
-  //   printk("%s Error! packet length %d differs from supposed size of %d\n",
-  //          __func__, packet_len, size);
-  // }
+
   v->value.paxos_value_len = size;
   if (size > 0) {
     v->value.paxos_value_val = pmalloc(size);
@@ -236,7 +204,7 @@ msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int packet_len)
   return 0;
 }
 
-long
+static long
 msgpack_pack_paxos_accepted(msgpack_packer** p, paxos_accepted* v)
 {
   int  len = v->value.paxos_value_len;
@@ -250,46 +218,29 @@ msgpack_pack_paxos_accepted(msgpack_packer** p, paxos_accepted* v)
   unsigned int value_ballot = v->value_ballot;
   char*        value = v->value.paxos_value_val;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(aid, &tmp);
-  serialize_int_to_big(iid, &tmp);
-  serialize_int_to_big(ballot, &tmp);
-  serialize_int_to_big(value_ballot, &tmp);
-  serialize_int_to_big(len, &tmp);
-#else
   cp_int_packet(aid, &tmp);
   cp_int_packet(iid, &tmp);
   cp_int_packet(ballot, &tmp);
   cp_int_packet(value_ballot, &tmp);
   cp_int_packet(len, &tmp);
-#endif
+
   memcpy(tmp, value, len);
   return size;
 }
 
-int
+static int
 msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v,
                               int packet_len)
 {
   unsigned char* buffer = (unsigned char*)o;
   int            size;
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&v->aid, &buffer);
-  deserialize_int_to_big(&v->iid, &buffer);
-  deserialize_int_to_big(&v->ballot, &buffer);
-  deserialize_int_to_big(&v->value_ballot, &buffer);
-  deserialize_int_to_big(&size, &buffer);
-#else
+
   dcp_int_packet(&v->aid, &buffer);
   dcp_int_packet(&v->iid, &buffer);
   dcp_int_packet(&v->ballot, &buffer);
   dcp_int_packet(&v->value_ballot, &buffer);
   dcp_int_packet(&size, &buffer);
-#endif
-  // if ((packet_len - (sizeof(int) * 5)) != size) {
-  //   printk("%s Error! packet length %d differs from supposed size of %d\n",
-  //          __func__, packet_len, size);
-  // }
+
   v->value.paxos_value_len = size;
   if (size > 0) {
     v->value.paxos_value_val = pmalloc(size);
@@ -301,7 +252,7 @@ msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v,
   return 0;
 }
 
-long
+static long
 msgpack_pack_paxos_preempted(msgpack_packer** p, paxos_preempted* v)
 {
   long size = (sizeof(unsigned int) * 3);
@@ -312,36 +263,24 @@ msgpack_pack_paxos_preempted(msgpack_packer** p, paxos_preempted* v)
   unsigned int iid = v->iid;
   unsigned int ballot = v->ballot;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(aid, &tmp);
-  serialize_int_to_big(iid, &tmp);
-  serialize_int_to_big(ballot, &tmp);
-#else
   cp_int_packet(aid, &tmp);
   cp_int_packet(iid, &tmp);
   cp_int_packet(ballot, &tmp);
-#endif
 
   return size;
 }
 
-void
+static void
 msgpack_unpack_paxos_preempted(msgpack_packer* o, paxos_preempted* v)
 {
   unsigned char* buffer = (unsigned char*)o;
 
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&v->aid, &buffer);
-  deserialize_int_to_big(&v->iid, &buffer);
-  deserialize_int_to_big(&v->ballot, &buffer);
-#else
   dcp_int_packet(&v->aid, &buffer);
   dcp_int_packet(&v->iid, &buffer);
   dcp_int_packet(&v->ballot, &buffer);
-#endif
 }
 
-long
+static long
 msgpack_pack_paxos_repeat(msgpack_packer** p, paxos_repeat* v)
 {
   long size = (sizeof(unsigned int) * 2);
@@ -351,32 +290,22 @@ msgpack_pack_paxos_repeat(msgpack_packer** p, paxos_repeat* v)
   unsigned int from = v->from;
   unsigned int to = v->to;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(from, &tmp);
-  serialize_int_to_big(to, &tmp);
-#else
   cp_int_packet(from, &tmp);
   cp_int_packet(to, &tmp);
-#endif
 
   return size;
 }
 
-void
+static void
 msgpack_unpack_paxos_repeat(msgpack_packer* o, paxos_repeat* v)
 {
   unsigned char* buffer = (unsigned char*)o;
 
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&v->from, &buffer);
-  deserialize_int_to_big(&v->to, &buffer);
-#else
   dcp_int_packet(&v->from, &buffer);
   dcp_int_packet(&v->to, &buffer);
-#endif
 }
 
-long
+static long
 msgpack_pack_paxos_trim(msgpack_packer** p, paxos_trim* v)
 {
   long size = (sizeof(unsigned int) * 1);
@@ -384,28 +313,19 @@ msgpack_pack_paxos_trim(msgpack_packer** p, paxos_trim* v)
   unsigned char* tmp = (unsigned char*)*p;
 
   unsigned int iid = v->iid;
-
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(iid, &tmp);
-#else
   cp_int_packet(iid, &tmp);
-#endif
   return size;
 }
 
-void
+static void
 msgpack_unpack_paxos_trim(msgpack_packer* o, paxos_trim* v)
 {
   unsigned char* buffer = (unsigned char*)o;
 
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&v->iid, &buffer);
-#else
   dcp_int_packet(&v->iid, &buffer);
-#endif
 }
 
-long
+static long
 msgpack_pack_paxos_acceptor_state(msgpack_packer** p, paxos_acceptor_state* v)
 {
   long size = (sizeof(unsigned int) * 2);
@@ -415,32 +335,22 @@ msgpack_pack_paxos_acceptor_state(msgpack_packer** p, paxos_acceptor_state* v)
   unsigned int aid = v->aid;
   unsigned int trim_iid = v->trim_iid;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(aid, &tmp);
-  serialize_int_to_big(trim_iid, &tmp);
-#else
   cp_int_packet(aid, &tmp);
   cp_int_packet(trim_iid, &tmp);
-#endif
 
   return size;
 }
 
-void
+static void
 msgpack_unpack_paxos_acceptor_state(msgpack_packer* o, paxos_acceptor_state* v)
 {
   unsigned char* buffer = (unsigned char*)o;
 
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&v->aid, &buffer);
-  deserialize_int_to_big(&v->trim_iid, &buffer);
-#else
   dcp_int_packet(&v->aid, &buffer);
   dcp_int_packet(&v->trim_iid, &buffer);
-#endif
 }
 
-long
+static long
 msgpack_pack_paxos_client_value(msgpack_packer** p, paxos_client_value* v)
 {
   int  len = v->value.paxos_value_len;
@@ -450,26 +360,20 @@ msgpack_pack_paxos_client_value(msgpack_packer** p, paxos_client_value* v)
   // printk("Sending size data %d tot size %ld\n", len, size);
   char* value = v->value.paxos_value_val;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(len, &tmp);
-#else
   cp_int_packet(len, &tmp);
-#endif
+
   memcpy(tmp, value, len);
   return size;
 }
 
-int
+static int
 msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v,
                                   int packet_len)
 {
   unsigned char* buffer = (unsigned char*)o;
   int            size;
-#ifndef _BIG_ENDIAN
-  deserialize_int_to_big(&size, &buffer);
-#else
+
   dcp_int_packet(&size, &buffer);
-#endif
   // printk("Receved %d, size data %d\n", packet_len, size);
 
   // if ((packet_len - sizeof(int)) != size) {
@@ -487,25 +391,22 @@ msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v,
   return 0;
 }
 
-long
-msgpack_pack_paxos_learner(msgpack_packer** p, void* v, int enum_type)
+static long
+msgpack_pack_paxos_learner(msgpack_packer** p, paxos_message_type enum_type)
 {
   long size = sizeof(unsigned int);
   *p = pmalloc(size);
   unsigned char* tmp = (unsigned char*)*p;
 
-  unsigned int type = enum_type;
+  paxos_message_type type = enum_type;
 
-#ifndef _BIG_ENDIAN
-  serialize_int_to_big(type, &tmp);
-#else
   cp_int_packet(type, &tmp);
-#endif
   return size;
 }
 
-int
-msgpack_unpack_paxos_learner(msgpack_packer* o, void* v, int packet_len)
+static int
+msgpack_unpack_paxos_learner(msgpack_packer* o, paxos_message_type enum_type,
+                             int packet_len)
 {
   return 0;
 }
@@ -513,96 +414,96 @@ msgpack_unpack_paxos_learner(msgpack_packer* o, void* v, int packet_len)
 long
 msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v)
 {
-  long ret = 0;
   switch (v->type) {
     case PAXOS_PREPARE:
-      ret = msgpack_pack_paxos_prepare(p, &v->u.prepare);
-      break;
+      return msgpack_pack_paxos_prepare(p, &v->u.prepare);
+
     case PAXOS_PROMISE:
-      ret = msgpack_pack_paxos_promise(p, &v->u.promise);
-      break;
+      return msgpack_pack_paxos_promise(p, &v->u.promise);
+
     case PAXOS_ACCEPT:
-      ret = msgpack_pack_paxos_accept(p, &v->u.accept);
-      break;
+      return msgpack_pack_paxos_accept(p, &v->u.accept);
+
     case PAXOS_ACCEPTED:
-      ret = msgpack_pack_paxos_accepted(p, &v->u.accepted);
-      break;
+      return msgpack_pack_paxos_accepted(p, &v->u.accepted);
+
     case PAXOS_PREEMPTED:
-      ret = msgpack_pack_paxos_preempted(p, &v->u.preempted);
-      break;
+      return msgpack_pack_paxos_preempted(p, &v->u.preempted);
+
     case PAXOS_REPEAT:
-      ret = msgpack_pack_paxos_repeat(p, &v->u.repeat);
-      break;
+      return msgpack_pack_paxos_repeat(p, &v->u.repeat);
+
     case PAXOS_TRIM:
-      ret = msgpack_pack_paxos_trim(p, &v->u.trim);
-      break;
+      return msgpack_pack_paxos_trim(p, &v->u.trim);
+
     case PAXOS_ACCEPTOR_STATE:
-      ret = msgpack_pack_paxos_acceptor_state(p, &v->u.state);
-      break;
+      return msgpack_pack_paxos_acceptor_state(p, &v->u.state);
+
     case PAXOS_CLIENT_VALUE:
-      ret = msgpack_pack_paxos_client_value(p, &v->u.client_value);
-      break;
+      return msgpack_pack_paxos_client_value(p, &v->u.client_value);
+
     case PAXOS_LEARNER_HI:
-      ret = msgpack_pack_paxos_learner(p, &v->u.learner_hi, PAXOS_LEARNER_HI);
-      break;
+      return msgpack_pack_paxos_learner(p, PAXOS_LEARNER_HI);
+
     case PAXOS_LEARNER_DEL:
-      ret = msgpack_pack_paxos_learner(p, &v->u.learner_del, PAXOS_LEARNER_DEL);
-      break;
+      return msgpack_pack_paxos_learner(p, PAXOS_LEARNER_DEL);
+
     case PAXOS_ACCEPTOR_OK:
-      ret = msgpack_pack_paxos_learner(p, &v->u.accept_ok, PAXOS_ACCEPTOR_OK);
-      break;
+      return msgpack_pack_paxos_learner(p, PAXOS_ACCEPTOR_OK);
+    default:
+      return 0;
   }
-  return ret;
 }
 
 int
 msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size,
                              paxos_message_type p)
 {
-  int partial_message = 0;
   v->type = p;
 
   switch (p) {
     case PAXOS_PREPARE:
       msgpack_unpack_paxos_prepare(o, &v->u.prepare);
-      break;
+      return 0;
+
     case PAXOS_PROMISE:
-      partial_message = msgpack_unpack_paxos_promise(o, &v->u.promise, size);
-      break;
+      return msgpack_unpack_paxos_promise(o, &v->u.promise, size);
+
     case PAXOS_ACCEPT:
-      partial_message = msgpack_unpack_paxos_accept(o, &v->u.accept, size);
-      break;
+      return msgpack_unpack_paxos_accept(o, &v->u.accept, size);
+
     case PAXOS_ACCEPTED:
-      partial_message = msgpack_unpack_paxos_accepted(o, &v->u.accepted, size);
-      break;
+      return msgpack_unpack_paxos_accepted(o, &v->u.accepted, size);
+
     case PAXOS_PREEMPTED:
       msgpack_unpack_paxos_preempted(o, &v->u.preempted);
-      break;
+      return 0;
+
     case PAXOS_REPEAT:
       msgpack_unpack_paxos_repeat(o, &v->u.repeat);
-      break;
+      return 0;
+
     case PAXOS_TRIM:
       msgpack_unpack_paxos_trim(o, &v->u.trim);
-      break;
+      return 0;
+
     case PAXOS_ACCEPTOR_STATE:
       msgpack_unpack_paxos_acceptor_state(o, &v->u.state);
-      break;
+      return 0;
+
     case PAXOS_CLIENT_VALUE:
-      partial_message =
-        msgpack_unpack_paxos_client_value(o, &v->u.client_value, size);
-      break;
+      return msgpack_unpack_paxos_client_value(o, &v->u.client_value, size);
+
     case PAXOS_LEARNER_HI:
-      // partial_message = msgpack_unpack_paxos_learner(o, &v->u.learner_hi,
-      // size, PAXOS_LEARNER_HI);
-      break;
+      return msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_HI, size);
+
     case PAXOS_LEARNER_DEL:
-      // partial_message = msgpack_unpack_paxos_learner(o, &v->u.learner_del,
-      // size, PAXOS_LEARNER_DEL);
-      break;
+      return msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_DEL, size);
+
     case PAXOS_ACCEPTOR_OK:
-      // partial_message = msgpack_unpack_paxos_learner(o, &v->u.accept_ok,
-      // size, PAXOS_ACCEPTOR_OK);
-      break;
+      return msgpack_unpack_paxos_learner(o, PAXOS_ACCEPTOR_OK, size);
+
+    default:
+      return 0;
   }
-  return partial_message;
 }
