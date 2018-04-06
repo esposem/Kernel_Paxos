@@ -70,7 +70,7 @@ static void
 start_replica(int id)
 {
 
-  kdevchar_init(id, "klearner");
+  // kdevchar_init(id, "klearner");
   replica = evpaxos_replica_init(id, deliver, NULL, if_name, path);
 
   if (replica == NULL) {
@@ -92,8 +92,8 @@ static int __init
 static void __exit
             replica_exit(void)
 {
-  kstop_device();
-  kdevchar_exit();
+  // kstop_device();
+  // kdevchar_exit();
   if (replica != NULL)
     evpaxos_replica_free(replica);
   printk("Module unloaded\n\n");

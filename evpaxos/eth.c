@@ -1,5 +1,4 @@
 #include "eth.h"
-// #include "log.h"
 #include "message.h"
 #include <linux/if_ether.h>
 #include <linux/net.h>
@@ -16,8 +15,7 @@ struct callback
   void*              arg;
 };
 
-static struct callback cbs[MAX_PROTO];
-static int             cbs_count;
+static struct callback cbs[N_PAXOS_TYPES];
 
 static int packet_recv(struct sk_buff* sk, struct net_device* dev,
                        struct packet_type* pt, struct net_device* dev2);
@@ -25,7 +23,6 @@ static int packet_recv(struct sk_buff* sk, struct net_device* dev,
 struct net_device*
 eth_init(const char* if_name)
 {
-  cbs_count = 0;
   memset(cbs, 0, sizeof(cbs));
   return dev_get_by_name(&init_net, if_name);
 }
@@ -33,54 +30,43 @@ eth_init(const char* if_name)
 int
 eth_listen(struct net_device* dev, uint16_t proto, peer_cb cb, void* arg)
 {
-  int i;
-
-  if (cbs_count == MAX_PROTO) {
-    printk(KERN_ERR "reached maximum numbers of listeners.");
-    return 0;
-  }
-  for (i = 0; i < cbs_count; ++i) {
-    if (cbs[i].pt.type == htons(proto))
-      break;
-  }
-  cbs[i].pt.type = htons(proto);
-  cbs[i].pt.func = packet_recv;
-  cbs[i].pt.dev = dev;
-  cbs[i].cb = cb;
-  cbs[i].arg = arg;
-  if (i == cbs_count) {
-    cbs_count++;
+  int i = GET_PAXOS_POS(proto);
+  if (i >= 0 && i < N_PAXOS_TYPES) {
+    cbs[i].pt.type = htons(proto);
+    cbs[i].pt.func = packet_recv;
+    cbs[i].pt.dev = dev;
+    cbs[i].cb = cb;
+    cbs[i].arg = arg;
     dev_add_pack(&cbs[i].pt);
   }
+
   return 1;
 }
 
+// proto must be in ntohs
+static void
+deliver_message(uint16_t proto, eth_address* addr, char* data, size_t len)
+{
+  int i = GET_PAXOS_POS(proto);
+  if (i >= 0 && i < N_PAXOS_TYPES && cbs[i].cb != NULL) {
+    paxos_message msg;
+    recv_paxos_message(&msg, proto, data, len);
+    cbs[i].cb(&msg, cbs[i].arg, addr);
+    paxos_message_destroy(&msg);
+  }
+}
 static int
 packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
             struct net_device* src_dev)
 {
-  int            i;
-  int            found = 0;
   uint16_t       proto = skb->protocol;
   struct ethhdr* eth = eth_hdr(skb);
   char*          data = pmalloc(ETH_FRAME_LEN - ETH_HLEN);
   size_t         len = skb->len;
 
   skb_copy_bits(skb, 0, data, len);
+  deliver_message(ntohs(proto), eth->h_source, data, len);
 
-  for (i = 0; i < cbs_count; ++i) {
-    if (cbs[i].pt.type == proto) {
-      paxos_message msg;
-      recv_paxos_message(&msg, (paxos_message_type)ntohs(proto), data, len);
-      // if (ntohs(proto) == PAXOS_PROMISE)
-      //   printk("ll received %zu", len);
-      cbs[i].cb(&msg, cbs[i].arg, eth->h_source);
-      paxos_message_destroy(&msg);
-      found++;
-    }
-  }
-  if (!found)
-    printk(KERN_ERR "no callback for protocol number %d\n", ntohs(proto));
   kfree_skb(skb);
   pfree(data);
   return 0;
@@ -90,8 +76,14 @@ int
 eth_send(struct net_device* dev, uint8_t dest_addr[ETH_ALEN], uint16_t proto,
          const char* msg, size_t len)
 {
-  int             ret;
-  unsigned char*  data;
+  int            ret;
+  unsigned char* data;
+  if (memcmp(dev->dev_addr, dest_addr, eth_size) == 0) {
+    // localhost for replica
+    deliver_message(proto, dest_addr, (char*)msg, len);
+    return !len;
+  }
+
   struct sk_buff* skb = alloc_skb(ETH_FRAME_LEN, GFP_ATOMIC);
 
   skb->dev = dev;
@@ -121,9 +113,10 @@ int
 eth_destroy(struct net_device* dev)
 {
   int i;
-
-  for (i = 0; i < cbs_count; ++i)
-    dev_remove_pack(&cbs[i].pt);
+  for (i = 0; i < N_PAXOS_TYPES; ++i) {
+    if (cbs[i].cb != NULL)
+      dev_remove_pack(&cbs[i].pt);
+  }
   return 1;
 }
 

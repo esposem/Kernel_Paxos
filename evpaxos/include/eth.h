@@ -7,7 +7,6 @@
 #include <linux/types.h>
 #include "peers.h"
 
-#define MAX_PROTO 30
 
 // typedef void (*rcv_cb)(struct net_device* dev, uint8_t src_addr[ETH_ALEN],
 //                        char* rmsg, size_t len);

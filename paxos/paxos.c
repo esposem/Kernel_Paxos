@@ -126,17 +126,11 @@ paxos_message_destroy(paxos_message* m)
 void
 paxos_log(int level, const char* format, va_list ap)
 {
-  int  off = 0;
-  char msg[1000];
-  vsnprintf(msg + off, sizeof(msg) - off, format, ap);
-
-  // always print errors!
-  if (level == PAXOS_LOG_ERROR)
-    printk(KERN_ERR "%s\n", msg);
-
   if (level > paxos_config.verbosity) {
     return;
   }
+  char msg[1000];
+  vsnprintf(msg, sizeof(msg), format, ap);
 
   switch (level) {
     case PAXOS_LOG_INFO:
@@ -145,6 +139,9 @@ paxos_log(int level, const char* format, va_list ap)
     case PAXOS_LOG_DEBUG:
       printk(KERN_INFO "%s\n", msg);
       break;
+    case PAXOS_LOG_ERROR:
+      printk(KERN_ERR "%s\n", msg);
+      break
   }
 }
 
