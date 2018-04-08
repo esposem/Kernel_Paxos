@@ -52,12 +52,11 @@ struct subscription
 
 struct peers
 {
-  int                    peers_count, clients_count;
-  struct peer**          peers;   /* peers we connected to */
-  struct peer**          clients; /* peers we accepted connections from */
-  struct peer*           me_send;
-  struct evpaxos_config* config;
-  struct net_device*     dev;
+  int                peers_count, clients_count;
+  struct peer**      peers;   /* peers we connected to */
+  struct peer**      clients; /* peers we accepted connections from */
+  struct peer*       me_send;
+  struct net_device* dev;
 };
 
 int* peers_received_ok = NULL;
@@ -114,7 +113,6 @@ peers_new(struct evpaxos_config* config, int id, char* if_name)
   p->peers = NULL;
   p->clients = NULL;
 
-  p->config = config;
   p->dev = eth_init(if_name);
   if (p->dev == NULL) {
     printk(KERN_ERR "Interface not found: %s\n", if_name);
@@ -177,16 +175,16 @@ peers_get_acceptor(struct peers* p, int id)
 
 // add all acceptors in the peers
 void
-add_acceptors_from_config(struct peers* p)
+add_acceptors_from_config(struct peers* p, struct evpaxos_config* conf)
 {
   eth_address* addr;
-  int          n = evpaxos_acceptor_count(p->config);
+  int          n = evpaxos_acceptor_count(conf);
   p->peers = prealloc(p->peers, sizeof(struct peer*) * n);
-  int i;
-  for (i = 0; i < n; i++) {
-    addr = evpaxos_acceptor_address(p->config, i);
-    p->peers[p->peers_count] = make_peer(p, i, addr);
-    p->peers_count++;
+
+  for (int i = 0; i < n; i++) {
+    addr = evpaxos_acceptor_address(conf, i);
+    if (addr)
+      p->peers[p->peers_count++] = make_peer(p, i, addr);
   }
   peers_received_ok = pmalloc(sizeof(int) * p->peers_count);
   memset(peers_received_ok, 0, sizeof(int) * p->peers_count);
@@ -309,11 +307,6 @@ make_peer(struct peers* peers, int id, eth_address* addr)
 {
   struct peer* p = pmalloc(sizeof(struct peer));
   p->id = id;
-  if (addr == NULL) {
-    paxos_log_error("Null address for peer %d", id);
-    kfree(p);
-    return NULL;
-  }
   memcpy(p->addr, addr, eth_size);
   p->peers = peers;
   return p;

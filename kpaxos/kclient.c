@@ -46,7 +46,7 @@ struct timeval        sk_timeout_timeval;
 
 struct client
 {
-  int               id; // will create nclients from id to nclients+id
+  int               id; // will create nclients from id to nclients+id-1
   struct timeval*   clients_timeval;
   eth_address       proposeradd[ETH_ALEN];
   int               value_size;

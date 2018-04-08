@@ -141,7 +141,7 @@ paxos_log(int level, const char* format, va_list ap)
       break;
     case PAXOS_LOG_ERROR:
       printk(KERN_ERR "%s\n", msg);
-      break
+      break;
   }
 }
 

@@ -82,10 +82,10 @@ mem_storage_close(void* handle)
   {
     HASH_DEL(s->record, current_hash);
     paxos_accepted_free(current_hash->value);
-    kfree(current_hash);
+    pfree(current_hash);
   }
 
-  kfree(s);
+  pfree(s);
 }
 
 static int
@@ -155,7 +155,7 @@ mem_storage_trim(void* handle, iid_t iid)
     if (hash_el->iid <= (int)iid) {
       HASH_DEL(s->record, hash_el);
       paxos_accepted_free(hash_el->value);
-      kfree(hash_el);
+      pfree(hash_el);
     }
   }
   s->trim_iid = iid;
