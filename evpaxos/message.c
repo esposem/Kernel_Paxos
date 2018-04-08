@@ -37,6 +37,7 @@ send_paxos_message(struct net_device* dev, eth_address* addr,
 {
   msgpack_packer* packer;
   long            size_msg = msgpack_pack_paxos_message(&packer, msg);
+
   eth_send(dev, addr, (uint16_t)msg->type, packer, size_msg);
   // if (msg->type == PAXOS_PROMISE)
   //   printk("sent %ld\n", size_msg);

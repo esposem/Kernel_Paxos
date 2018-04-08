@@ -31,7 +31,7 @@ int
 eth_listen(struct net_device* dev, uint16_t proto, peer_cb cb, void* arg)
 {
   int i = GET_PAXOS_POS(proto);
-  if (i >= 0 && i < N_PAXOS_TYPES) {
+  if (i >= 0 && i < N_PAXOS_TYPES && cbs[i].cb == NULL) {
     cbs[i].pt.type = htons(proto);
     cbs[i].pt.func = packet_recv;
     cbs[i].pt.dev = dev;
@@ -55,6 +55,7 @@ deliver_message(uint16_t proto, eth_address* addr, char* data, size_t len)
     paxos_message_destroy(&msg);
   }
 }
+
 static int
 packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
             struct net_device* src_dev)

@@ -52,8 +52,6 @@ deliver(unsigned iid, char* value, size_t size, void* arg)
         printk(KERN_ERR "Replica sent trim to all");
         evpaxos_replica_send_trim(replica, sendtrim);
       }
-      printk("Replica sent autotrim");
-      evpaxos_replica_internal_trim(replica, sendtrim);
       sendtrim = 0;
     }
   } else {

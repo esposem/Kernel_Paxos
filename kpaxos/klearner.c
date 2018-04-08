@@ -26,12 +26,6 @@ static int cantrim = 0;
 module_param(cantrim, int, S_IRUGO);
 MODULE_PARM_DESC(cantrim, "If the module has send to trim, set it to 1");
 
-// static int catch_up = 0;
-// module_param(catch_up, int, S_IRUGO);
-// MODULE_PARM_DESC(
-//   catch_up, "If the module has to catch up the previous values, set it to
-//   1");
-
 static int id = 0;
 module_param(id, int, S_IRUGO);
 MODULE_PARM_DESC(id, "The learner id (used for kdevice), default 0");
@@ -55,8 +49,6 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
         printk(KERN_ERR "Learner: sent trim to all\n");
         evlearner_send_trim(lea, sendtrim);
       }
-      printk("Learner: sent autotrim");
-      evlearner_auto_trim(lea, sendtrim);
       sendtrim = 0;
     }
   } else {
@@ -75,11 +67,6 @@ static int
 start_learner(void)
 {
   kdevchar_init(id, "klearner");
-
-  // if (catch_up == 0) {
-  //   paxos_config.learner_catch_up = 0;
-  // }
-
   lea = evlearner_init(on_deliver, NULL, if_name, path, 0);
 
   if (lea == NULL) {
@@ -96,11 +83,6 @@ static int __init
     printk(KERN_ERR "you must give an id!\n");
     return 0;
   }
-
-  // if (catch_up != 1 && catch_up != 0) {
-  //   printk(KERN_ERR "invalid catch_up, set to 0\n");
-  //   catch_up = 0;
-  // }
   start_learner();
   return 0;
 }

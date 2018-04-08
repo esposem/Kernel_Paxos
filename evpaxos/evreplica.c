@@ -69,7 +69,7 @@ evpaxos_replica_init(int id, deliver_function f, void* arg, char* if_name,
   r->peers = peers_new(config, id, if_name);
   if (r->peers == NULL)
     return NULL;
-  add_acceptors_from_config(r->peers);
+  add_acceptors_from_config(r->peers, config);
   printall(r->peers, "Replica");
   r->deliver = f;
   r->acceptor = evacceptor_init_internal(id, config, r->peers);
@@ -78,7 +78,6 @@ evpaxos_replica_init(int id, deliver_function f, void* arg, char* if_name,
   r->proposer = evproposer_init_internal(id, config, r->peers);
   r->arg = arg;
   evpaxos_config_free(config);
-  evproposer_preexec_once(r->proposer);
   return r;
 }
 

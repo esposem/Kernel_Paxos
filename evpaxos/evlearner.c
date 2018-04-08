@@ -157,7 +157,7 @@ evlearner_init(deliver_function f, void* arg, char* if_name, char* path,
   if (peers == NULL) {
     return NULL;
   }
-  add_acceptors_from_config(peers);
+  add_acceptors_from_config(peers, c);
   printall(peers, "Learner");
 
   struct evlearner* l = evlearner_init_internal(c, peers, f, arg);
@@ -206,4 +206,5 @@ evlearner_send_trim(struct evlearner* l, unsigned iid)
   paxos_trim trim = { iid };
   paxos_log_debug("Learner: Sent PAXOS_TRIM to all acceptors");
   peers_foreach_acceptor(l->acceptors, peer_send_trim, &trim);
+  evlearner_auto_trim(l, iid);
 }

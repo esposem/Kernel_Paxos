@@ -44,7 +44,6 @@ int evpaxos_proposer_listen_port(struct evpaxos_config* c, int i);
 int evpaxos_acceptor_count(struct evpaxos_config* config);
 int evpaxos_proposer_count(struct evpaxos_config* config);
 eth_address * evpaxos_acceptor_address(struct evpaxos_config* c, int i);
-// struct sockaddr_in evpaxos_learner_address(struct evpaxos_config* c, int i);
 int evpaxos_acceptor_listen_port(struct evpaxos_config* c, int i);
 
 #ifdef __cplusplus
