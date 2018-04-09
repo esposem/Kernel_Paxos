@@ -113,6 +113,7 @@ evpaxos_config_read(char* name)
   if (line && f) {
 #if 1
     int offset = 0, read = 0, line_pos = 0;
+    // TODO LATER put in file.h
     while ((read = file_read(f, offset, &(line[line_pos]), 1)) != 0) {
       offset += read;
 

@@ -36,7 +36,7 @@ extern "C" {
 #include "paxos_types.h"
 #include "common.h"
 
-long msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v);
+long msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v);
 int msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size, paxos_message_type p);
 
 #ifdef __cplusplus

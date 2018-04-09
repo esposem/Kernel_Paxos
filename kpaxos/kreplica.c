@@ -28,9 +28,9 @@ static int cantrim = 0;
 module_param(cantrim, int, S_IRUGO);
 MODULE_PARM_DESC(cantrim, "If the module has to send trim, set it to 1");
 
-static char* if_name = "enp1s0";
+static char* if_name = "enp4s0";
 module_param(if_name, charp, 0000);
-MODULE_PARM_DESC(if_name, "The interface name, default enp1s0");
+MODULE_PARM_DESC(if_name, "The interface name, default enp4s0");
 
 static char* path = "./paxos.conf";
 module_param(path, charp, S_IRUGO);

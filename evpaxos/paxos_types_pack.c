@@ -33,7 +33,7 @@
  */
 
 #include "paxos_types_pack.h"
-#include <linux/slab.h>
+#include "eth.h"
 
 #ifndef _BIG_ENDIAN
 // Machine is little endian
@@ -76,127 +76,65 @@ dcp_int_packet(uint32_t* n, unsigned char** buffer)
 }
 #endif
 
-static long
-msgpack_pack_paxos_prepare(msgpack_packer** p, paxos_prepare* v)
+static int
+check_len(int len, int size)
 {
-  long size = (sizeof(unsigned int) * 2);
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
+  int l = ETH_DATA_LEN - size;
+  if (len > l)
+    len = l;
+  return len;
+}
 
-  unsigned int iid = v->iid;
-  unsigned int ballot = v->ballot;
+static long
+msgpack_pack_paxos_prepare(msgpack_packer* p, paxos_prepare* v)
+{
+  cp_int_packet(v->iid, &p);
+  cp_int_packet(v->ballot, &p);
 
-  cp_int_packet(iid, &tmp);
-  cp_int_packet(ballot, &tmp);
-
-  return size;
+  return (sizeof(uint32_t) * 2);
 }
 
 static void
 msgpack_unpack_paxos_prepare(msgpack_packer* o, paxos_prepare* v)
 {
-  unsigned char* buffer = (unsigned char*)o;
-
-  dcp_int_packet(&v->iid, &buffer);
-  dcp_int_packet(&v->ballot, &buffer);
+  dcp_int_packet(&v->iid, &o);
+  dcp_int_packet(&v->ballot, &o);
 }
 
 static long
-msgpack_pack_paxos_promise(msgpack_packer** p, paxos_promise* v)
+msgpack_pack_paxos_promise(msgpack_packer* p, paxos_promise* v)
 {
-  int  len = v->value.paxos_value_len;
-  long size = (sizeof(unsigned int) * 5) + len;
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
+  char* value = v->value.paxos_value_val;
+  long  size = (sizeof(uint32_t) * 5);
+  int   len = check_len(v->value.paxos_value_len, size);
 
-  unsigned int aid = v->aid;
-  unsigned int iid = v->iid;
-  unsigned int ballot = v->ballot;
-  unsigned int value_ballot = v->value_ballot;
-  char*        value = v->value.paxos_value_val;
+  cp_int_packet(v->aid, &p);
+  cp_int_packet(v->iid, &p);
+  cp_int_packet(v->ballot, &p);
+  cp_int_packet(v->value_ballot, &p);
+  cp_int_packet(len, &p);
 
-  cp_int_packet(aid, &tmp);
-  cp_int_packet(iid, &tmp);
-  cp_int_packet(ballot, &tmp);
-  cp_int_packet(value_ballot, &tmp);
-  cp_int_packet(len, &tmp);
+  memcpy(p, value, len);
 
-  // printk("Sent data size %d, tot packet size %ld\n", len, size);
-  if (size > 0)
-    memcpy(tmp, value, len);
-  // printk("%u %u %u %u %u %s\n", aid, iid, ballot, value_ballot, len, tmp);
-
-  return size;
+  return size + len;
 }
 
 static int
-msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v,
-                             int packet_len)
+msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v)
 {
-  unsigned char* buffer = (unsigned char*)o;
-  int            size;
+  int size;
 
-  dcp_int_packet(&v->aid, &buffer);
-  dcp_int_packet(&v->iid, &buffer);
-  dcp_int_packet(&v->ballot, &buffer);
-  dcp_int_packet(&v->value_ballot, &buffer);
-  dcp_int_packet(&size, &buffer);
-
-  // printk("Received %d, data size %d\n", packet_len, size);
-
-  // if ((packet_len - (sizeof(int) * 5)) != size) {
-  //   printk("%s Error! packet length %d differs from supposed size of %d\n",
-  //          __func__, packet_len, size);
-  // }
-  v->value.paxos_value_len = size;
-  if (size > 0) {
-    v->value.paxos_value_val = pmalloc(size);
-    memset(v->value.paxos_value_val, 0, size);
-    memcpy(v->value.paxos_value_val, buffer, size);
-  } else {
-    v->value.paxos_value_val = NULL;
-  }
-
-  // printk("%u %u %u %u %u %s\n", v->aid, v->iid, v->ballot, v->value_ballot,
-  //        size, v->value.paxos_value_val);
-
-  return 0;
-}
-
-static long
-msgpack_pack_paxos_accept(msgpack_packer** p, paxos_accept* v)
-{
-  int  len = v->value.paxos_value_len;
-  long size = (sizeof(unsigned int) * 3) + len;
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
-
-  unsigned int iid = v->iid;
-  unsigned int ballot = v->ballot;
-  char*        value = v->value.paxos_value_val;
-
-  cp_int_packet(iid, &tmp);
-  cp_int_packet(ballot, &tmp);
-  cp_int_packet(len, &tmp);
-
-  memcpy(tmp, value, len);
-  return size;
-}
-
-static int
-msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int packet_len)
-{
-  unsigned char* buffer = (unsigned char*)o;
-  int            size;
-
-  dcp_int_packet(&v->iid, &buffer);
-  dcp_int_packet(&v->ballot, &buffer);
-  dcp_int_packet(&size, &buffer);
+  dcp_int_packet(&v->aid, &o);
+  dcp_int_packet(&v->iid, &o);
+  dcp_int_packet(&v->ballot, &o);
+  dcp_int_packet(&v->value_ballot, &o);
+  dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
   if (size > 0) {
+    // TODO MAYBE pre-alloc
     v->value.paxos_value_val = pmalloc(size);
-    memcpy(v->value.paxos_value_val, buffer, size);
+    memcpy(v->value.paxos_value_val, o, size);
   } else {
     v->value.paxos_value_val = NULL;
   }
@@ -205,46 +143,33 @@ msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v, int packet_len)
 }
 
 static long
-msgpack_pack_paxos_accepted(msgpack_packer** p, paxos_accepted* v)
+msgpack_pack_paxos_accept(msgpack_packer* p, paxos_accept* v)
 {
-  int  len = v->value.paxos_value_len;
-  long size = (sizeof(unsigned int) * 5) + len;
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
+  long  size = (sizeof(unsigned int) * 3);
+  int   len = check_len(v->value.paxos_value_len, size);
+  char* value = v->value.paxos_value_val;
 
-  unsigned int aid = v->aid;
-  unsigned int iid = v->iid;
-  unsigned int ballot = v->ballot;
-  unsigned int value_ballot = v->value_ballot;
-  char*        value = v->value.paxos_value_val;
+  cp_int_packet(v->iid, &p);
+  cp_int_packet(v->ballot, &p);
+  cp_int_packet(len, &p);
 
-  cp_int_packet(aid, &tmp);
-  cp_int_packet(iid, &tmp);
-  cp_int_packet(ballot, &tmp);
-  cp_int_packet(value_ballot, &tmp);
-  cp_int_packet(len, &tmp);
-
-  memcpy(tmp, value, len);
-  return size;
+  memcpy(p, value, len);
+  return size + len;
 }
 
 static int
-msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v,
-                              int packet_len)
+msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v)
 {
-  unsigned char* buffer = (unsigned char*)o;
-  int            size;
+  int size;
 
-  dcp_int_packet(&v->aid, &buffer);
-  dcp_int_packet(&v->iid, &buffer);
-  dcp_int_packet(&v->ballot, &buffer);
-  dcp_int_packet(&v->value_ballot, &buffer);
-  dcp_int_packet(&size, &buffer);
+  dcp_int_packet(&v->iid, &o);
+  dcp_int_packet(&v->ballot, &o);
+  dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
   if (size > 0) {
     v->value.paxos_value_val = pmalloc(size);
-    memcpy(v->value.paxos_value_val, buffer, size);
+    memcpy(v->value.paxos_value_val, o, size);
   } else {
     v->value.paxos_value_val = NULL;
   }
@@ -253,137 +178,125 @@ msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v,
 }
 
 static long
-msgpack_pack_paxos_preempted(msgpack_packer** p, paxos_preempted* v)
+msgpack_pack_paxos_accepted(msgpack_packer* p, paxos_accepted* v)
 {
-  long size = (sizeof(unsigned int) * 3);
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
+  long  size = (sizeof(unsigned int) * 5);
+  char* value = v->value.paxos_value_val;
+  int   len = check_len(v->value.paxos_value_len, size);
 
-  unsigned int aid = v->aid;
-  unsigned int iid = v->iid;
-  unsigned int ballot = v->ballot;
+  cp_int_packet(v->aid, &p);
+  cp_int_packet(v->iid, &p);
+  cp_int_packet(v->ballot, &p);
+  cp_int_packet(v->value_ballot, &p);
+  cp_int_packet(len, &p);
 
-  cp_int_packet(aid, &tmp);
-  cp_int_packet(iid, &tmp);
-  cp_int_packet(ballot, &tmp);
+  memcpy(p, value, len);
+  return size + len;
+}
 
-  return size;
+static int
+msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v)
+{
+  int size;
+
+  dcp_int_packet(&v->aid, &o);
+  dcp_int_packet(&v->iid, &o);
+  dcp_int_packet(&v->ballot, &o);
+  dcp_int_packet(&v->value_ballot, &o);
+  dcp_int_packet(&size, &o);
+
+  v->value.paxos_value_len = size;
+  if (size > 0) {
+    v->value.paxos_value_val = pmalloc(size);
+    memcpy(v->value.paxos_value_val, o, size);
+  } else {
+    v->value.paxos_value_val = NULL;
+  }
+
+  return 0;
+}
+
+static long
+msgpack_pack_paxos_preempted(msgpack_packer* p, paxos_preempted* v)
+{
+  cp_int_packet(v->aid, &p);
+  cp_int_packet(v->iid, &p);
+  cp_int_packet(v->ballot, &p);
+  return (sizeof(uint32_t) * 3);
 }
 
 static void
 msgpack_unpack_paxos_preempted(msgpack_packer* o, paxos_preempted* v)
 {
-  unsigned char* buffer = (unsigned char*)o;
-
-  dcp_int_packet(&v->aid, &buffer);
-  dcp_int_packet(&v->iid, &buffer);
-  dcp_int_packet(&v->ballot, &buffer);
+  dcp_int_packet(&v->aid, &o);
+  dcp_int_packet(&v->iid, &o);
+  dcp_int_packet(&v->ballot, &o);
 }
 
 static long
-msgpack_pack_paxos_repeat(msgpack_packer** p, paxos_repeat* v)
+msgpack_pack_paxos_repeat(msgpack_packer* p, paxos_repeat* v)
 {
-  long size = (sizeof(unsigned int) * 2);
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
-
-  unsigned int from = v->from;
-  unsigned int to = v->to;
-
-  cp_int_packet(from, &tmp);
-  cp_int_packet(to, &tmp);
-
-  return size;
+  cp_int_packet(v->from, &p);
+  cp_int_packet(v->to, &p);
+  return (sizeof(uint32_t) * 2);
 }
 
 static void
 msgpack_unpack_paxos_repeat(msgpack_packer* o, paxos_repeat* v)
 {
-  unsigned char* buffer = (unsigned char*)o;
-
-  dcp_int_packet(&v->from, &buffer);
-  dcp_int_packet(&v->to, &buffer);
+  dcp_int_packet(&v->from, &o);
+  dcp_int_packet(&v->to, &o);
 }
 
 static long
-msgpack_pack_paxos_trim(msgpack_packer** p, paxos_trim* v)
+msgpack_pack_paxos_trim(msgpack_packer* p, paxos_trim* v)
 {
-  long size = (sizeof(unsigned int) * 1);
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
-
-  unsigned int iid = v->iid;
-  cp_int_packet(iid, &tmp);
-  return size;
+  cp_int_packet(v->iid, &p);
+  return sizeof(uint32_t);
 }
 
 static void
 msgpack_unpack_paxos_trim(msgpack_packer* o, paxos_trim* v)
 {
-  unsigned char* buffer = (unsigned char*)o;
-
-  dcp_int_packet(&v->iid, &buffer);
+  dcp_int_packet(&v->iid, &o);
 }
 
 static long
-msgpack_pack_paxos_acceptor_state(msgpack_packer** p, paxos_acceptor_state* v)
+msgpack_pack_paxos_acceptor_state(msgpack_packer* p, paxos_acceptor_state* v)
 {
-  long size = (sizeof(unsigned int) * 2);
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
-
-  unsigned int aid = v->aid;
-  unsigned int trim_iid = v->trim_iid;
-
-  cp_int_packet(aid, &tmp);
-  cp_int_packet(trim_iid, &tmp);
-
-  return size;
+  cp_int_packet(v->aid, &p);
+  cp_int_packet(v->trim_iid, &p);
+  return sizeof(uint32_t) * 2;
 }
 
 static void
 msgpack_unpack_paxos_acceptor_state(msgpack_packer* o, paxos_acceptor_state* v)
 {
-  unsigned char* buffer = (unsigned char*)o;
-
-  dcp_int_packet(&v->aid, &buffer);
-  dcp_int_packet(&v->trim_iid, &buffer);
+  dcp_int_packet(&v->aid, &o);
+  dcp_int_packet(&v->trim_iid, &o);
 }
 
 static long
-msgpack_pack_paxos_client_value(msgpack_packer** p, paxos_client_value* v)
+msgpack_pack_paxos_client_value(msgpack_packer* p, paxos_client_value* v)
 {
-  int  len = v->value.paxos_value_len;
-  long size = sizeof(uint32_t) + len;
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
-  // printk("Sending size data %d tot size %ld\n", len, size);
   char* value = v->value.paxos_value_val;
-
-  cp_int_packet(len, &tmp);
-
-  memcpy(tmp, value, len);
-  return size;
+  long  size = sizeof(uint32_t);
+  int   len = check_len(v->value.paxos_value_len, size);
+  cp_int_packet(len, &p);
+  memcpy(p, value, len);
+  return size + len;
 }
 
 static int
-msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v,
-                                  int packet_len)
+msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v)
 {
-  unsigned char* buffer = (unsigned char*)o;
-  int            size;
+  int size;
 
-  dcp_int_packet(&size, &buffer);
-  // printk("Receved %d, size data %d\n", packet_len, size);
-
-  // if ((packet_len - sizeof(int)) != size) {
-  //   printk("%s Error! packet length %d differs from supposed size of %d\n",
-  //          __func__, packet_len, size);
-  // }
+  dcp_int_packet(&size, &o);
   v->value.paxos_value_len = size;
   if (size > 0) {
     v->value.paxos_value_val = pmalloc(size);
-    memcpy(v->value.paxos_value_val, buffer, size);
+    memcpy(v->value.paxos_value_val, o, size);
   } else {
     v->value.paxos_value_val = NULL;
   }
@@ -392,27 +305,20 @@ msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v,
 }
 
 static long
-msgpack_pack_paxos_learner(msgpack_packer** p, paxos_message_type enum_type)
+msgpack_pack_paxos_learner(msgpack_packer* p, paxos_message_type enum_type)
 {
-  long size = sizeof(unsigned int);
-  *p = pmalloc(size);
-  unsigned char* tmp = (unsigned char*)*p;
-
-  paxos_message_type type = enum_type;
-
-  cp_int_packet(type, &tmp);
-  return size;
+  cp_int_packet(enum_type, &p);
+  return sizeof(paxos_message_type);
 }
 
 static int
-msgpack_unpack_paxos_learner(msgpack_packer* o, paxos_message_type enum_type,
-                             int packet_len)
+msgpack_unpack_paxos_learner(msgpack_packer* o, paxos_message_type enum_type)
 {
   return 0;
 }
 
 long
-msgpack_pack_paxos_message(msgpack_packer** p, paxos_message* v)
+msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v)
 {
   switch (v->type) {
     case PAXOS_PREPARE:
@@ -467,13 +373,13 @@ msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size,
       return 0;
 
     case PAXOS_PROMISE:
-      return msgpack_unpack_paxos_promise(o, &v->u.promise, size);
+      return msgpack_unpack_paxos_promise(o, &v->u.promise);
 
     case PAXOS_ACCEPT:
-      return msgpack_unpack_paxos_accept(o, &v->u.accept, size);
+      return msgpack_unpack_paxos_accept(o, &v->u.accept);
 
     case PAXOS_ACCEPTED:
-      return msgpack_unpack_paxos_accepted(o, &v->u.accepted, size);
+      return msgpack_unpack_paxos_accepted(o, &v->u.accepted);
 
     case PAXOS_PREEMPTED:
       msgpack_unpack_paxos_preempted(o, &v->u.preempted);
@@ -492,16 +398,16 @@ msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size,
       return 0;
 
     case PAXOS_CLIENT_VALUE:
-      return msgpack_unpack_paxos_client_value(o, &v->u.client_value, size);
+      return msgpack_unpack_paxos_client_value(o, &v->u.client_value);
 
     case PAXOS_LEARNER_HI:
-      return msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_HI, size);
+      return msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_HI);
 
     case PAXOS_LEARNER_DEL:
-      return msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_DEL, size);
+      return msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_DEL);
 
     case PAXOS_ACCEPTOR_OK:
-      return msgpack_unpack_paxos_learner(o, PAXOS_ACCEPTOR_OK, size);
+      return msgpack_unpack_paxos_learner(o, PAXOS_ACCEPTOR_OK);
 
     default:
       return 0;

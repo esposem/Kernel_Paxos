@@ -100,7 +100,7 @@ void paxos_log_info(const char* format, ...);
 void paxos_log_debug(const char* format, ...);
 
 /*
-	TODO MAX_N_OF_PROPOSERS should be removed.
+	MAX_N_OF_PROPOSERS should be removed.
 	The maximum number of proposers must be fixed beforehand
 	(this is because of unique ballot generation).
 	The proposers must be started with different IDs.
