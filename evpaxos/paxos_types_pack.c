@@ -119,7 +119,7 @@ msgpack_pack_paxos_promise(msgpack_packer* p, paxos_promise* v)
   return size + len;
 }
 
-static int
+static void
 msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v)
 {
   int size;
@@ -131,15 +131,7 @@ msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
-  if (size > 0) {
-    // TODO MAYBE pre-alloc
-    v->value.paxos_value_val = pmalloc(size);
-    memcpy(v->value.paxos_value_val, o, size);
-  } else {
-    v->value.paxos_value_val = NULL;
-  }
-
-  return 0;
+  memcpy(v->value.paxos_value_val, o, size);
 }
 
 static long
@@ -157,7 +149,7 @@ msgpack_pack_paxos_accept(msgpack_packer* p, paxos_accept* v)
   return size + len;
 }
 
-static int
+static void
 msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v)
 {
   int size;
@@ -167,14 +159,7 @@ msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
-  if (size > 0) {
-    v->value.paxos_value_val = pmalloc(size);
-    memcpy(v->value.paxos_value_val, o, size);
-  } else {
-    v->value.paxos_value_val = NULL;
-  }
-
-  return 0;
+  memcpy(v->value.paxos_value_val, o, size);
 }
 
 static long
@@ -194,7 +179,7 @@ msgpack_pack_paxos_accepted(msgpack_packer* p, paxos_accepted* v)
   return size + len;
 }
 
-static int
+static void
 msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v)
 {
   int size;
@@ -206,14 +191,7 @@ msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
-  if (size > 0) {
-    v->value.paxos_value_val = pmalloc(size);
-    memcpy(v->value.paxos_value_val, o, size);
-  } else {
-    v->value.paxos_value_val = NULL;
-  }
-
-  return 0;
+  memcpy(v->value.paxos_value_val, o, size);
 }
 
 static long
@@ -287,21 +265,14 @@ msgpack_pack_paxos_client_value(msgpack_packer* p, paxos_client_value* v)
   return size + len;
 }
 
-static int
+static void
 msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v)
 {
   int size;
 
   dcp_int_packet(&size, &o);
   v->value.paxos_value_len = size;
-  if (size > 0) {
-    v->value.paxos_value_val = pmalloc(size);
-    memcpy(v->value.paxos_value_val, o, size);
-  } else {
-    v->value.paxos_value_val = NULL;
-  }
-
-  return 0;
+  memcpy(v->value.paxos_value_val, o, size);
 }
 
 static long
@@ -311,11 +282,9 @@ msgpack_pack_paxos_learner(msgpack_packer* p, paxos_message_type enum_type)
   return sizeof(paxos_message_type);
 }
 
-static int
+static void
 msgpack_unpack_paxos_learner(msgpack_packer* o, paxos_message_type enum_type)
-{
-  return 0;
-}
+{}
 
 long
 msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v)
@@ -361,55 +330,75 @@ msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v)
   }
 }
 
+#define ADJ_POINTER(msg, name)                                                 \
+  ({                                                                           \
+    msg->u.name.value.paxos_value_val =                                        \
+      (char*)msg + offsetof(paxos_message, u.name.value.paxos_value_val) +     \
+      sizeof(char*);                                                           \
+  })
+
 int
-msgpack_unpack_paxos_message(msgpack_packer* o, paxos_message* v, int size,
-                             paxos_message_type p)
+msgpack_unpack_paxos_message(paxos_message* v, paxos_message_type p,
+                             msgpack_packer* o, int size)
 {
   v->type = p;
 
   switch (p) {
-    case PAXOS_PREPARE:
-      msgpack_unpack_paxos_prepare(o, &v->u.prepare);
-      return 0;
+
+    case PAXOS_CLIENT_VALUE:
+      ADJ_POINTER(v, client_value);
+      msgpack_unpack_paxos_client_value(o, &v->u.client_value);
+      break;
 
     case PAXOS_PROMISE:
-      return msgpack_unpack_paxos_promise(o, &v->u.promise);
+      ADJ_POINTER(v, promise);
+      msgpack_unpack_paxos_promise(o, &v->u.promise);
+      break;
 
     case PAXOS_ACCEPT:
-      return msgpack_unpack_paxos_accept(o, &v->u.accept);
+      ADJ_POINTER(v, accept);
+      msgpack_unpack_paxos_accept(o, &v->u.accept);
+      break;
 
     case PAXOS_ACCEPTED:
-      return msgpack_unpack_paxos_accepted(o, &v->u.accepted);
+      ADJ_POINTER(v, accepted);
+      msgpack_unpack_paxos_accepted(o, &v->u.accepted);
+      break;
+
+    case PAXOS_PREPARE:
+      msgpack_unpack_paxos_prepare(o, &v->u.prepare);
+      break;
 
     case PAXOS_PREEMPTED:
       msgpack_unpack_paxos_preempted(o, &v->u.preempted);
-      return 0;
+      break;
 
     case PAXOS_REPEAT:
       msgpack_unpack_paxos_repeat(o, &v->u.repeat);
-      return 0;
+      break;
 
     case PAXOS_TRIM:
       msgpack_unpack_paxos_trim(o, &v->u.trim);
-      return 0;
+      break;
 
     case PAXOS_ACCEPTOR_STATE:
       msgpack_unpack_paxos_acceptor_state(o, &v->u.state);
-      return 0;
-
-    case PAXOS_CLIENT_VALUE:
-      return msgpack_unpack_paxos_client_value(o, &v->u.client_value);
+      break;
 
     case PAXOS_LEARNER_HI:
-      return msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_HI);
+      msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_HI);
+      break;
 
     case PAXOS_LEARNER_DEL:
-      return msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_DEL);
+      msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_DEL);
+      break;
 
     case PAXOS_ACCEPTOR_OK:
-      return msgpack_unpack_paxos_learner(o, PAXOS_ACCEPTOR_OK);
+      msgpack_unpack_paxos_learner(o, PAXOS_ACCEPTOR_OK);
+      break;
 
     default:
-      return 0;
+      break;
   }
+  return 0;
 }
