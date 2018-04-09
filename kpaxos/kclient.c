@@ -33,9 +33,9 @@ static int nclients = 1;
 module_param(nclients, int, S_IRUGO);
 MODULE_PARM_DESC(nclients, "The number of virtual clients");
 
-static char* if_name = "enp1s0";
+static char* if_name = "enp4s0";
 module_param(if_name, charp, 0000);
-MODULE_PARM_DESC(if_name, "The interface name, default enp1s0");
+MODULE_PARM_DESC(if_name, "The interface name, default enp4s0");
 
 static char* path = "./paxos.conf";
 module_param(path, charp, S_IRUGO);
@@ -49,7 +49,6 @@ struct client
   int               id; // will create nclients from id to nclients+id-1
   struct timeval*   clients_timeval;
   eth_address       proposeradd[ETH_ALEN];
-  int               value_size;
   int               outstanding;
   char*             send_buffer;
   struct stats      stats;
@@ -58,13 +57,16 @@ struct client
   struct evlearner* learner;
 };
 
+static long timeval_diff(struct timeval* t1, struct timeval* t2);
+
 static void
 random_string(char* s, const int len)
 {
   int               i;
   static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+  // TODO LATER check if this works
   // for (i = 0; i < len - 1; ++i) {
-  //   int j;
+  //   unsigned int j = 0;
   //   get_random_bytes(&j, sizeof(int));
   //   s[i] = alphanum[j % (sizeof(alphanum) - 1)];
   // }
@@ -80,13 +82,18 @@ client_submit_value(struct client* c, int cid)
 {
   struct client_value* v = (struct client_value*)c->send_buffer;
   v->client_id = cid;
-  do_gettimeofday(&v->t);
-  v->size = c->value_size;
-  random_string(v->value, v->size);
   size_t size = sizeof(struct client_value) + v->size;
   paxos_submit(get_learn_dev(c->learner), c->proposeradd, c->send_buffer, size);
   do_gettimeofday(&c->clients_timeval[cid - id]);
+  v->t = c->clients_timeval[cid - id];
 
+  for (size_t i = 0; i < nclients; i++) {
+    if (i != cid && timeval_diff(&c->clients_timeval[i], &v->t) > 1000000) {
+      v->client_id = cid;
+      paxos_submit(get_learn_dev(c->learner), c->proposeradd, c->send_buffer,
+                   size);
+    }
+  }
   paxos_log_debug(
     "Client submitted PAXOS_CLIENT_VALUE size data %zu total size %zu value %s",
     v->size, size, v->value);
@@ -104,28 +111,30 @@ timeval_diff(struct timeval* t1, struct timeval* t2)
 }
 
 static void
-update_stats(struct stats* stats, struct client_value* delivered, size_t size)
+update_stats(struct stats* stats, struct client_value* delivered, size_t size,
+             struct timeval* tv)
 {
-  struct timeval tv;
-  do_gettimeofday(&tv);
-  long lat = timeval_diff(&delivered->t, &tv);
+  do_gettimeofday(tv);
+  // long lat = timeval_diff(&delivered->t, tv);
   stats->delivered_count++;
+
+  /* // TODO LATER uncomment this
   stats->delivered_bytes += size;
   stats->avg_latency =
-    stats->avg_latency + ((lat - stats->avg_latency) / stats->delivered_count);
+    stats->avg_latency + ((lat - stats->avg_latency) /
+    stats->delivered_count);
   if (stats->min_latency == 0 || lat < stats->min_latency)
     stats->min_latency = lat;
   if (lat > stats->max_latency)
     stats->max_latency = lat;
+  */
 }
 
 static void
-check_timeout(void)
+check_timeout(struct timeval* now)
 {
-  struct timeval now;
-  do_gettimeofday(&now);
   for (size_t i = 0; i < nclients; i++) {
-    if (timeval_diff(&c->clients_timeval[i], &now) > 1000000) {
+    if (timeval_diff(&c->clients_timeval[i], now) > 1000000) {
       paxos_log_debug("Client %zu sent expired", i);
       client_submit_value(c, i + id);
     }
@@ -138,15 +147,16 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
   struct client*       c = arg;
   struct client_value* v = (struct client_value*)value;
   int                  clid = v->client_id;
+  struct timeval       now;
 
   if (clid >= id && clid < id + nclients) {
-    update_stats(&c->stats, v, size);
+    update_stats(&c->stats, v, size, &now);
     if (iid % 100000 == 0) {
       paxos_log_info("Client%d: trim called, instance %d ", clid, iid);
       evlearner_send_trim(c->learner, iid - 100000 + 1);
     }
     client_submit_value(c, clid);
-    check_timeout();
+    check_timeout(&now);
 
     // paxos_log_info(KERN_INFO "Client: On deliver iid:%d value:%.16s", iid,
     //                v->value);
@@ -165,7 +175,9 @@ on_stats(unsigned long arg)
          c->stats.max_latency, c->stats.avg_latency);
   memset(&c->stats, 0, sizeof(struct stats));
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
-  check_timeout();
+  struct timeval now;
+  do_gettimeofday(&now);
+  check_timeout(&now);
 }
 
 static struct client*
@@ -188,9 +200,11 @@ make_client(int proposer_id, int outstanding, int value_size)
   // get_random_bytes(&c->id, sizeof(int));
   c->id = id;
 
-  c->value_size = value_size;
   c->outstanding = outstanding;
   c->send_buffer = pmalloc(sizeof(struct client_value) + value_size);
+  struct client_value* val = (struct client_value*)c->send_buffer;
+  random_string(val->value, value_size);
+  val->size = value_size;
 
   c->learner = evlearner_init(on_deliver, c, if_name, path, 1);
 

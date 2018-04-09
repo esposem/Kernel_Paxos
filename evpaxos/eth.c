@@ -11,7 +11,7 @@
 struct callback
 {
   struct packet_type pt;
-  peer_cb            cb;
+  peer_cb            cb; // TODO LATER add callback array
   void*              arg;
 };
 
@@ -62,14 +62,13 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
 {
   uint16_t       proto = skb->protocol;
   struct ethhdr* eth = eth_hdr(skb);
-  char*          data = pmalloc(ETH_FRAME_LEN - ETH_HLEN);
+  char           data[ETH_DATA_LEN];
   size_t         len = skb->len;
 
   skb_copy_bits(skb, 0, data, len);
   deliver_message(ntohs(proto), eth->h_source, data, len);
 
   kfree_skb(skb);
-  pfree(data);
   return 0;
 }
 
@@ -79,11 +78,12 @@ eth_send(struct net_device* dev, uint8_t dest_addr[ETH_ALEN], uint16_t proto,
 {
   int            ret;
   unsigned char* data;
-  if (memcmp(dev->dev_addr, dest_addr, eth_size) == 0) {
-    // localhost for replica
-    deliver_message(proto, dest_addr, (char*)msg, len);
-    return !len;
-  }
+  // TODO LATER Replica Fix this
+  // if (memcmp(dev->dev_addr, dest_addr, eth_size) == 0) {
+  //   // localhost for replica
+  //   deliver_message(proto, dest_addr, (char*)msg, len);
+  //   return !len;
+  // }
 
   struct sk_buff* skb = alloc_skb(ETH_FRAME_LEN, GFP_ATOMIC);
 
@@ -102,8 +102,6 @@ eth_send(struct net_device* dev, uint8_t dest_addr[ETH_ALEN], uint16_t proto,
     len = ETH_DATA_LEN;
 
   data = skb_put(skb, len);
-  // if (proto == PAXOS_PROMISE)
-  //   printk("ll sent %zu", len);
 
   memcpy(data, msg, len);
   ret = dev_queue_xmit(skb);

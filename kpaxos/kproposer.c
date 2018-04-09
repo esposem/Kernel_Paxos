@@ -8,9 +8,9 @@
 
 #include "evpaxos.h"
 
-static char* if_name = "enp1s0";
+static char* if_name = "enp4s0";
 module_param(if_name, charp, 0000);
-MODULE_PARM_DESC(if_name, "The interface name, default enp1s0");
+MODULE_PARM_DESC(if_name, "The interface name, default enp4s0");
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
