@@ -184,33 +184,38 @@ struct evproposer*
 evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers)
 {
 
-  struct evproposer* p;
+  struct evproposer* proposer;
   int                acceptor_count;
   acceptor_count = evpaxos_acceptor_count(c);
 
-  p = pmalloc(sizeof(struct evproposer));
-  if (p == NULL)
+  proposer = pmalloc(sizeof(struct evproposer));
+  if (proposer == NULL)
     return NULL;
-  memset(p, 0, sizeof(struct evproposer));
+  memset(proposer, 0, sizeof(struct evproposer));
 
-  p->id = id;
-  p->preexec_window = paxos_config.proposer_preexec_window;
-  p->state = proposer_new(p->id, acceptor_count);
-  p->peers = peers;
+  proposer->id = id;
+  proposer->preexec_window = paxos_config.proposer_preexec_window;
+  proposer->state = proposer_new(proposer->id, acceptor_count);
+  proposer->peers = peers;
 
-  peers_subscribe(peers, PAXOS_PROMISE, evproposer_handle_promise, p);
-  peers_subscribe(peers, PAXOS_ACCEPTED, evproposer_handle_accepted, p);
-  peers_subscribe(peers, PAXOS_PREEMPTED, evproposer_handle_preempted, p);
-  peers_subscribe(peers, PAXOS_CLIENT_VALUE, evproposer_handle_client_value, p);
+  peers_subscribe(peers, PAXOS_PROMISE, evproposer_handle_promise, proposer);
+  peers_subscribe(peers, PAXOS_ACCEPTED, evproposer_handle_accepted, proposer);
+  peers_subscribe(peers, PAXOS_PREEMPTED, evproposer_handle_preempted,
+                  proposer);
+  peers_subscribe(peers, PAXOS_CLIENT_VALUE, evproposer_handle_client_value,
+                  proposer);
   peers_subscribe(peers, PAXOS_ACCEPTOR_STATE, evproposer_handle_acceptor_state,
-                  p);
+                  proposer);
 
-  evproposer_preexec_once(p);
-  setup_timer(&p->stats_ev, evproposer_check_timeouts, (unsigned long)p);
-  p->stats_interval = (struct timeval){ paxos_config.proposer_timeout, 0 };
-  mod_timer(&p->stats_ev, jiffies + timeval_to_jiffies(&p->stats_interval));
+  evproposer_preexec_once(proposer);
+  setup_timer(&proposer->stats_ev, evproposer_check_timeouts,
+              (unsigned long)proposer);
+  proposer->stats_interval =
+    (struct timeval){ paxos_config.proposer_timeout, 0 };
+  mod_timer(&proposer->stats_ev,
+            jiffies + timeval_to_jiffies(&proposer->stats_interval));
 
-  return p;
+  return proposer;
 }
 
 struct evproposer*

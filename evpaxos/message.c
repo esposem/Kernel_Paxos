@@ -143,7 +143,5 @@ int
 recv_paxos_message(paxos_message* out, paxos_message_type p, char* data,
                    size_t size)
 {
-  // if (p == PAXOS_PROMISE)
-  //   printk("Received %zu\n", size);
-  return msgpack_unpack_paxos_message(data, out, size, p);
+  return msgpack_unpack_paxos_message(out, p, data, size);
 }

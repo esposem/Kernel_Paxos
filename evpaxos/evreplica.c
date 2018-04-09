@@ -53,7 +53,7 @@ struct evpaxos_replica*
 evpaxos_replica_init(int id, deliver_function f, void* arg, char* if_name,
                      char* path)
 {
-  struct evpaxos_replica* r;
+  struct evpaxos_replica* replica;
   struct evpaxos_config*  config;
 
   config = evpaxos_config_read(path);
@@ -61,24 +61,24 @@ evpaxos_replica_init(int id, deliver_function f, void* arg, char* if_name,
     return NULL;
   }
 
-  r = pmalloc(sizeof(struct evpaxos_replica));
-  if (r == NULL) {
+  replica = pmalloc(sizeof(struct evpaxos_replica));
+  if (replica == NULL) {
     return NULL;
   }
 
-  r->peers = peers_new(config, id, if_name);
-  if (r->peers == NULL)
+  replica->peers = peers_new(config, id, if_name);
+  if (replica->peers == NULL)
     return NULL;
-  add_acceptors_from_config(r->peers, config);
-  printall(r->peers, "Replica");
-  r->deliver = f;
-  r->acceptor = evacceptor_init_internal(id, config, r->peers);
-  r->learner =
-    evlearner_init_internal(config, r->peers, evpaxos_replica_deliver, r);
-  r->proposer = evproposer_init_internal(id, config, r->peers);
-  r->arg = arg;
+  add_acceptors_from_config(replica->peers, config);
+  printall(replica->peers, "Replica");
+  replica->deliver = f;
+  replica->acceptor = evacceptor_init_internal(id, config, replica->peers);
+  replica->learner = evlearner_init_internal(config, replica->peers,
+                                             evpaxos_replica_deliver, replica);
+  replica->proposer = evproposer_init_internal(id, config, replica->peers);
+  replica->arg = arg;
   evpaxos_config_free(config);
-  return r;
+  return replica;
 }
 
 void
