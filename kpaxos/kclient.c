@@ -41,6 +41,10 @@ static char* path = "./paxos.conf";
 module_param(path, charp, S_IRUGO);
 MODULE_PARM_DESC(path, "The config file position, default ./paxos.conf");
 
+static int trimval = 100000;
+module_param(trimval, int, S_IRUGO);
+MODULE_PARM_DESC(trimval, "After how many instance should the klearner trim");
+
 static struct client* c = NULL;
 struct timeval        sk_timeout_timeval;
 
@@ -151,9 +155,9 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 
   if (clid >= id && clid < id + nclients) {
     update_stats(&c->stats, v, size, &now);
-    if (iid % 100000 == 0) {
+    if (iid % trimval == 0) {
       paxos_log_info("Client%d: trim called, instance %d ", clid, iid);
-      evlearner_send_trim(c->learner, iid - 100000 + 1);
+      evlearner_send_trim(c->learner, iid - trimval + 1);
     }
     client_submit_value(c, clid);
     check_timeout(&now);
