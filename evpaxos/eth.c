@@ -50,10 +50,8 @@ deliver_message(uint16_t proto, eth_address* addr, char* data, size_t len)
 {
   int i = GET_PAXOS_POS(proto);
   if (i >= 0 && i < N_PAXOS_TYPES && cbs[i].cb != NULL) {
-    // paxos_message m;
     recv_paxos_message(msg, proto, data, len);
     cbs[i].cb(msg, cbs[i].arg, addr);
-    // paxos_message_destroy(&m);
   }
 }
 

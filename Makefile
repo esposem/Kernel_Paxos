@@ -49,7 +49,7 @@ REP_OBJ= \
 	evpaxos/evreplica.o \
 	$(PAX_OBJ)
 
-########################################### MODIFY HERE ###########
+################# MODIFY HERE FOR MORE MODULES ##############
 obj-m += \
 kproposer.o \
 klearner.o \
@@ -58,58 +58,37 @@ kreplica.o \
 kclient.o
 
 kclient-y:= $(CL_OBJ)
-# kclient1-y:= $(CL_OBJ)
-# kclient2-y:= $(CL_OBJ)
-
 kproposer-y:= $(PROP_OBJ)
-# kproposer1-y:= $(PROP_OBJ)
-# kproposer2-y:= $(PROP_OBJ)
-
 kacceptor-y:= $(ACC_OBJ)
-# kacceptor1-y:= $(ACC_OBJ)
-# kacceptor2-y:= $(ACC_OBJ)
-#
 klearner-y:= $(LEARN_OBJ)
-# klearner1-y:= $(LEARN_OBJ)
-# klearner2-y:= $(LEARN_OBJ)
-# klearner3-y:= $(LEARN_OBJ)
-# klearner4-y:= $(LEARN_OBJ)
-#
 kreplica-y:= $(REP_OBJ)
-# kreplica1-y:= $(REP_OBJ)
-# kreplica2-y:= $(REP_OBJ)
+
 ##############################################################
 C_COMP:= -std=c99
 G_COMP:= -std=gnu99
+SUPPRESSED_WARN:= -Wno-declaration-after-statement -Wframe-larger-than=1520
+
 USR_FLAGS:= -Wall -D user_space
 USR_OBJ:=user_app.o user_udp.o user_levent.o user_stats.o
-
-EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
-ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -O2
+_USR_HEAD:= user_levent.h user_stats.h user_udp.h kernel_client.h
+USR_HEAD:= $(patsubst %,$(I_DIR)/include/%,$(_USR_HEAD))
 
 LFLAGS = -levent -I /usr/local/include -L /usr/local/lib
+EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
+ccflags-y:= $(G_COMP) -Wall $(SUPPRESSED_WARN) -O2
 
-# user_app
+.PHONY: all clean
+
+#user_app
 all:
 	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
-user_udp.o: kpaxos/user_udp.c
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
+%.o: $(I_DIR)/%.c $(USR_HEAD)
+	$(CC) $(USR_FLAGS) $(ccflags-y) -c $< -o $@
 
-user_levent.o: kpaxos/user_levent.c
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
-
-user_stats.o: kpaxos/user_stats.c
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
-
-user_app.o: kpaxos/user_app.c
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
-
-############## MODIFY HERE IF YOU WANT TO ADD MORE USER SPACE APPLICATIONS
 user_app: $(USR_OBJ)
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@ $^ $(LFLAGS)
-###########################################################################
 
+# rm user_app*
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
-	rm user_app*
