@@ -44,28 +44,23 @@ eth_listen(struct net_device* dev, uint16_t proto, peer_cb cb, void* arg)
   return 1;
 }
 
-// proto must be in ntohs
-static void
-deliver_message(uint16_t proto, eth_address* addr, char* data, size_t len)
-{
-  int i = GET_PAXOS_POS(proto);
-  if (i >= 0 && i < N_PAXOS_TYPES && cbs[i].cb != NULL) {
-    recv_paxos_message(&msg, msg_data, proto, data, len);
-    cbs[i].cb(&msg, cbs[i].arg, addr);
-  }
-}
-
 static int
 packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
             struct net_device* src_dev)
 {
-  uint16_t       proto = skb->protocol;
+  uint16_t       proto = ntohs(skb->protocol);
   struct ethhdr* eth = eth_hdr(skb);
   char           data[ETH_DATA_LEN];
   size_t         len = skb->len;
+  int            i = GET_PAXOS_POS(proto);
+
+  if (i < 0 || i >= N_PAXOS_TYPES || cbs[i].cb == NULL) {
+    return 0;
+  }
 
   skb_copy_bits(skb, 0, data, len);
-  deliver_message(ntohs(proto), eth->h_source, data, len);
+  recv_paxos_message(&msg, msg_data, proto, data, len);
+  cbs[i].cb(&msg, cbs[i].arg, eth->h_source);
 
   kfree_skb(skb);
   return 0;
