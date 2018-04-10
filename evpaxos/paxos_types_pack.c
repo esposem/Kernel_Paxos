@@ -330,38 +330,34 @@ msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v)
   }
 }
 
-#define ADJ_POINTER(msg, name)                                                 \
-  ({                                                                           \
-    msg->u.name.value.paxos_value_val =                                        \
-      (char*)msg + offsetof(paxos_message, u.name.value.paxos_value_val) +     \
-      sizeof(char*);                                                           \
-  })
+#define ADJ_POINTER(msg, name, dest)                                           \
+  ({ msg->u.name.value.paxos_value_val = dest; })
 
 int
-msgpack_unpack_paxos_message(paxos_message* v, paxos_message_type p,
-                             msgpack_packer* o, int size)
+msgpack_unpack_paxos_message(paxos_message* v, char* v_data,
+                             paxos_message_type p, msgpack_packer* o, int size)
 {
   v->type = p;
 
   switch (p) {
 
     case PAXOS_CLIENT_VALUE:
-      ADJ_POINTER(v, client_value);
+      ADJ_POINTER(v, client_value, v_data);
       msgpack_unpack_paxos_client_value(o, &v->u.client_value);
       break;
 
     case PAXOS_PROMISE:
-      ADJ_POINTER(v, promise);
+      ADJ_POINTER(v, promise, v_data);
       msgpack_unpack_paxos_promise(o, &v->u.promise);
       break;
 
     case PAXOS_ACCEPT:
-      ADJ_POINTER(v, accept);
+      ADJ_POINTER(v, accept, v_data);
       msgpack_unpack_paxos_accept(o, &v->u.accept);
       break;
 
     case PAXOS_ACCEPTED:
-      ADJ_POINTER(v, accepted);
+      ADJ_POINTER(v, accepted, v_data);
       msgpack_unpack_paxos_accepted(o, &v->u.accepted);
       break;
 

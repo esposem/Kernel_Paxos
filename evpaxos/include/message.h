@@ -52,8 +52,8 @@ void send_paxos_preempted(struct net_device *dev, eth_address *addr,
 void send_paxos_repeat(struct net_device *dev, eth_address *addr,
                        paxos_repeat *p);
 void send_paxos_trim(struct net_device *dev, eth_address *addr, paxos_trim *t);
-int recv_paxos_message(paxos_message *out, paxos_message_type p, char *data,
-                       size_t size);
+int recv_paxos_message(paxos_message *out, char * out_data, paxos_message_type p,
+                        char *data, size_t size);
 void send_paxos_learner_hi(struct net_device *dev, eth_address *addr);
 void send_paxos_learner_del(struct net_device *dev, eth_address *addr);
 void send_paxos_acceptor_ok(struct net_device *dev, eth_address *addr);
