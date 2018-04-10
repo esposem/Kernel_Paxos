@@ -16,7 +16,8 @@ struct callback
 };
 
 static struct callback cbs[N_PAXOS_TYPES];
-static paxos_message*  msg;
+static paxos_message   msg;
+static char            msg_data[ETH_DATA_LEN];
 
 static int packet_recv(struct sk_buff* sk, struct net_device* dev,
                        struct packet_type* pt, struct net_device* dev2);
@@ -25,7 +26,6 @@ struct net_device*
 eth_init(const char* if_name)
 {
   memset(cbs, 0, sizeof(cbs));
-  msg = pmalloc(sizeof(paxos_message) + ETH_DATA_LEN);
   return dev_get_by_name(&init_net, if_name);
 }
 
@@ -50,8 +50,8 @@ deliver_message(uint16_t proto, eth_address* addr, char* data, size_t len)
 {
   int i = GET_PAXOS_POS(proto);
   if (i >= 0 && i < N_PAXOS_TYPES && cbs[i].cb != NULL) {
-    recv_paxos_message(msg, proto, data, len);
-    cbs[i].cb(msg, cbs[i].arg, addr);
+    recv_paxos_message(&msg, msg_data, proto, data, len);
+    cbs[i].cb(&msg, cbs[i].arg, addr);
   }
 }
 
@@ -115,7 +115,6 @@ eth_destroy(struct net_device* dev)
     if (cbs[i].cb != NULL)
       dev_remove_pack(&cbs[i].pt);
   }
-  pfree(msg);
   return 1;
 }
 
