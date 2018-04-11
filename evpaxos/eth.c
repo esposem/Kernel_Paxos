@@ -16,7 +16,6 @@ struct callback
 };
 
 static struct callback cbs[N_PAXOS_TYPES];
-static paxos_message*  msg;
 
 static int packet_recv(struct sk_buff* sk, struct net_device* dev,
                        struct packet_type* pt, struct net_device* dev2);
@@ -25,7 +24,6 @@ struct net_device*
 eth_init(const char* if_name)
 {
   memset(cbs, 0, sizeof(cbs));
-  msg = pmalloc(sizeof(paxos_message) + ETH_DATA_LEN);
   return dev_get_by_name(&init_net, if_name);
 }
 
@@ -48,11 +46,11 @@ eth_listen(struct net_device* dev, uint16_t proto, peer_cb cb, void* arg)
 static void
 deliver_message(uint16_t proto, eth_address* addr, char* data, size_t len)
 {
-  int i = GET_PAXOS_POS(proto);
-  if (i >= 0 && i < N_PAXOS_TYPES && cbs[i].cb != NULL) {
-    recv_paxos_message(msg, proto, data, len);
-    cbs[i].cb(msg, cbs[i].arg, addr);
-  }
+  int           i = GET_PAXOS_POS(proto);
+  paxos_message msg;
+
+  recv_paxos_message(&msg, proto, data, len);
+  cbs[i].cb(&msg, cbs[i].arg, addr);
 }
 
 static int
@@ -66,7 +64,6 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
 
   skb_copy_bits(skb, 0, data, len);
   deliver_message(ntohs(proto), eth->h_source, data, len);
-
   kfree_skb(skb);
   return 0;
 }
@@ -78,7 +75,7 @@ eth_send(struct net_device* dev, uint8_t dest_addr[ETH_ALEN], uint16_t proto,
   int            ret;
   unsigned char* data;
   // TODO LATER Replica Fix this
-  // if (memcmp(dev->dev_addr, dest_addr, eth_size) == 0) {
+  // if (memcmp(dev->dev_addr, dest_addr, ETH_ALEN) == 0) {
   //   // localhost for replica
   //   deliver_message(proto, dest_addr, (char*)msg, len);
   //   return !len;
@@ -111,11 +108,10 @@ int
 eth_destroy(struct net_device* dev)
 {
   int i;
-  for (i = 0; i < N_PAXOS_TYPES; ++i) {
+  for (i = 0; i < N_PAXOS_TYPES; ++i)
     if (cbs[i].cb != NULL)
       dev_remove_pack(&cbs[i].pt);
-  }
-  pfree(msg);
+
   return 1;
 }
 

@@ -134,13 +134,16 @@ paxos_log(int level, const char* format, va_list ap)
 
   switch (level) {
     case PAXOS_LOG_INFO:
-      printk("%s\n", msg);
+      LOG_INFO("%s", msg);
+      // printk("%s\n", msg);
       break;
     case PAXOS_LOG_DEBUG:
-      printk(KERN_INFO "%s\n", msg);
+      LOG_DEBUG("%s", msg);
+      // printk(KERN_INFO "%s\n", msg);
       break;
     case PAXOS_LOG_ERROR:
-      printk(KERN_ERR "%s\n", msg);
+      LOG_ERROR("%s", msg);
+      // printk(KERN_ERR "%s\n", msg);
       break;
   }
 }

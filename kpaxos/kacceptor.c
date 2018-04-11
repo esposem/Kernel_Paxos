@@ -8,6 +8,8 @@
 
 #include "evpaxos.h"
 
+const char* MOD_NAME = "KACCEPTOR";
+
 static char* if_name = "enp4s0";
 module_param(if_name, charp, 0000);
 MODULE_PARM_DESC(if_name, "The interface name, default enp4s0");

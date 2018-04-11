@@ -1,3 +1,4 @@
+#include "evpaxos.h"
 #include <asm/atomic.h>
 #include <linux/init.h>
 #include <linux/kthread.h>
@@ -6,7 +7,7 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-#include "evpaxos.h"
+const char* MOD_NAME = "KPROPOSER";
 
 static char* if_name = "enp4s0";
 module_param(if_name, charp, 0000);

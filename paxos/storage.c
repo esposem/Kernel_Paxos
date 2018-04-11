@@ -25,66 +25,64 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "storage.h"
-
 
 void
 storage_init(struct storage* store, int acceptor_id)
 {
-	storage_init_mem(store, acceptor_id);
+  storage_init_mem(store, acceptor_id);
 }
 
 int
 storage_open(struct storage* store)
 {
-	return store->api.open(store->handle);
+  return store->api.open(store->handle);
 }
 
 void
 storage_close(struct storage* store)
 {
-	store->api.close(store->handle);
+  store->api.close(store->handle);
 }
 
 int
 storage_tx_begin(struct storage* store)
 {
-	return store->api.tx_begin(store->handle);
+  return store->api.tx_begin(store->handle);
 }
 
 int
 storage_tx_commit(struct storage* store)
 {
-	return store->api.tx_commit(store->handle);
+  return store->api.tx_commit(store->handle);
 }
 
 void
 storage_tx_abort(struct storage* store)
 {
-	store->api.tx_abort(store->handle);
+  store->api.tx_abort(store->handle);
 }
 
 int
 storage_get_record(struct storage* store, iid_t iid, paxos_accepted* out)
 {
-	return store->api.get(store->handle, iid, out);
+  return store->api.get(store->handle, iid, out);
 }
 
 int
 storage_put_record(struct storage* store, paxos_accepted* acc)
 {
-	return store->api.put(store->handle, acc);
+  return store->api.put(store->handle, acc);
 }
 
 int
 storage_trim(struct storage* store, iid_t iid)
 {
-	return store->api.trim(store->handle, iid);
+  return store->api.trim(store->handle, iid);
 }
 
 iid_t
 storage_get_trim_instance(struct storage* store)
 {
-	return store->api.get_trim_instance(store->handle);
+  return store->api.get_trim_instance(store->handle);
 }

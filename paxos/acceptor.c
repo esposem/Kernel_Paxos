@@ -31,20 +31,23 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
-struct acceptor {
-  int id;
-  iid_t trim_iid;
+struct acceptor
+{
+  int            id;
+  iid_t          trim_iid;
   struct storage store;
 };
 
-static void paxos_accepted_to_promise(paxos_accepted *acc, paxos_message *out);
-static void paxos_accept_to_accepted(int id, paxos_accept *acc,
-                                     paxos_message *out);
-static void paxos_accepted_to_preempted(int id, paxos_accepted *acc,
-                                        paxos_message *out);
+static void paxos_accepted_to_promise(paxos_accepted* acc, paxos_message* out);
+static void paxos_accept_to_accepted(int id, paxos_accept* acc,
+                                     paxos_message* out);
+static void paxos_accepted_to_preempted(int id, paxos_accepted* acc,
+                                        paxos_message* out);
 
-struct acceptor *acceptor_new(int id) {
-  struct acceptor *a;
+struct acceptor*
+acceptor_new(int id)
+{
+  struct acceptor* a;
   a = pmalloc(sizeof(struct acceptor));
   storage_init(&a->store, id);
   if (storage_open(&a->store) != 0) {
@@ -60,13 +63,17 @@ struct acceptor *acceptor_new(int id) {
   return a;
 }
 
-void acceptor_free(struct acceptor *a) {
+void
+acceptor_free(struct acceptor* a)
+{
   storage_close(&a->store);
   pfree(a);
 }
 
-int acceptor_receive_prepare(struct acceptor *a, paxos_prepare *req,
-                             paxos_message *out) {
+int
+acceptor_receive_prepare(struct acceptor* a, paxos_prepare* req,
+                         paxos_message* out)
+{
   paxos_accepted acc;
   if (req->iid <= a->trim_iid)
     return 0;
@@ -90,8 +97,10 @@ int acceptor_receive_prepare(struct acceptor *a, paxos_prepare *req,
   return 1;
 }
 
-int acceptor_receive_accept(struct acceptor *a, paxos_accept *req,
-                            paxos_message *out) {
+int
+acceptor_receive_accept(struct acceptor* a, paxos_accept* req,
+                        paxos_message* out)
+{
   paxos_accepted acc;
   if (req->iid <= a->trim_iid)
     return 0;
@@ -114,8 +123,9 @@ int acceptor_receive_accept(struct acceptor *a, paxos_accept *req,
   return 1;
 }
 
-int acceptor_receive_repeat(struct acceptor *a, iid_t iid,
-                            paxos_accepted *out) {
+int
+acceptor_receive_repeat(struct acceptor* a, iid_t iid, paxos_accepted* out)
+{
   memset(out, 0, sizeof(paxos_accepted));
   if (storage_tx_begin(&a->store) != 0)
     return 0;
@@ -125,7 +135,9 @@ int acceptor_receive_repeat(struct acceptor *a, iid_t iid,
   return found && (out->value.paxos_value_len > 0);
 }
 
-int acceptor_receive_trim(struct acceptor *a, paxos_trim *trim) {
+int
+acceptor_receive_trim(struct acceptor* a, paxos_trim* trim)
+{
   if (trim->iid <= a->trim_iid)
     return 0;
   a->trim_iid = trim->iid;
@@ -137,37 +149,43 @@ int acceptor_receive_trim(struct acceptor *a, paxos_trim *trim) {
   return 1;
 }
 
-void acceptor_set_current_state(struct acceptor *a,
-                                paxos_acceptor_state *state) {
+void
+acceptor_set_current_state(struct acceptor* a, paxos_acceptor_state* state)
+{
   state->aid = a->id;
   state->trim_iid = a->trim_iid;
 }
 
-static void paxos_accepted_to_promise(paxos_accepted *acc, paxos_message *out) {
+static void
+paxos_accepted_to_promise(paxos_accepted* acc, paxos_message* out)
+{
   out->type = PAXOS_PROMISE;
-  out->u.promise =
-      (paxos_promise){acc->aid,
-                      acc->iid,
-                      acc->ballot,
-                      acc->value_ballot,
-                      {acc->value.paxos_value_len, acc->value.paxos_value_val}};
+  out->u.promise = (paxos_promise){ acc->aid,
+                                    acc->iid,
+                                    acc->ballot,
+                                    acc->value_ballot,
+                                    { acc->value.paxos_value_len,
+                                      acc->value.paxos_value_val } };
 }
 
-static void paxos_accept_to_accepted(int id, paxos_accept *acc,
-                                     paxos_message *out) {
-  char *value = NULL;
-  int value_size = acc->value.paxos_value_len;
+static void
+paxos_accept_to_accepted(int id, paxos_accept* acc, paxos_message* out)
+{
+  char* value = NULL;
+  int   value_size = acc->value.paxos_value_len;
   if (value_size > 0) {
     value = pmalloc(value_size);
     memcpy(value, acc->value.paxos_value_val, value_size);
   }
   out->type = PAXOS_ACCEPTED;
   out->u.accepted = (paxos_accepted){
-      id, acc->iid, acc->ballot, acc->ballot, {value_size, value}};
+    id, acc->iid, acc->ballot, acc->ballot, { value_size, value }
+  };
 }
 
-static void paxos_accepted_to_preempted(int id, paxos_accepted *acc,
-                                        paxos_message *out) {
+static void
+paxos_accepted_to_preempted(int id, paxos_accepted* acc, paxos_message* out)
+{
   out->type = PAXOS_PREEMPTED;
-  out->u.preempted = (paxos_preempted){id, acc->iid, acc->ballot};
+  out->u.preempted = (paxos_preempted){ id, acc->iid, acc->ballot };
 }

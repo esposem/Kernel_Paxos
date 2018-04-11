@@ -25,18 +25,18 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _STORAGE_UTILS_H_
 #define _STORAGE_UTILS_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include "paxos.h"
 
-char* paxos_accepted_to_buffer(paxos_accepted* acc);
-void paxos_accepted_from_buffer(char* buffer, paxos_accepted* out);
+  char* paxos_accepted_to_buffer(paxos_accepted* acc);
+  void  paxos_accepted_from_buffer(char* buffer, paxos_accepted* out);
 
 #ifdef __cplusplus
 }

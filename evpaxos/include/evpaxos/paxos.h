@@ -25,7 +25,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _EVPAXOS_H_
 #define _EVPAXOS_H_
 
@@ -35,152 +34,145 @@
 #include "common.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-struct evlearner;
-struct evproposer;
-struct evacceptor;
-struct evpaxos_replica;
+  struct evlearner;
+  struct evproposer;
+  struct evacceptor;
+  struct evpaxos_replica;
 
-/**
- * When starting a learner you must pass a callback to be invoked whenever
- * a value has been learned.
- */
-typedef void (*deliver_function)(
-	unsigned int,
-	char* value,
-	size_t size,
-	void* arg);
+  /**
+   * When starting a learner you must pass a callback to be invoked whenever
+   * a value has been learned.
+   */
+  typedef void (*deliver_function)(unsigned int, char* value, size_t size,
+                                   void* arg);
 
-/**
- * Create a Paxos replica, consisting of a collocated Acceptor, Proposer,
- * and Learner.
- *
- * @param id the id of the replica
- * @param config path a paxos config file
- * @param cb the callback function to be called whenever the learner delivers.
- * This paramater may be NULL, in which case no learner is initialized.
- * @param arg an optional argument that is passed to the callback
- * @param base the underlying event_base to be used
- *
- * @return a new evpaxos_replica on success, or NULL on failure.
- *
- * @see evpaxos_replica_free()
- */
-struct evpaxos_replica* evpaxos_replica_init(int id,
-	deliver_function cb, void* arg, char * if_name, char *path);
+  /**
+   * Create a Paxos replica, consisting of a collocated Acceptor, Proposer,
+   * and Learner.
+   *
+   * @param id the id of the replica
+   * @param config path a paxos config file
+   * @param cb the callback function to be called whenever the learner delivers.
+   * This paramater may be NULL, in which case no learner is initialized.
+   * @param arg an optional argument that is passed to the callback
+   * @param base the underlying event_base to be used
+   *
+   * @return a new evpaxos_replica on success, or NULL on failure.
+   *
+   * @see evpaxos_replica_free()
+   */
+  struct evpaxos_replica* evpaxos_replica_init(int id, deliver_function cb,
+                                               void* arg, char* if_name,
+                                               char* path);
 
-/**
- * Destroy a Paxos replica and free all its memory.
- *
- * @param replica a evpaxos_replica to be freed
- */
-void evpaxos_replica_free(struct evpaxos_replica* replica);
+  /**
+   * Destroy a Paxos replica and free all its memory.
+   *
+   * @param replica a evpaxos_replica to be freed
+   */
+  void evpaxos_replica_free(struct evpaxos_replica* replica);
 
-/**
- * Set the starting instance id of the given replica.
- * The replica will call the delivery function for instances larger than the
- * given instance id.
- *
- * @param iid the starting instance id
- */
-void evpaxos_replica_set_instance_id(struct evpaxos_replica* replica,
-	unsigned iid);
+  /**
+   * Set the starting instance id of the given replica.
+   * The replica will call the delivery function for instances larger than the
+   * given instance id.
+   *
+   * @param iid the starting instance id
+   */
+  void evpaxos_replica_set_instance_id(struct evpaxos_replica* replica,
+                                       unsigned                iid);
 
-/**
- * Send a trim message to all acceptors/replicas. Acceptors will trim their log
- * up the the given instance id.
- *
- * @param iid trim instance id
- */
- void evpaxos_replica_send_trim(struct evpaxos_replica* replica, unsigned iid);
+  /**
+   * Send a trim message to all acceptors/replicas. Acceptors will trim their
+   * log up the the given instance id.
+   *
+   * @param iid trim instance id
+   */
+  void evpaxos_replica_send_trim(struct evpaxos_replica* replica, unsigned iid);
 
-void evpaxos_replica_internal_trim(struct evpaxos_replica* replica, unsigned iid);
+  /**
+   * Used by replicas to submit values.
+   */
+  // void evpaxos_replica_submit(struct evpaxos_replica* replica,
+  // 	char* value, int size);
 
-void evlearner_auto_trim(struct evlearner* l, unsigned iid);
+  /**
+   * Returns the number of replicas in the configuration.
+   */
+  int evpaxos_replica_count(struct evpaxos_replica* replica);
 
-/**
- * Used by replicas to submit values.
- */
-// void evpaxos_replica_submit(struct evpaxos_replica* replica,
-// 	char* value, int size);
+  /**
+   * Initializes a learner with a given config file, a deliver callback,
+   * an optional argument to that is passed to the callback, and
+   * a libevent event_base.
+   */
+  struct evlearner* evlearner_init(deliver_function f, void* arg, char* if_name,
+                                   char* path, int isclient);
 
-/**
- * Returns the number of replicas in the configuration.
- */
-int evpaxos_replica_count(struct evpaxos_replica* replica);
+  /**
+   * Release the memory allocated by the learner
+   */
+  void evlearner_free(struct evlearner* l);
 
-/**
- * Initializes a learner with a given config file, a deliver callback,
- * an optional argument to that is passed to the callback, and
- * a libevent event_base.
- */
- struct evlearner *evlearner_init(deliver_function f, void *arg, char *if_name, char *path, int isclient);
+  /**
+   * Set the starting instance id of the given learner.
+   * The learner will call the delivery function for instances larger than the
+   * given instance id.
+   *
+   * @param iid the starting instance id
+   */
+  void evlearner_set_instance_id(struct evlearner* l, unsigned iid);
 
+  /**
+   * Send a trim message to all acceptors/replicas. Acceptors will trim their
+   * log up the the given instance id.
+   *
+   * @param iid trim instance id
+   */
+  void evlearner_send_trim(struct evlearner* l, unsigned iid);
 
-/**
- * Release the memory allocated by the learner
- */
-void evlearner_free(struct evlearner* l);
+  /**
+   * Initializes a acceptor with a given id (which MUST be unique),
+   * a config file and a libevent event_base.
+   */
+  struct evacceptor* evacceptor_init(int id, char* if_name, char* path);
 
-/**
- * Set the starting instance id of the given learner.
- * The learner will call the delivery function for instances larger than the
- * given instance id.
- *
- * @param iid the starting instance id
- */
-void evlearner_set_instance_id(struct evlearner* l, unsigned iid);
+  /**
+   * Frees the memory allocated by the acceptor.
+   * This will also cleanly close the  * underlying storage.
+   */
+  void evacceptor_free(struct evacceptor* a);
 
-/**
- * Send a trim message to all acceptors/replicas. Acceptors will trim their log
- * up the the given instance id.
- *
- * @param iid trim instance id
- */
-void evlearner_send_trim(struct evlearner* l, unsigned iid);
+  /**
+   * Initializes a proposer with a given ID (which MUST be unique),
+   * a config file and a libevent event_base.
+   *
+   * @param id a unique identifier, must be in the range
+   * [0...(MAX_N_OF_PROPOSERS-1)]
+   */
+  struct evproposer* evproposer_init(int id, char* if_name, char* path);
 
-/**
- * Initializes a acceptor with a given id (which MUST be unique),
- * a config file and a libevent event_base.
- */
-struct evacceptor* evacceptor_init(int id, char * if_name, char *path);
+  /**
+   * Release the memory allocated by the proposer
+   */
+  void evproposer_free(struct evproposer* p);
 
-/**
- * Frees the memory allocated by the acceptor.
- * This will also cleanly close the  * underlying storage.
- */
-void evacceptor_free(struct evacceptor* a);
+  /**
+   * This is a hint to the proposer to start from the given instance id.
+   *
+   * @param iid the starting instance id
+   */
+  void evproposer_set_instance_id(struct evproposer* p, unsigned iid);
 
-/**
- * Initializes a proposer with a given ID (which MUST be unique),
- * a config file and a libevent event_base.
- *
- * @param id a unique identifier, must be in the range [0...(MAX_N_OF_PROPOSERS-1)]
- */
-struct evproposer* evproposer_init(int id,  char * if_name, char * path);
-
-/**
- * Release the memory allocated by the proposer
- */
-void evproposer_free(struct evproposer* p);
-
-/**
- * This is a hint to the proposer to start from the given instance id.
- *
- * @param iid the starting instance id
- */
-void evproposer_set_instance_id(struct evproposer* p, unsigned iid);
-
-/**
- * Used by clients to submit values to proposers.
- */
-void paxos_submit(struct net_device *dev, eth_address *addr, char *data,
-                  int size);
-
-struct net_device *get_learn_dev(struct evlearner *ev) ;
-
+  /**
+   * Used by clients to submit values to proposers.
+   */
+  void paxos_submit(struct net_device* dev, eth_address* addr, char* data,
+                    int size);
 
 #ifdef __cplusplus
 }

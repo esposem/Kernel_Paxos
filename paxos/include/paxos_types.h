@@ -25,103 +25,103 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _PAXOS_TYPES_H_
 #define _PAXOS_TYPES_H_
 
 #include <linux/types.h>
 
-
 typedef unsigned char msgpack_packer;
 
 struct paxos_value
 {
-	int paxos_value_len;
-	char *paxos_value_val;
+  int   paxos_value_len;
+  char* paxos_value_val;
 };
 typedef struct paxos_value paxos_value;
 
 struct paxos_prepare
 {
-	uint32_t iid;
-	uint32_t ballot;
+  uint32_t iid;
+  uint32_t ballot;
 };
 typedef struct paxos_prepare paxos_prepare;
 
 struct paxos_promise
 {
-	uint32_t aid;
-	uint32_t iid;
-	uint32_t ballot;
-	uint32_t value_ballot;
-	paxos_value value;
+  uint32_t    aid;
+  uint32_t    iid;
+  uint32_t    ballot;
+  uint32_t    value_ballot;
+  paxos_value value;
 };
 typedef struct paxos_promise paxos_promise;
 
 struct paxos_accept
 {
-	uint32_t iid;
-	uint32_t ballot;
-	paxos_value value;
+  uint32_t    iid;
+  uint32_t    ballot;
+  paxos_value value;
 };
 typedef struct paxos_accept paxos_accept;
 
 struct paxos_accepted
 {
-	uint32_t aid;
-	uint32_t iid;
-	uint32_t ballot;
-	uint32_t value_ballot;
-	paxos_value value;
+  uint32_t    aid;
+  uint32_t    iid;
+  uint32_t    ballot;
+  uint32_t    value_ballot;
+  paxos_value value;
 };
 typedef struct paxos_accepted paxos_accepted;
 
 struct paxos_preempted
 {
-	uint32_t aid;
-	uint32_t iid;
-	uint32_t ballot;
+  uint32_t aid;
+  uint32_t iid;
+  uint32_t ballot;
 };
 typedef struct paxos_preempted paxos_preempted;
 
 struct paxos_repeat
 {
-	uint32_t from;
-	uint32_t to;
+  uint32_t from;
+  uint32_t to;
 };
 typedef struct paxos_repeat paxos_repeat;
 
 struct paxos_trim
 {
-	uint32_t iid;
+  uint32_t iid;
 };
 typedef struct paxos_trim paxos_trim;
 
 struct paxos_acceptor_state
 {
-	uint32_t aid;
-	uint32_t trim_iid;
+  uint32_t aid;
+  uint32_t trim_iid;
 };
 typedef struct paxos_acceptor_state paxos_acceptor_state;
 
 struct paxos_client_value
 {
-	paxos_value value;
+  paxos_value value;
 };
 typedef struct paxos_client_value paxos_client_value;
 
-struct paxos_learner_hi{};
+struct paxos_learner_hi
+{};
 typedef struct paxos_learner_hi paxos_learner_hi;
 
-struct paxos_learner_del{};
+struct paxos_learner_del
+{};
 typedef struct paxos_learner_del paxos_learner_del;
 
-
-struct paxos_acceptor_ok{};
+struct paxos_acceptor_ok
+{};
 typedef struct paxos_acceptor_ok paxos_acceptor_ok;
 
-
-enum paxos_message_type {
+enum paxos_message_type
+{
   PAXOS_PREPARE = 0xcafa,
   PAXOS_PROMISE,
   PAXOS_ACCEPT,
@@ -134,30 +134,31 @@ enum paxos_message_type {
   PAXOS_LEARNER_HI,
   PAXOS_LEARNER_DEL,
   PAXOS_ACCEPTOR_OK,
-	N_ELEMENTS // this MUST be the last element of the enum
+  N_ELEMENTS // this MUST be the last element of the enum
 };
+
 #define N_PAXOS_TYPES N_ELEMENTS - PAXOS_PREPARE
 #define GET_PAXOS_POS(n) n - PAXOS_PREPARE
 typedef enum paxos_message_type paxos_message_type;
 
 struct paxos_message
 {
-	paxos_message_type type;
-	union
-	{
-		paxos_prepare prepare;
-		paxos_promise promise;
-		paxos_accept accept;
-		paxos_accepted accepted;
-		paxos_preempted preempted;
-		paxos_repeat repeat;
-		paxos_trim trim;
-		paxos_acceptor_state state;
-		paxos_client_value client_value;
-		paxos_learner_hi learner_hi;
-		paxos_learner_del learner_del;
-		paxos_acceptor_ok accept_ok;
-	} u;
+  paxos_message_type type;
+  union
+  {
+    paxos_prepare        prepare;
+    paxos_promise        promise;
+    paxos_accept         accept;
+    paxos_accepted       accepted;
+    paxos_preempted      preempted;
+    paxos_repeat         repeat;
+    paxos_trim           trim;
+    paxos_acceptor_state state;
+    paxos_client_value   client_value;
+    paxos_learner_hi     learner_hi;
+    paxos_learner_del    learner_del;
+    paxos_acceptor_ok    accept_ok;
+  } u;
 };
 typedef struct paxos_message paxos_message;
 
