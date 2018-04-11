@@ -361,7 +361,7 @@ parse_line(struct evpaxos_config* c, char* line)
                       MAX_N_OF_PROPOSERS);
       return 0;
     }
-    c->acceptors[c->acceptors_count] = pmalloc(eth_size);
+    c->acceptors[c->acceptors_count] = pmalloc(ETH_ALEN);
     eth_address* addr = c->acceptors[c->acceptors_count++];
 
     return parse_address(line, addr);
@@ -373,7 +373,7 @@ parse_line(struct evpaxos_config* c, char* line)
                       MAX_N_OF_PROPOSERS);
       return 0;
     }
-    c->proposers[c->proposers_count] = pmalloc(eth_size);
+    c->proposers[c->proposers_count] = pmalloc(ETH_ALEN);
     eth_address* addr = c->proposers[c->proposers_count++];
     return parse_address(line, addr);
   }
@@ -385,12 +385,12 @@ parse_line(struct evpaxos_config* c, char* line)
                       MAX_N_OF_PROPOSERS);
       return 0;
     }
-    c->acceptors[c->acceptors_count] = pmalloc(eth_size);
+    c->acceptors[c->acceptors_count] = pmalloc(ETH_ALEN);
     eth_address* acc_addr = c->acceptors[c->acceptors_count++];
-    c->proposers[c->proposers_count] = pmalloc(eth_size);
+    c->proposers[c->proposers_count] = pmalloc(ETH_ALEN);
     eth_address* pro_addr = c->proposers[c->proposers_count++];
     rv = parse_address(line, pro_addr);
-    memcpy(acc_addr, pro_addr, eth_size);
+    memcpy(acc_addr, pro_addr, ETH_ALEN);
     return rv;
   }
 

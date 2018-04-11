@@ -25,26 +25,26 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _CONFIG_READER_H_
 #define _CONFIG_READER_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include "common.h"
 
-struct evpaxos_config;
+  struct evpaxos_config;
 
-struct evpaxos_config* evpaxos_config_read(char * name);
-void evpaxos_config_free(struct evpaxos_config* config);
-eth_address * evpaxos_proposer_address(struct evpaxos_config* c, int i);
-int evpaxos_proposer_listen_port(struct evpaxos_config* c, int i);
-int evpaxos_acceptor_count(struct evpaxos_config* config);
-int evpaxos_proposer_count(struct evpaxos_config* config);
-eth_address * evpaxos_acceptor_address(struct evpaxos_config* c, int i);
-int evpaxos_acceptor_listen_port(struct evpaxos_config* c, int i);
+  struct evpaxos_config* evpaxos_config_read(char* name);
+  void                   evpaxos_config_free(struct evpaxos_config* config);
+  eth_address* evpaxos_proposer_address(struct evpaxos_config* c, int i);
+  int          evpaxos_proposer_listen_port(struct evpaxos_config* c, int i);
+  int          evpaxos_acceptor_count(struct evpaxos_config* config);
+  int          evpaxos_proposer_count(struct evpaxos_config* config);
+  eth_address* evpaxos_acceptor_address(struct evpaxos_config* c, int i);
+  int          evpaxos_acceptor_listen_port(struct evpaxos_config* c, int i);
 
 #ifdef __cplusplus
 }

@@ -1,3 +1,7 @@
+#include "evpaxos.h"
+#include "kernel_client.h"
+#include "kernel_device.h"
+#include "paxos.h"
 #include <asm/atomic.h>
 #include <linux/init.h>
 #include <linux/kthread.h>
@@ -6,11 +10,7 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-#include "evpaxos.h"
-#include "paxos.h"
-
-#include "kernel_client.h"
-#include "kernel_device.h"
+#define SEND_TO_CHAR_DEVICE 0
 
 struct file_operations fops = {
   .open = kdev_open,
@@ -18,6 +18,8 @@ struct file_operations fops = {
   .write = kdev_write,
   .release = kdev_release,
 };
+
+const char* MOD_NAME = "KLEARNER";
 
 size_t   sendtrim;
 atomic_t auto_trim;
@@ -51,16 +53,15 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
       }
       sendtrim = 0;
     }
-  } else {
-    if (iid % 100000 == 0) {
-      printk("Learner: sent indipendent autotrim\n");
-      evlearner_auto_trim(lea, iid - 100000 + 1);
-    }
   }
-
-  // printk(KERN_INFO "%s On deliver iid:%d size %zu ",klearner->name, iid,
-  // size);
-  kset_message(value, size, iid);
+  // else {
+  //   if (iid % 100000 == 0) {
+  //     printk("Learner: sent indipendent autotrim\n");
+  //     evlearner_auto_trim(lea, iid - 100000 + 1);
+  //   }
+  // }
+  if (SEND_TO_CHAR_DEVICE)
+    kset_message(value, size, iid);
 }
 
 static int

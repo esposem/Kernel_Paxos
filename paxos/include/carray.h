@@ -25,24 +25,24 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _CARRAY_H_
 #define _CARRAY_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 #include "common.h"
 
-struct carray;
+  struct carray;
 
-struct carray* carray_new(int size);
-void carray_free(struct carray* a);
-int carray_empty(struct carray* a);
-int carray_size(struct carray* a);
-int carray_push_back(struct carray* a, void* p);
-void carray_foreach(struct carray* a, void (*carray_cb)(void*));
-void* carray_pop_front(struct carray* a);
+  struct carray* carray_new(int size);
+  void           carray_free(struct carray* a);
+  int            carray_empty(struct carray* a);
+  int            carray_size(struct carray* a);
+  int            carray_push_back(struct carray* a, void* p);
+  void           carray_foreach(struct carray* a, void (*carray_cb)(void*));
+  void*          carray_pop_front(struct carray* a);
 
 #ifdef __cplusplus
 }
