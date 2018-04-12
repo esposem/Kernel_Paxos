@@ -55,12 +55,15 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
   int            i = GET_PAXOS_POS(proto);
 
   if (i < 0 || i >= N_PAXOS_TYPES || cbs[i].cb == NULL) {
+    printk("Rejected packet i:%d cbs[i].cb:%p", i, cbs[i].cb);
     return 0;
   }
 
   skb_copy_bits(skb, 0, data, len);
+  // paxos_message msg;
   recv_paxos_message(&msg, msg_data, proto, data, len);
   cbs[i].cb(&msg, cbs[i].arg, eth->h_source);
+  // paxos_message_destroy(&msg);
 
   kfree_skb(skb);
   return 0;

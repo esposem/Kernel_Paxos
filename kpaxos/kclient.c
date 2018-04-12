@@ -156,7 +156,7 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
   if (clid >= id && clid < id + nclients) {
     update_stats(&c->stats, v, size, &now);
     if (iid % trimval == 0) {
-      paxos_log_info("Client%d: trim called, instance %d ", clid, iid);
+      paxos_log_debug("Client%d: trim called, instance %d ", clid, iid);
       evlearner_send_trim(c->learner, iid - trimval + 1);
     }
     client_submit_value(c, clid);
