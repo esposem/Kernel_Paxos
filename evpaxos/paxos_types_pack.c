@@ -131,6 +131,9 @@ msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
+  // if (size <= 0)
+  //   return;
+  // v->value.paxos_value_val = pmalloc(size);
   memcpy(v->value.paxos_value_val, o, size);
 }
 
@@ -159,6 +162,9 @@ msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
+  // if (size <= 0)
+  //   return;
+  // v->value.paxos_value_val = pmalloc(size);
   memcpy(v->value.paxos_value_val, o, size);
 }
 
@@ -191,6 +197,9 @@ msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
+  // if (size <= 0)
+  //   return;
+  // v->value.paxos_value_val = pmalloc(size);
   memcpy(v->value.paxos_value_val, o, size);
 }
 
@@ -272,6 +281,9 @@ msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v)
 
   dcp_int_packet(&size, &o);
   v->value.paxos_value_len = size;
+  // if (size <= 0)
+  //   return;
+  // v->value.paxos_value_val = pmalloc(size);
   memcpy(v->value.paxos_value_val, o, size);
 }
 
