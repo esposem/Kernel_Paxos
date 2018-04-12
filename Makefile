@@ -66,7 +66,7 @@ kreplica-y:= $(REP_OBJ)
 ##############################################################
 C_COMP:= -std=c99
 G_COMP:= -std=gnu99
-SUPPRESSED_WARN:= -Wno-declaration-after-statement -Wframe-larger-than=1520
+SUPPRESSED_WARN:= -Wno-declaration-after-statement -Wframe-larger-than=1550
 
 USR_FLAGS:= -Wall -D user_space
 USR_OBJ:=user_app.o user_udp.o user_levent.o user_stats.o
