@@ -54,7 +54,7 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
   } else {
     if (iid % 100000 == 0) {
       printk("Learner: sent indipendent autotrim\n");
-      evlearner_auto_trim(lea, iid - 100000 + 1);
+      // evlearner_auto_trim(lea, iid - 100000 + 1);
     }
   }
 

@@ -120,7 +120,7 @@ evpaxos_replica_send_trim(struct evpaxos_replica* r, unsigned iid)
 void
 evpaxos_replica_internal_trim(struct evpaxos_replica* r, unsigned iid)
 {
-  evlearner_auto_trim(r->learner, iid);
+  // evlearner_auto_trim(r->learner, iid);
 }
 
 // void evpaxos_replica_submit(struct evpaxos_replica *r, char *value, int size)

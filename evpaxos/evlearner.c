@@ -206,5 +206,5 @@ evlearner_send_trim(struct evlearner* l, unsigned iid)
   paxos_trim trim = { iid };
   paxos_log_debug("Learner: Sent PAXOS_TRIM to all acceptors");
   peers_foreach_acceptor(l->acceptors, peer_send_trim, &trim);
-  evlearner_auto_trim(l, iid);
+  // evlearner_auto_trim(l, iid);
 }
