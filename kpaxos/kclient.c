@@ -43,10 +43,6 @@ static char* path = "./paxos.conf";
 module_param(path, charp, S_IRUGO);
 MODULE_PARM_DESC(path, "The config file position, default ./paxos.conf");
 
-static int trimval = 500000;
-module_param(trimval, int, S_IRUGO);
-MODULE_PARM_DESC(trimval, "After how many instance should the klearner trim");
-
 struct client
 {
   struct timeval*      clients_timeval;
@@ -76,10 +72,10 @@ timeval_diff(struct timeval* t1, struct timeval* t2)
 static void
 random_string(char* s, const int len)
 {
-  int               i, j = 0;
+  int               i, j;
   static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
-  for (i = 0; i < len - 1; ++i, j = 0) {
+  for (i = 0, j = 0; i < len - 1; ++i, j = 0) {
     get_random_bytes(&j, sizeof(int));
     j &= 0xffffff;
     s[i] = alphanum[j % (sizeof(alphanum) - 1)];
@@ -142,13 +138,9 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 
   if (clid >= id && clid < id + nclients) {
     update_stats(&c->stats, v, size, &now);
-    if (iid % trimval == 0) {
-      paxos_log_info("Client%d: trim called, instance %d ", clid, iid);
-      evlearner_send_trim(c->learner, iid - trimval + 1);
-    }
-    paxos_log_debug(
-      "Client %d received value %.16s with %zu bytes, total size is %zu",
-      v->client_id, v->value, v->size, size);
+    //    paxos_log_debug(
+    //      "Client %d received value %.16s with %zu bytes, total size is %zu",
+    //      v->client_id, v->value, v->size, size);
 
     client_submit_value(c, clid);
   }
