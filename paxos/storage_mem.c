@@ -30,7 +30,7 @@
 #include <linux/if_ether.h>
 #include <linux/vmalloc.h>
 
-static const int MAX_SIZE = 2000;
+static const int MAX_SIZE = 1000000;
 
 typedef struct store
 {
