@@ -182,8 +182,9 @@ evacceptor_init(int id, char* if_name, char* path)
 
   int acceptor_count = evpaxos_acceptor_count(config);
   if (id < 0 || id >= acceptor_count) {
-    paxos_log_error("Acceptor: Invalid acceptor id: %d", id);
-    paxos_log_error("Acceptor: Should be between 0 and %d", acceptor_count);
+    paxos_log_error(
+      "Acceptor: Invalid acceptor id: %d, should be between 0 and %d", id,
+      (acceptor_count - 1));
     evpaxos_config_free(config);
     return NULL;
   }

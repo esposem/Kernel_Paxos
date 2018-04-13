@@ -61,9 +61,6 @@ proposer_preexecute(struct evproposer* p)
   paxos_prepare pr;
   int           count = p->preexec_window - proposer_prepared_count(p->state);
 
-  paxos_log_debug("Proposer: Preexec %d - prepared count %d", p->preexec_window,
-                  proposer_prepared_count(p->state));
-
   if (count <= 0)
     return;
   for (i = 0; i < count; i++) {
@@ -77,25 +74,20 @@ static void
 try_accept(struct evproposer* p)
 {
   paxos_accept accept;
-  int          i = 0;
-  while (proposer_accept(p->state, &accept)) {
-    i = 1;
+  while (proposer_accept(p->state, &accept))
     peers_foreach_acceptor(p->peers, peer_send_accept, &accept);
-  }
-  if (i == 1) {
-    paxos_log_debug("Proposer: Sending accept to all acceptors");
-  }
+
   proposer_preexecute(p);
 }
 
 static void
 evproposer_handle_promise(paxos_message* msg, void* arg, eth_address* src)
 {
-  paxos_log_debug("Proposer: received PROMISE");
   struct evproposer* proposer = arg;
   paxos_prepare      prepare;
   paxos_promise*     pro = &msg->u.promise;
   int preempted = proposer_receive_promise(proposer->state, pro, &prepare);
+
   if (preempted)
     peers_foreach_acceptor(proposer->peers, peer_send_prepare, &prepare);
   try_accept(proposer);
@@ -106,20 +98,19 @@ evproposer_handle_accepted(paxos_message* msg, void* arg, eth_address* src)
 {
   struct evproposer* proposer = arg;
   paxos_accepted*    acc = &msg->u.accepted;
-  if (proposer_receive_accepted(proposer->state, acc)) {
-    paxos_log_debug("Proposer: received ACCEPTED");
+
+  if (proposer_receive_accepted(proposer->state, acc))
     try_accept(proposer);
-  }
 }
 
 static void
 evproposer_handle_preempted(paxos_message* msg, void* arg, eth_address* src)
 {
-  paxos_log_debug(KERN_INFO "Proposer: received PREEMPTED");
   struct evproposer* proposer = arg;
   paxos_prepare      prepare;
   int                preempted =
     proposer_receive_preempted(proposer->state, &msg->u.preempted, &prepare);
+
   if (preempted) {
     peers_foreach_acceptor(proposer->peers, peer_send_prepare, &prepare);
     try_accept(proposer);
@@ -158,11 +149,9 @@ evproposer_preexec_once(struct evproposer* arg)
 static void
 evproposer_check_timeouts(unsigned long arg)
 {
-  paxos_log_debug("Proposer: evproposer_check_timeouts");
 
   struct evproposer*       p = (struct evproposer*)arg;
   struct timeout_iterator* iter = proposer_timeout_iterator(p->state);
-  paxos_log_debug("Proposer: Instances timed out in phase 1 or 2.");
 
   paxos_prepare pr;
   while (timeout_iterator_prepare(iter, &pr)) {
