@@ -54,12 +54,6 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
       sendtrim = 0;
     }
   }
-  // else {
-  //   if (iid % 100000 == 0) {
-  //     printk("Learner: sent indipendent autotrim\n");
-  //     evlearner_auto_trim(lea, iid - 100000 + 1);
-  //   }
-  // }
   if (SEND_TO_CHAR_DEVICE)
     kset_message(value, size, iid);
 }

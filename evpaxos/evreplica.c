@@ -117,7 +117,6 @@ evpaxos_replica_send_trim(struct evpaxos_replica* r, unsigned iid)
   peers_foreach_acceptor(r->peers, peer_send_trim, &trim);
 }
 
-
 // void evpaxos_replica_submit(struct evpaxos_replica *r, char *value, int size)
 // {
 //   int i;

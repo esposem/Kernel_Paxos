@@ -25,33 +25,44 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "common.h"
 #include "storage.h"
-#include <linux/if_ether.h>
-#include <linux/vmalloc.h>
+#include "uthash.h"
+#include <linux/slab.h>
+// TODO use vmalloc
 
-static const int MAX_SIZE = 2000;
+#ifndef HASH_FIND_IID
+#define HASH_FIND_IID(head, findint, out)                                      \
+  HASH_FIND(hh, head, findint, sizeof(iid_t), out)
+#endif
 
-typedef struct store
+#ifndef HASH_ADD_IID
+#define HASH_ADD_IID(head, intfield, add)                                      \
+  HASH_ADD(hh, head, intfield, sizeof(iid_t), add)
+#endif
+
+struct hash_item
 {
-  paxos_accepted msg;
-  char           data[ETH_DATA_LEN - sizeof(paxos_accepted)];
-} store_t;
-
-struct mem_storage
-{
-  store_t* st;
-  iid_t    trim_iid; // just for compatibility
+  iid_t           iid;
+  paxos_accepted* value;
+  UT_hash_handle  hh;
 };
+
+struct mem_storage // db
+{
+  iid_t             trim_iid;
+  struct hash_item* record;
+};
+
+static void paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src);
 
 static struct mem_storage*
 mem_storage_new(int acceptor_id)
 {
-  struct mem_storage* s = vmalloc(sizeof(struct mem_storage));
-
-  s->st = vmalloc(MAX_SIZE * sizeof(struct store));
-  memset(s->st, 0, MAX_SIZE * sizeof(struct store));
+  struct mem_storage* s = pmalloc(sizeof(struct mem_storage));
+  if (s == NULL)
+    return s;
   s->trim_iid = 0;
+  s->record = NULL;
   return s;
 }
 
@@ -65,10 +76,16 @@ static void
 mem_storage_close(void* handle)
 {
   struct mem_storage* s = handle;
-  if (s) {
-    vfree(s->st);
-    vfree(s);
+  struct hash_item*   current_hash;
+  struct hash_item*   tmp;
+  HASH_ITER(hh, s->record, current_hash, tmp)
+  {
+    HASH_DEL(s->record, current_hash);
+    paxos_accepted_free(current_hash->value);
+    pfree(current_hash);
   }
+
+  pfree(s);
 }
 
 static int
@@ -88,37 +105,43 @@ mem_storage_tx_abort(void* handle)
 {}
 
 static int
-mem_storage_get(void* handle, iid_t iid, paxos_accepted* out)
+mem_storage_get(void* handle, iid_t iids, paxos_accepted* out)
 {
   struct mem_storage* s = handle;
-  int                 idx = iid % MAX_SIZE;
-
-  if (s->st[idx].msg.iid == iid) {
-    memcpy(out, &s->st[idx].msg, sizeof(paxos_accepted));
-    if (out->value.paxos_value_len > 0) {
-      out->value.paxos_value_val = pmalloc(out->value.paxos_value_len);
-      memcpy(out->value.paxos_value_val, s->st[idx].data,
-             out->value.paxos_value_len);
-    }
-    return 1;
+  struct hash_item*   h;
+  HASH_FIND_IID(s->record, &iids, h);
+  if (h == NULL) {
+    return 0;
   }
-
-  return 0;
+  paxos_accepted_copy(out, h->value);
+  return 1;
 }
 
 static int
 mem_storage_put(void* handle, paxos_accepted* acc)
 {
   struct mem_storage* s = handle;
-  int                 idx = acc->iid % MAX_SIZE;
+  struct hash_item*   a;
 
-  memcpy(&s->st[idx].msg, acc, sizeof(paxos_accepted));
-  if (s->st[idx].msg.value.paxos_value_len > sizeof(s->st[idx].data)) {
-    LOG_ERROR("Data will be truncated.");
-    s->st[idx].msg.value.paxos_value_len = sizeof(s->st[idx].data);
+  paxos_accepted* val = pmalloc(sizeof(paxos_accepted));
+  if (val != NULL) {
+    paxos_accepted_copy(val, acc);
+
+    HASH_FIND_IID(s->record, &(acc->iid), a);
+    if (a != NULL) {
+      paxos_accepted_free(a->value);
+      a->value = val;
+      a->iid = acc->iid;
+    } else {
+      a = pmalloc(sizeof(struct hash_item));
+      if (a != NULL) {
+        a->value = val;
+        a->iid = acc->iid;
+        HASH_ADD_IID(s->record, iid, a);
+      }
+    }
   }
-  memcpy(s->st[idx].data, acc->value.paxos_value_val,
-         s->st[idx].msg.value.paxos_value_len);
+
   return 0;
 }
 
@@ -126,6 +149,15 @@ static int
 mem_storage_trim(void* handle, iid_t iid)
 {
   struct mem_storage* s = handle;
+  struct hash_item *  hash_el, *tmp;
+  HASH_ITER(hh, s->record, hash_el, tmp)
+  {
+    if (hash_el->iid <= (int)iid) {
+      HASH_DEL(s->record, hash_el);
+      paxos_accepted_free(hash_el->value);
+      pfree(hash_el);
+    }
+  }
   s->trim_iid = iid;
   return 0;
 }
@@ -135,6 +167,17 @@ mem_storage_get_trim_instance(void* handle)
 {
   struct mem_storage* s = handle;
   return s->trim_iid;
+}
+
+static void
+paxos_accepted_copy(paxos_accepted* dst, paxos_accepted* src)
+{
+  memcpy(dst, src, sizeof(paxos_accepted));
+  if (dst->value.paxos_value_len > 0) {
+    dst->value.paxos_value_val = pmalloc(src->value.paxos_value_len);
+    memcpy(dst->value.paxos_value_val, src->value.paxos_value_val,
+           src->value.paxos_value_len);
+  }
 }
 
 void
