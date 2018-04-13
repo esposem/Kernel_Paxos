@@ -145,11 +145,10 @@ proposer_set_instance_id(struct proposer* p, iid_t iid)
   if (iid > p->next_prepare_iid) {
     p->next_prepare_iid = iid;
     // remove instances older than iid
+    paxos_log_debug("Proposer: removing instances older than %d", iid);
+    proposer_trim_instances(p, &p->prepare_instances, iid);
+    proposer_trim_instances(p, &p->accept_instances, iid);
   }
-  paxos_log_debug("Proposer: removing instances older than %d", iid);
-
-  proposer_trim_instances(p, &p->prepare_instances, iid);
-  proposer_trim_instances(p, &p->accept_instances, iid);
 }
 
 void
