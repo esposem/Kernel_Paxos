@@ -25,20 +25,20 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _PAXOS_TYPES_PACK_H_
 #define _PAXOS_TYPES_PACK_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-#include "paxos_types.h"
 #include "common.h"
+#include "paxos_types.h"
 
-long msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v);
-int msgpack_unpack_paxos_message(paxos_message* v, char * v_data, paxos_message_type p,
-                                 msgpack_packer* o, int size );
+  long msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v);
+  int  msgpack_unpack_paxos_message(paxos_message* v, paxos_message_type p,
+                                    msgpack_packer* o, int size);
 
 #ifdef __cplusplus
 }

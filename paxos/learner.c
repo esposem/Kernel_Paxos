@@ -81,9 +81,9 @@ learner_new(int acceptors)
     l->current_iid = 1;
     l->highest_iid_closed = 1;
     if (paxos_config.learner_catch_up) {
-      paxos_log_debug("Catch up on\n");
+      paxos_log_info("Catch up on\n");
     } else {
-      paxos_log_debug("Catch up off\n");
+      paxos_log_info("Catch up off\n");
     }
     l->late_start = !paxos_config.learner_catch_up;
     l->instances = NULL;
@@ -147,24 +147,10 @@ learner_deliver_next(struct learner* l, paxos_accepted* out)
 
   memcpy(out, inst->final_value, sizeof(paxos_accepted));
   paxos_value_copy(&out->value, &inst->final_value->value);
-  paxos_log_debug(KERN_INFO "Learner: Deleted instance %u", inst->iid);
+  paxos_log_debug("Learner: Deleted instance %u.", inst->iid);
   learner_delete_instance(l, inst);
   l->current_iid++;
   return 1;
-}
-
-void
-trim_old_learn(struct learner* l, iid_t iid)
-{
-  struct instance *inst, *tmp;
-
-  HASH_ITER(hh, l->instances, inst, tmp)
-  {
-    if (inst->iid < iid) {
-      HASH_DEL(l->instances, inst);
-      instance_free(inst, l->acceptors);
-    }
-  }
 }
 
 int

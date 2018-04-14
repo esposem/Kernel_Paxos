@@ -42,7 +42,7 @@ struct evlearner
 };
 
 struct net_device*
-get_learn_dev(struct evlearner* ev)
+evlearner_get_device(struct evlearner* ev)
 {
   return get_dev(ev->acceptors);
 }
@@ -63,6 +63,7 @@ static void
 evlearner_check_holes(unsigned long arg)
 {
   paxos_log_debug("Learner: Checking holes");
+
   paxos_repeat      msg;
   int               chunks = 10;
   struct evlearner* l = (struct evlearner*)arg;
@@ -195,16 +196,9 @@ peer_send_trim(struct net_device* dev, struct peer* p, void* arg)
 }
 
 void
-evlearner_auto_trim(struct evlearner* l, unsigned iid)
-{
-  trim_old_learn(l->state, iid);
-}
-
-void
 evlearner_send_trim(struct evlearner* l, unsigned iid)
 {
   paxos_trim trim = { iid };
   paxos_log_debug("Learner: Sent PAXOS_TRIM to all acceptors");
   peers_foreach_acceptor(l->acceptors, peer_send_trim, &trim);
-  // evlearner_auto_trim(l, iid);
 }

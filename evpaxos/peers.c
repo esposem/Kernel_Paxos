@@ -82,7 +82,7 @@ check_id(struct peers* p, struct evpaxos_config* config, int id)
       p->dev->dev_addr[0], p->dev->dev_addr[1], p->dev->dev_addr[2],
       p->dev->dev_addr[3], p->dev->dev_addr[4], p->dev->dev_addr[5], ad1[0],
       ad1[1], ad1[2], ad1[3], ad1[4], ad1[5]);
-    if (memcmp(p->dev->dev_addr, ad1, eth_size) == 0)
+    if (memcmp(p->dev->dev_addr, ad1, ETH_ALEN) == 0)
       return;
   }
 
@@ -93,7 +93,7 @@ check_id(struct peers* p, struct evpaxos_config* config, int id)
       p->dev->dev_addr[0], p->dev->dev_addr[1], p->dev->dev_addr[2],
       p->dev->dev_addr[3], p->dev->dev_addr[4], p->dev->dev_addr[5], ad2[0],
       ad2[1], ad2[2], ad2[3], ad2[4], ad2[5]);
-    if (memcmp(p->dev->dev_addr, ad2, eth_size) == 0)
+    if (memcmp(p->dev->dev_addr, ad2, ETH_ALEN) == 0)
       return;
   }
 
@@ -193,29 +193,29 @@ add_acceptors_from_config(struct peers* p, struct evpaxos_config* conf)
 void
 printall(struct peers* p, char* name)
 {
-  printk(KERN_INFO "\t%s\n", name);
-  printk(KERN_INFO "\t\tME id=%d address %02x:%02x:%02x:%02x:%02x:%02x\n",
-         p->me_send->id, p->me_send->addr[0], p->me_send->addr[1],
-         p->me_send->addr[2], p->me_send->addr[3], p->me_send->addr[4],
-         p->me_send->addr[5]);
-  printk(KERN_INFO "\tPEERS we connect to\n");
+  paxos_log_info("\t%s", name);
+  paxos_log_info("\t\tME id=%d address %02x:%02x:%02x:%02x:%02x:%02x",
+                 p->me_send->id, p->me_send->addr[0], p->me_send->addr[1],
+                 p->me_send->addr[2], p->me_send->addr[3], p->me_send->addr[4],
+                 p->me_send->addr[5]);
+  paxos_log_info("\tPEERS we connect to");
   int i;
   for (i = 0; i < p->peers_count; i++) {
-    printk(KERN_INFO "\t\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x\n",
-           p->peers[i]->id, p->peers[i]->addr[0], p->peers[i]->addr[1],
-           p->peers[i]->addr[2], p->peers[i]->addr[3], p->peers[i]->addr[4],
-           p->peers[i]->addr[5]);
+    paxos_log_info("\t\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x",
+                   p->peers[i]->id, p->peers[i]->addr[0], p->peers[i]->addr[1],
+                   p->peers[i]->addr[2], p->peers[i]->addr[3],
+                   p->peers[i]->addr[4], p->peers[i]->addr[5]);
   }
 
   printk(KERN_INFO
          "\tCLIENTS we receive connections \n\t(will be updated as message are "
-         "received)\n");
+         "received)");
 
   for (i = 0; i < p->clients_count; i++) {
-    printk(KERN_INFO "\t\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x\n",
-           p->clients[i]->id, p->clients[i]->addr[0], p->clients[i]->addr[1],
-           p->clients[i]->addr[2], p->clients[i]->addr[3],
-           p->clients[i]->addr[4], p->clients[i]->addr[5]);
+    paxos_log_info(
+      "\t\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x", p->clients[i]->id,
+      p->clients[i]->addr[0], p->clients[i]->addr[1], p->clients[i]->addr[2],
+      p->clients[i]->addr[3], p->clients[i]->addr[4], p->clients[i]->addr[5]);
   }
 }
 
@@ -231,7 +231,7 @@ add_or_update_client(eth_address* addr, struct peers* p)
 {
   int i;
   for (i = 0; i < p->clients_count; ++i) {
-    if (memcmp(addr, p->clients[i]->addr, eth_size) == 0) {
+    if (memcmp(addr, p->clients[i]->addr, ETH_ALEN) == 0) {
       return 0;
     }
   }
@@ -267,7 +267,7 @@ peers_update_ok(struct peers* p, eth_address* addr)
 {
   int i;
   for (i = 0; i < p->peers_count; ++i) {
-    if (memcmp(addr, p->peers[i]->addr, eth_size) == 0 &&
+    if (memcmp(addr, p->peers[i]->addr, ETH_ALEN) == 0 &&
         peers_received_ok[p->peers[i]->id] == 0) {
       paxos_log_debug("peers_received_ok[%d] = 1", p->peers[i]->id);
       peers_received_ok[p->peers[i]->id] = 1;
@@ -282,7 +282,7 @@ peers_delete_learner(struct peers* p, eth_address* addr)
 {
   int i, j;
   for (i = 0; i < p->clients_count; ++i) {
-    if (memcmp(addr, p->clients[i]->addr, eth_size) == 0) {
+    if (memcmp(addr, p->clients[i]->addr, ETH_ALEN) == 0) {
       pfree(p->clients[i]);
       for (j = i; j < p->clients_count - 1; ++j) {
         p->clients[j] = p->clients[j + 1];
@@ -307,7 +307,7 @@ make_peer(struct peers* peers, int id, eth_address* addr)
 {
   struct peer* p = pmalloc(sizeof(struct peer));
   p->id = id;
-  memcpy(p->addr, addr, eth_size);
+  memcpy(p->addr, addr, ETH_ALEN);
   p->peers = peers;
   return p;
 }

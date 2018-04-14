@@ -1,3 +1,6 @@
+#include "evpaxos_internal.h"
+#include "kernel_client.h"
+#include "paxos.h"
 #include <asm/atomic.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -8,10 +11,9 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-#include "evpaxos.h"
-#include "paxos.h"
+#define TIMEOUT_US 1000000
 
-#include "kernel_client.h"
+const char* MOD_NAME = "KCLIENT";
 
 static int proposer_id = 0;
 module_param(proposer_id, int, S_IRUGO);
@@ -41,67 +43,20 @@ static char* path = "./paxos.conf";
 module_param(path, charp, S_IRUGO);
 MODULE_PARM_DESC(path, "The config file position, default ./paxos.conf");
 
-static int trimval = 100000;
-module_param(trimval, int, S_IRUGO);
-MODULE_PARM_DESC(trimval, "After how many instance should the klearner trim");
-
-static struct client* c = NULL;
-struct timeval        sk_timeout_timeval;
-
 struct client
 {
-  int               id; // will create nclients from id to nclients+id-1
-  struct timeval*   clients_timeval;
-  eth_address       proposeradd[ETH_ALEN];
-  int               outstanding;
-  char*             send_buffer;
-  struct stats      stats;
-  struct timer_list stats_ev;
-  struct timeval    stats_interval;
-  struct evlearner* learner;
+  struct timeval*      clients_timeval;
+  eth_address          proposeradd[ETH_ALEN];
+  struct client_value* val;
+  char                 send_buffer[ETH_DATA_LEN];
+  int                  send_buffer_len;
+  struct stats         stats;
+  struct timer_list    stats_ev;
+  struct timeval       stats_interval;
+  struct evlearner*    learner;
 };
 
-static long timeval_diff(struct timeval* t1, struct timeval* t2);
-
-static void
-random_string(char* s, const int len)
-{
-  int               i;
-  static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-  // TODO LATER check if this works
-  // for (i = 0; i < len - 1; ++i) {
-  //   unsigned int j = 0;
-  //   get_random_bytes(&j, sizeof(int));
-  //   s[i] = alphanum[j % (sizeof(alphanum) - 1)];
-  // }
-  for (i = 0; i < len - 1; ++i) {
-    s[i] = alphanum[i % (sizeof(alphanum) - 1)];
-  }
-
-  s[len - 1] = 0;
-}
-
-static void
-client_submit_value(struct client* c, int cid)
-{
-  struct client_value* v = (struct client_value*)c->send_buffer;
-  v->client_id = cid;
-  size_t size = sizeof(struct client_value) + v->size;
-  paxos_submit(get_learn_dev(c->learner), c->proposeradd, c->send_buffer, size);
-  do_gettimeofday(&c->clients_timeval[cid - id]);
-  v->t = c->clients_timeval[cid - id];
-
-  for (size_t i = 0; i < nclients; i++) {
-    if (i != cid && timeval_diff(&c->clients_timeval[i], &v->t) > 1000000) {
-      v->client_id = cid;
-      paxos_submit(get_learn_dev(c->learner), c->proposeradd, c->send_buffer,
-                   size);
-    }
-  }
-  paxos_log_debug(
-    "Client submitted PAXOS_CLIENT_VALUE size data %zu total size %zu value %s",
-    v->size, size, v->value);
-}
+static struct client* c = NULL;
 
 static long
 timeval_diff(struct timeval* t1, struct timeval* t2)
@@ -115,10 +70,38 @@ timeval_diff(struct timeval* t1, struct timeval* t2)
 }
 
 static void
+random_string(char* s, const int len)
+{
+  int               i, j;
+  static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+  for (i = 0, j = 0; i < len - 1; ++i, j = 0) {
+    get_random_bytes(&j, sizeof(int));
+    j &= 0xffffff;
+    s[i] = alphanum[j % (sizeof(alphanum) - 1)];
+  }
+
+  s[len - 1] = 0;
+}
+
+static void
+client_submit_value(struct client* c, int cid)
+{
+  c->val->client_id = cid;
+  do_gettimeofday(&c->clients_timeval[cid - id]);
+  c->val->t = c->clients_timeval[cid - id];
+  paxos_submit(evlearner_get_device(c->learner), c->proposeradd, c->send_buffer,
+               c->send_buffer_len);
+  paxos_log_debug(
+    "Client %d submitted value %.16s with %zu bytes, total size is %zu",
+    c->val->client_id, c->val->value, c->val->size, c->send_buffer_len);
+}
+
+static void
 update_stats(struct stats* stats, struct client_value* delivered, size_t size,
              struct timeval* tv)
 {
-  do_gettimeofday(tv);
+  // do_gettimeofday(tv);
   // long lat = timeval_diff(&delivered->t, tv);
   stats->delivered_count++;
 
@@ -137,9 +120,9 @@ update_stats(struct stats* stats, struct client_value* delivered, size_t size,
 static void
 check_timeout(struct timeval* now)
 {
-  for (size_t i = 0; i < nclients; i++) {
-    if (timeval_diff(&c->clients_timeval[i], now) > 1000000) {
-      paxos_log_debug("Client %zu sent expired", i);
+  for (int i = 0; i < nclients; i++) {
+    if (timeval_diff(&c->clients_timeval[i], now) > TIMEOUT_US) {
+      LOG_ERROR("Client %d sent expired", i);
       client_submit_value(c, i + id);
     }
   }
@@ -151,19 +134,15 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
   struct client*       c = arg;
   struct client_value* v = (struct client_value*)value;
   int                  clid = v->client_id;
-  struct timeval       now;
+  struct timeval       now = { 0, 0 };
 
   if (clid >= id && clid < id + nclients) {
     update_stats(&c->stats, v, size, &now);
-    if (iid % trimval == 0) {
-      paxos_log_debug("Client%d: trim called, instance %d ", clid, iid);
-      evlearner_send_trim(c->learner, iid - trimval + 1);
-    }
-    client_submit_value(c, clid);
-    check_timeout(&now);
+    //    paxos_log_debug(
+    //      "Client %d received value %.16s with %zu bytes, total size is %zu",
+    //      v->client_id, v->value, v->size, size);
 
-    // paxos_log_info(KERN_INFO "Client: On deliver iid:%d value:%.16s", iid,
-    //                v->value);
+    client_submit_value(c, clid);
   }
 }
 
@@ -171,82 +150,65 @@ static void
 on_stats(unsigned long arg)
 {
   struct client* c = (struct client*)arg;
-  int            mbps = (int)(c->stats.delivered_bytes * 8) / (1024 * 1024);
+  struct timeval now;
+  long           mbps =
+    (c->stats.delivered_count * c->send_buffer_len * 8) / (1024 * 1024);
 
-  printk(KERN_INFO "Client: %d value/sec, %d Mbps, latency min %ld us max %ld "
-                   "us avg %ld us\n",
-         c->stats.delivered_count, mbps, c->stats.min_latency,
-         c->stats.max_latency, c->stats.avg_latency);
+  LOG_INFO("%d msgs/sec, %ld Mbps", c->stats.delivered_count, mbps);
+  //  LOG_INFO("Client: %d value/sec, %d Mbps, latency min %ld us max %ld "
+  //           "us avg %ld us\n",
+  //           c->stats.delivered_count, mbps, c->stats.min_latency,
+  //           c->stats.max_latency, c->stats.avg_latency);
   memset(&c->stats, 0, sizeof(struct stats));
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
-  struct timeval now;
+
   do_gettimeofday(&now);
   check_timeout(&now);
 }
 
-static struct client*
-make_client(int proposer_id, int outstanding, int value_size)
+void
+start_client(int proposer_id, int value_size)
 {
+  struct evpaxos_config* conf = evpaxos_config_read(path);
 
-  struct client* c = pmalloc(sizeof(struct client));
+  if (conf == NULL) {
+    LOG_ERROR("Failed to read config file.");
+    return;
+  }
+
+  c = pmalloc(sizeof(struct client));
+  c->learner = evlearner_init(on_deliver, c, if_name, path, 1);
+  if (c->learner == NULL) {
+    LOG_ERROR("Could not start the learner.");
+    kfree(c);
+    return;
+  }
+
   c->clients_timeval = pmalloc(sizeof(struct timeval) * nclients);
-
   memset(c->clients_timeval, 0, sizeof(struct timeval) * nclients);
   memset(&c->stats, 0, sizeof(struct stats));
-  struct evpaxos_config* conf = evpaxos_config_read(path);
-  if (conf == NULL) {
-    printk(KERN_ERR "Client: Failed to read config file\n");
-    kfree(c);
-    return NULL;
-  }
-  memcpy(c->proposeradd, evpaxos_proposer_address(conf, proposer_id), eth_size);
+  memcpy(c->proposeradd, evpaxos_proposer_address(conf, proposer_id), ETH_ALEN);
   evpaxos_config_free(conf);
-  // get_random_bytes(&c->id, sizeof(int));
-  c->id = id;
 
-  c->outstanding = outstanding;
-  c->send_buffer = pmalloc(sizeof(struct client_value) + value_size);
-  struct client_value* val = (struct client_value*)c->send_buffer;
-  random_string(val->value, value_size);
-  val->size = value_size;
+  c->val = (struct client_value*)c->send_buffer;
+  c->val->size = value_size;
+  c->send_buffer_len = sizeof(struct client_value) + value_size;
+  random_string(c->val->value, value_size);
 
-  c->learner = evlearner_init(on_deliver, c, if_name, path, 1);
+  setup_timer(&c->stats_ev, on_stats, (unsigned long)c);
+  c->stats_interval = (struct timeval){ 1, 0 };
+  mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 
-  if (c->learner == NULL) {
-    printk(KERN_ERR "Client: Could not start the learner!");
-    kfree(c);
-    return NULL;
-  } else {
-    setup_timer(&c->stats_ev, on_stats, (unsigned long)c);
-    c->stats_interval = (struct timeval){ 1, 0 };
-    mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
-
-    for (int j = 0; j < nclients; j++) {
-      for (int i = 0; i < c->outstanding; ++i) {
-        client_submit_value(c, j + id);
-      }
-    }
+  for (int i = 0; i < nclients; ++i) {
+    client_submit_value(c, id + i);
   }
-
-  return c;
-}
-
-static void
-client_free(struct client* c)
-{
-  if (c->learner) {
-    del_timer(&c->stats_ev);
-    evlearner_free(c->learner);
-  }
-  pfree(c->send_buffer);
-  pfree(c);
 }
 
 static int __init
            init_client(void)
 {
-  printk("Id: %d    Nclients: %d\n", id, nclients);
-  c = make_client(proposer_id, outstanding, value_size);
+  LOG_INFO("Id: %d --- Nclients: %d", id, nclients);
+  start_client(proposer_id, value_size);
   return 0;
 }
 
@@ -254,10 +216,16 @@ static void __exit
             client_exit(void)
 {
   if (c != NULL) {
-    client_free(c);
+    if (c->learner) {
+      del_timer(&c->stats_ev);
+      evlearner_free(c->learner);
+    }
+    pfree(c);
   }
-  printk("Module unloaded\n\n");
+  LOG_INFO("Module unloaded.");
 }
 
-module_init(init_client) module_exit(client_exit) MODULE_LICENSE("GPL");
+module_init(init_client);
+module_exit(client_exit);
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Emanuele Giuseppe Esposito");

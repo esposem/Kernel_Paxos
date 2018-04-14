@@ -1,3 +1,6 @@
+#include "evpaxos.h"
+#include "kernel_client.h"
+#include "kernel_device.h"
 #include <asm/atomic.h>
 #include <linux/init.h>
 #include <linux/kthread.h>
@@ -6,10 +9,7 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-#include "evpaxos.h"
-
-#include "kernel_client.h"
-#include "kernel_device.h"
+const char* MOD_NAME = "KREPLICA";
 
 struct file_operations fops = {
   .open = kdev_open,
@@ -54,12 +54,13 @@ deliver(unsigned iid, char* value, size_t size, void* arg)
       }
       sendtrim = 0;
     }
-  } else {
-    if (iid % 100000 == 0) {
-      printk("Replica sent indipendent autotrim");
-      evpaxos_replica_internal_trim(replica, iid - 100000 + 1);
-    }
   }
+  // else {
+  //   if (iid % 100000 == 0) {
+  //     printk("Replica sent indipendent autotrim");
+  //     evpaxos_replica_internal_trim(replica, iid - 100000 + 1);
+  //   }
+  // }
 
   kset_message(value, size, iid);
 }

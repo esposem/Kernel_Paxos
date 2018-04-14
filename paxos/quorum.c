@@ -29,21 +29,31 @@
 #include "paxos.h"
 #include <linux/slab.h>
 
-void quorum_init(struct quorum *q, int acceptors) {
+void
+quorum_init(struct quorum* q, int acceptors)
+{
   q->acceptors = acceptors;
   q->quorum = paxos_quorum(acceptors);
   q->acceptor_ids = pmalloc(sizeof(int) * q->acceptors);
   quorum_clear(q);
 }
 
-void quorum_clear(struct quorum *q) {
+void
+quorum_clear(struct quorum* q)
+{
   q->count = 0;
   memset(q->acceptor_ids, 0, sizeof(int) * q->acceptors);
 }
 
-void quorum_destroy(struct quorum *q) { pfree(q->acceptor_ids); }
+void
+quorum_destroy(struct quorum* q)
+{
+  pfree(q->acceptor_ids);
+}
 
-int quorum_add(struct quorum *q, int id) {
+int
+quorum_add(struct quorum* q, int id)
+{
   if (q->acceptor_ids[id] == 0) {
     q->count++;
     q->acceptor_ids[id] = 1;
@@ -52,4 +62,8 @@ int quorum_add(struct quorum *q, int id) {
   return 0;
 }
 
-int quorum_reached(struct quorum *q) { return (q->count >= q->quorum); }
+int
+quorum_reached(struct quorum* q)
+{
+  return (q->count >= q->quorum);
+}
