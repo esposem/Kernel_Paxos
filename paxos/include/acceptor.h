@@ -25,28 +25,29 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _ACCEPTOR_H_
 #define _ACCEPTOR_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include "paxos.h"
 
-struct acceptor;
+  struct acceptor;
 
-struct acceptor* acceptor_new(int id);
-void acceptor_free(struct acceptor* a);
-int acceptor_receive_prepare(struct acceptor* a,
-	paxos_prepare* req, paxos_message* out);
-int acceptor_receive_accept(struct acceptor* a,
-	paxos_accept* req, paxos_message* out);
-int acceptor_receive_repeat(struct acceptor* a,
-	iid_t iid, paxos_accepted* out);
-int acceptor_receive_trim(struct acceptor* a, paxos_trim* trim);
-void acceptor_set_current_state(struct acceptor* a, paxos_acceptor_state* out);
+  struct acceptor* acceptor_new(int id);
+  void             acceptor_free(struct acceptor* a);
+  int  acceptor_receive_prepare(struct acceptor* a, paxos_prepare* req,
+                                paxos_message* out);
+  int  acceptor_receive_accept(struct acceptor* a, paxos_accept* req,
+                               paxos_message* out);
+  int  acceptor_receive_repeat(struct acceptor* a, iid_t iid,
+                               paxos_accepted* out);
+  int  acceptor_receive_trim(struct acceptor* a, paxos_trim* trim);
+  void acceptor_set_current_state(struct acceptor*      a,
+                                  paxos_acceptor_state* out);
 
 #ifdef __cplusplus
 }

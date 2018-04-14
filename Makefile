@@ -64,31 +64,43 @@ klearner-y:= $(LEARN_OBJ)
 kreplica-y:= $(REP_OBJ)
 
 ##############################################################
+
+KDIR ?= /lib/modules/$(shell uname -r)/build
+BUILD_DIR ?= $(PWD)/build
+BUILD_DIR_MAKEFILE ?= $(PWD)/build/Makefile
+
 C_COMP:= -std=c99
 G_COMP:= -std=gnu99
-SUPPRESSED_WARN:= -Wno-declaration-after-statement -Wframe-larger-than=1550
-
 USR_FLAGS:= -Wall -D user_space
-USR_OBJ:=user_app.o user_udp.o user_levent.o user_stats.o
-_USR_HEAD:= user_levent.h user_stats.h user_udp.h kernel_client.h
-USR_HEAD:= $(patsubst %,$(I_DIR)/include/%,$(_USR_HEAD))
+USR_SRCS := $(wildcard kpaxos/user_*.c)
+USR_OBJS := $(patsubst kpaxos/%.c, $(BUILD_DIR)/%.o, $(USR_SRCS))
 
-LFLAGS = -levent -I /usr/local/include -L /usr/local/lib
-EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include
-ccflags-y:= $(G_COMP) -Wall $(SUPPRESSED_WARN) -O2
+EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include -I$(HOME)/local/include
+ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -Wframe-larger-than=2048 -O3
 
-.PHONY: all clean
+LFLAGS = -levent -I /home/ubuntu/local/include -L /home/ubuntu/local/lib
 
-#user_app
-all:
-	make -C  /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+all: $(BUILD_DIR) user_app kernel_app
 
-%.o: $(I_DIR)/%.c $(USR_HEAD)
-	$(CC) $(USR_FLAGS) $(ccflags-y) -c $< -o $@
+kernel_app: $(BUILD_DIR_MAKEFILE)
+	make -C $(KDIR) M=$(BUILD_DIR) src=$(PWD) modules
 
-user_app: $(USR_OBJ)
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $@ $^ $(LFLAGS)
+$(BUILD_DIR):
+	mkdir -p "$@/paxos"
+	mkdir -p "$@/evpaxos"
+	mkdir -p "$@/kpaxos"
 
-# rm user_app*
+$(BUILD_DIR_MAKEFILE): $(BUILD_DIR)
+	touch "$@"
+
+$(BUILD_DIR)/%.o: kpaxos/%.c
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
+
+user_app: $(USR_OBJS)
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $(BUILD_DIR)/$@ $^ $(LFLAGS)
+
+
+###########################################################################
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	make -C $(KDIR) M=$(BUILD_DIR) src=$(PWD) clean
+	-rm -rf build

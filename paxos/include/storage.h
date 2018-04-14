@@ -25,46 +25,46 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _STORAGE_H_
 #define _STORAGE_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include "paxos.h"
 
-struct storage
-{
-	void* handle;
-	struct
-	{
-		int (*open) (void* handle);
-		void (*close) (void* handle);
-		int (*tx_begin) (void* handle);
-		int (*tx_commit) (void* handle);
-		void (*tx_abort) (void* handle);
-		int (*get) (void* handle, iid_t iid, paxos_accepted* out);
-		int (*put) (void* handle, paxos_accepted* acc);
-		int (*trim) (void* handle, iid_t iid);
-		iid_t (*get_trim_instance) (void* handle);
-	} api;
-};
+  struct storage
+  {
+    void* handle;
+    struct
+    {
+      int (*open)(void* handle);
+      void (*close)(void* handle);
+      int (*tx_begin)(void* handle);
+      int (*tx_commit)(void* handle);
+      void (*tx_abort)(void* handle);
+      int (*get)(void* handle, iid_t iid, paxos_accepted* out);
+      int (*put)(void* handle, paxos_accepted* acc);
+      int (*trim)(void* handle, iid_t iid);
+      iid_t (*get_trim_instance)(void* handle);
+    } api;
+  };
 
-void storage_init(struct storage* store, int acceptor_id);
-int storage_open(struct storage* store);
-void storage_close(struct storage* store);
-int storage_tx_begin(struct storage* store);
-int storage_tx_commit(struct storage* store);
-void storage_tx_abort(struct storage* store);
-int storage_get_record(struct storage* store, iid_t iid, paxos_accepted* out);
-int storage_put_record(struct storage* store, paxos_accepted* acc);
-int storage_trim(struct storage* store, iid_t iid);
-iid_t storage_get_trim_instance(struct storage* store);
+  void storage_init(struct storage* store, int acceptor_id);
+  int  storage_open(struct storage* store);
+  void storage_close(struct storage* store);
+  int  storage_tx_begin(struct storage* store);
+  int  storage_tx_commit(struct storage* store);
+  void storage_tx_abort(struct storage* store);
+  int storage_get_record(struct storage* store, iid_t iid, paxos_accepted* out);
+  int storage_put_record(struct storage* store, paxos_accepted* acc);
+  int storage_trim(struct storage* store, iid_t iid);
+  iid_t storage_get_trim_instance(struct storage* store);
 
-void storage_init_mem(struct storage* s, int acceptor_id);
-void storage_init_lmdb(struct storage* s, int acceptor_id);
+  void storage_init_mem(struct storage* s, int acceptor_id);
+  void storage_init_lmdb(struct storage* s, int acceptor_id);
 
 #ifdef __cplusplus
 }

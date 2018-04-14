@@ -26,11 +26,13 @@
  */
 
 #include "storage_utils.h"
-
 #include <linux/slab.h>
-char *paxos_accepted_to_buffer(paxos_accepted *acc) {
+
+char*
+paxos_accepted_to_buffer(paxos_accepted* acc)
+{
   size_t len = acc->value.paxos_value_len;
-  char *buffer = pmalloc(sizeof(paxos_accepted) + len);
+  char*  buffer = pmalloc(sizeof(paxos_accepted) + len);
   if (buffer == NULL)
     return NULL;
   memcpy(buffer, acc, sizeof(paxos_accepted));
@@ -40,7 +42,9 @@ char *paxos_accepted_to_buffer(paxos_accepted *acc) {
   return buffer;
 }
 
-void paxos_accepted_from_buffer(char *buffer, paxos_accepted *out) {
+void
+paxos_accepted_from_buffer(char* buffer, paxos_accepted* out)
+{
   memcpy(out, buffer, sizeof(paxos_accepted));
   if (out->value.paxos_value_len > 0) {
     out->value.paxos_value_val = pmalloc(out->value.paxos_value_len);

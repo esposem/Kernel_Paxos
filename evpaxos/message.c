@@ -34,8 +34,8 @@ void
 send_paxos_message(struct net_device* dev, eth_address* addr,
                    paxos_message* msg)
 {
-  msgpack_packer packer[ETH_DATA_LEN];
-  long           size_msg = msgpack_pack_paxos_message(packer, msg);
+  eth_address packer[ETH_DATA_LEN];
+  long        size_msg = msgpack_pack_paxos_message(packer, msg);
 
   eth_send(dev, addr, (uint16_t)msg->type, packer, size_msg);
 }
@@ -140,8 +140,8 @@ paxos_submit(struct net_device* dev, eth_address* addr, char* data, int size)
 }
 
 int
-recv_paxos_message(paxos_message* out, char* out_data, paxos_message_type p,
-                   char* data, size_t size)
+recv_paxos_message(paxos_message* out, paxos_message_type p, char* data,
+                   size_t size)
 {
-  return msgpack_unpack_paxos_message(out, out_data, p, data, size);
+  return msgpack_unpack_paxos_message(out, p, data, size);
 }

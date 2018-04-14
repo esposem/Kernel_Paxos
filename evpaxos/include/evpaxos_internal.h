@@ -47,4 +47,6 @@ struct evproposer* evproposer_init_internal(int id,
 
 void evproposer_free_internal(struct evproposer* p);
 
+struct net_device* evlearner_get_device(struct evlearner* ev);
+
 #endif

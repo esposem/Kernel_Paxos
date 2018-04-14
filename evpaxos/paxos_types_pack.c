@@ -131,9 +131,6 @@ msgpack_unpack_paxos_promise(msgpack_packer* o, paxos_promise* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
-  // if (size <= 0)
-  //   return;
-  // v->value.paxos_value_val = pmalloc(size);
   memcpy(v->value.paxos_value_val, o, size);
 }
 
@@ -162,9 +159,6 @@ msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
-  // if (size <= 0)
-  //   return;
-  // v->value.paxos_value_val = pmalloc(size);
   memcpy(v->value.paxos_value_val, o, size);
 }
 
@@ -197,9 +191,6 @@ msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v)
   dcp_int_packet(&size, &o);
 
   v->value.paxos_value_len = size;
-  // if (size <= 0)
-  //   return;
-  // v->value.paxos_value_val = pmalloc(size);
   memcpy(v->value.paxos_value_val, o, size);
 }
 
@@ -281,9 +272,6 @@ msgpack_unpack_paxos_client_value(msgpack_packer* o, paxos_client_value* v)
 
   dcp_int_packet(&size, &o);
   v->value.paxos_value_len = size;
-  // if (size <= 0)
-  //   return;
-  // v->value.paxos_value_val = pmalloc(size);
   memcpy(v->value.paxos_value_val, o, size);
 }
 
@@ -342,34 +330,38 @@ msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v)
   }
 }
 
-#define ADJ_POINTER(msg, name, dest)                                           \
-  ({ msg->u.name.value.paxos_value_val = dest; })
+#define ADJ_POINTER(msg, name)                                                 \
+  ({                                                                           \
+    msg->u.name.value.paxos_value_val =                                        \
+      (char*)msg + offsetof(paxos_message, u.name.value.paxos_value_val) +     \
+      sizeof(char*);                                                           \
+  })
 
 int
-msgpack_unpack_paxos_message(paxos_message* v, char* v_data,
-                             paxos_message_type p, msgpack_packer* o, int size)
+msgpack_unpack_paxos_message(paxos_message* v, paxos_message_type p,
+                             msgpack_packer* o, int size)
 {
   v->type = p;
 
   switch (p) {
 
     case PAXOS_CLIENT_VALUE:
-      ADJ_POINTER(v, client_value, v_data);
+      ADJ_POINTER(v, client_value);
       msgpack_unpack_paxos_client_value(o, &v->u.client_value);
       break;
 
     case PAXOS_PROMISE:
-      ADJ_POINTER(v, promise, v_data);
+      ADJ_POINTER(v, promise);
       msgpack_unpack_paxos_promise(o, &v->u.promise);
       break;
 
     case PAXOS_ACCEPT:
-      ADJ_POINTER(v, accept, v_data);
+      ADJ_POINTER(v, accept);
       msgpack_unpack_paxos_accept(o, &v->u.accept);
       break;
 
     case PAXOS_ACCEPTED:
-      ADJ_POINTER(v, accepted, v_data);
+      ADJ_POINTER(v, accepted);
       msgpack_unpack_paxos_accepted(o, &v->u.accepted);
       break;
 

@@ -25,88 +25,87 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _LIBPAXOS_H_
 #define _LIBPAXOS_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
+#include "common.h"
+#include "paxos_types.h"
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include "paxos_types.h"
-#include "common.h"
 
+  /* Paxos instance ids and ballots */
+  typedef uint32_t iid_t;
+  typedef uint32_t ballot_t;
 
-/* Paxos instance ids and ballots */
-typedef uint32_t iid_t;
-typedef uint32_t ballot_t;
+  /* Logging and verbosity levels */
+  typedef enum
+  {
+    PAXOS_LOG_QUIET = 0,
+    PAXOS_LOG_ERROR = 1,
+    PAXOS_LOG_INFO = 2,
+    PAXOS_LOG_DEBUG = 3
+  } paxos_log_level;
 
-/* Logging and verbosity levels */
-typedef enum
-{
-	PAXOS_LOG_QUIET = 0,
-	PAXOS_LOG_ERROR = 1,
-	PAXOS_LOG_INFO  = 2,
-	PAXOS_LOG_DEBUG = 3
-} paxos_log_level;
+  /* Supported storage backends */
+  typedef enum
+  {
+    PAXOS_MEM_STORAGE = 0,
+    PAXOS_LMDB_STORAGE = 1
+  } paxos_storage_backend;
 
-/* Supported storage backends */
-typedef enum
-{
-	PAXOS_MEM_STORAGE = 0,
-	PAXOS_LMDB_STORAGE = 1
-} paxos_storage_backend;
+  /* Configuration */
+  struct paxos_config
+  {
+    /* General configuration */
+    paxos_log_level verbosity;
+    int             tcp_nodelay;
 
-/* Configuration */
-struct paxos_config
-{
-	/* General configuration */
-	paxos_log_level verbosity;
-	int tcp_nodelay;
+    /* Learner */
+    int learner_catch_up;
 
-	/* Learner */
-	int learner_catch_up;
+    /* Proposer */
+    int proposer_timeout;
+    int proposer_preexec_window;
 
-	/* Proposer */
-	int proposer_timeout;
-	int proposer_preexec_window;
+    /* Acceptor */
+    paxos_storage_backend storage_backend;
+    int                   trash_files;
 
-	/* Acceptor */
-	paxos_storage_backend storage_backend;
-	int trash_files;
+    /* lmdb storage configuration */
+    int    lmdb_sync;
+    char*  lmdb_env_path;
+    size_t lmdb_mapsize;
+  };
 
-	/* lmdb storage configuration */
-	int lmdb_sync;
-	char *lmdb_env_path;
-	size_t lmdb_mapsize;
-};
+  extern struct paxos_config paxos_config;
 
-extern struct paxos_config paxos_config;
-
-/* Core functions */
-int paxos_quorum(int acceptors);
-paxos_value* paxos_value_new(const char* v, size_t s);
-void paxos_value_free(paxos_value* v);
-void paxos_promise_destroy(paxos_promise* p);
-void paxos_accept_destroy(paxos_accept* a);
-void paxos_accepted_destroy(paxos_accepted* a);
-void paxos_message_destroy(paxos_message* m);
-void paxos_accepted_free(paxos_accepted* a);
-void paxos_log(int level, const char* format, va_list ap);
-void paxos_log_error(const char* format, ...);
-void paxos_log_info(const char* format, ...);
-void paxos_log_debug(const char* format, ...);
+  /* Core functions */
+  int          paxos_quorum(int acceptors);
+  paxos_value* paxos_value_new(const char* v, size_t s);
+  void         paxos_value_free(paxos_value* v);
+  void         paxos_promise_destroy(paxos_promise* p);
+  void         paxos_accept_destroy(paxos_accept* a);
+  void         paxos_accepted_destroy(paxos_accepted* a);
+  void         paxos_message_destroy(paxos_message* m);
+  void         paxos_accepted_free(paxos_accepted* a);
+  void         paxos_log(int level, const char* format, va_list ap);
+  void         paxos_log_error(const char* format, ...);
+  void         paxos_log_info(const char* format, ...);
+  void         paxos_log_debug(const char* format, ...);
 
 /*
-	MAX_N_OF_PROPOSERS should be removed.
-	The maximum number of proposers must be fixed beforehand
-	(this is because of unique ballot generation).
-	The proposers must be started with different IDs.
-	This number MUST be a power of 10.
+    MAX_N_OF_PROPOSERS should be removed.
+    The maximum number of proposers must be fixed beforehand
+    (this is because of unique ballot generation).
+    The proposers must be started with different IDs.
+    This number MUST be a power of 10.
 */
-#define MAX_N_OF_PROPOSERS 100
+#define MAX_N_OF_PROPOSERS 10
 
 #ifdef __cplusplus
 }
