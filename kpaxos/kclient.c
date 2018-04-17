@@ -13,7 +13,7 @@
 
 #define TIMEOUT_US 1000000
 
-const char* MOD_NAME = "KCLIENT";
+const char* MOD_NAME = "KClient";
 
 static int proposer_id = 0;
 module_param(proposer_id, int, S_IRUGO);
@@ -220,6 +220,7 @@ static void __exit
       del_timer(&c->stats_ev);
       evlearner_free(c->learner);
     }
+    pfree(c->clients_timeval);
     pfree(c);
   }
   LOG_INFO("Module unloaded.");

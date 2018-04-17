@@ -9,7 +9,7 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-const char* MOD_NAME = "KREPLICA";
+const char* MOD_NAME = "KReplica";
 
 struct file_operations fops = {
   .open = kdev_open,

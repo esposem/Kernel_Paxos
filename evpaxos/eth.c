@@ -49,17 +49,15 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
   uint16_t       proto = ntohs(skb->protocol);
   int            i = GET_PAXOS_POS(proto);
   paxos_message  msg;
+  char           msg_data[ETH_DATA_LEN];
   struct ethhdr* eth = eth_hdr(skb);
   size_t         len = skb->len;
   char           data[ETH_DATA_LEN];
 
-  if (i < 0 || i >= N_PAXOS_TYPES || cbs[i].cb == NULL) {
-    LOG_ERROR("Rejected packet i:%d cbs[i].cb:%p", i, cbs[i].cb);
-  } else {
-    skb_copy_bits(skb, 0, data, len);
-    recv_paxos_message(&msg, proto, data, len);
-    cbs[i].cb(&msg, cbs[i].arg, eth->h_source);
-  }
+  skb_copy_bits(skb, 0, data, len);
+  recv_paxos_message(&msg, msg_data, proto, data, len);
+  cbs[i].cb(&msg, cbs[i].arg, eth->h_source);
+
   kfree_skb(skb);
   return 0;
 }

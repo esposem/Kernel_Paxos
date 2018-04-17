@@ -98,7 +98,7 @@ proposer_new(int id, int acceptors)
   p->acceptors = acceptors;
   p->max_trim_iid = 0;
   p->next_prepare_iid = 0;
-  p->values = carray_new(128);
+  p->values = carray_new(paxos_config.proposer_preexec_window);
   p->prepare_instances = NULL;
   p->accept_instances = NULL;
   return p;
