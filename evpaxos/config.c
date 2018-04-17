@@ -99,6 +99,9 @@ evpaxos_config_read(char* name)
 {
   struct file*           f;
   struct evpaxos_config* c = NULL;
+  int                    offset = 0;
+  int                    read = 0;
+  int                    line_pos = 0;
 
   c = pmalloc(sizeof(struct evpaxos_config));
   if (c == NULL)
@@ -107,91 +110,54 @@ evpaxos_config_read(char* name)
 
   int   SIZE_LINE = 512;
   char* line = pmalloc(SIZE_LINE);
+  if (!line) {
+    return NULL;
+  }
   memset(line, 0, SIZE_LINE);
 
   f = file_open(name, O_RDONLY, S_IRUSR | S_IRGRP);
-  if (line && f) {
-#if 1
-    int offset = 0, read = 0, line_pos = 0;
-    // TODO LATER put in file.h
-    while ((read = file_read(f, offset, &(line[line_pos]), 1)) != 0) {
-      offset += read;
+  if (!f) {
+    return NULL;
+  }
 
-      // if new line
-      if (line[line_pos] == '\n') {
-        line[line_pos] = '\0';
-        parse_line(c, line);
-        memset(line, 0, SIZE_LINE);
-        line_pos = 0;
-        continue;
-      }
+  // TODO LATER put in file.h
+  while ((read = file_read(f, offset, &(line[line_pos]), 1)) != 0) {
+    offset += read;
 
-      line_pos++;
-
-      // if comment or line too long
-      if (line_pos == SIZE_LINE || line[line_pos - 1] == '#') {
-        line_pos = 0;
-        char c;
-        // skip rest of the line
-        while ((read = file_read(f, offset, &c, 1)) != 0) {
-          offset += read;
-          if (c == '\n') {
-            break;
-          }
-        }
-      }
-    }
-
-    // safety check in case the file does not end with \n
-    if (line_pos > 0) {
+    // if new line
+    if (line[line_pos] == '\n') {
       line[line_pos] = '\0';
       parse_line(c, line);
+      memset(line, 0, SIZE_LINE);
+      line_pos = 0;
+      continue;
     }
-#else
-    // NOT COMPLETE!!!!!!!!!!!!!!!!!!!
-    int   offset = 0, read = 0, temp_full = 0;
-    char *l, *t;
-    char  temp[SIZE_LINE + 1];
-    while ((read = file_read(f, offset, line, SIZE_LINE)) > 0) {
-      line[read] = '~';
-      line[read + 1] = '\0';
-      printk("Read %d %s\n", read, line);
 
-      while ((l = strsep(&line, "\n")) != NULL) {
-        size_t len = (strlen(l));
-        printk("Token %s a%ca\n", l, l[len]);
+    line_pos++;
 
-        if (l[len] != '~') {
-          if (temp_full) {
-            t = pmalloc(strlen(temp) + len + 1);
-            memcpy(t, temp, strlen(temp));
-            memcpy(t + strlen(temp), l, len + 1);
-            printk("PARSE %s\n", t);
-            // parse_line(c, t);
-            pfree(t);
-            temp_full = 0;
-          } else {
-            printk("PARSE %s\n", l);
-            // parse_line(c, l);
-          }
-        } else {
-          memcpy(temp, l, len + 1);
-          temp_full = 1;
+    // if comment or line too long
+    if (line_pos == SIZE_LINE || line[line_pos - 1] == '#') {
+      line_pos = 0;
+      char c;
+      // skip rest of the line
+      while ((read = file_read(f, offset, &c, 1)) != 0) {
+        offset += read;
+        if (c == '\n') {
+          break;
         }
       }
-      printk("Token %s\n", l);
-      offset += read;
     }
-    printk("Read %d\n", read);
-
-    // if (temp_full) {
-    //   printk("PARSE %s\n", temp);
-    //   // parse_line(c, temp);
-    // }
-#endif
-    pfree(line);
-    file_close(f);
   }
+
+  // safety check in case the file does not end with \n
+  if (line_pos > 0) {
+    line[line_pos] = '\0';
+    parse_line(c, line);
+  }
+
+  pfree(line);
+  file_close(f);
+
   return c;
 }
 

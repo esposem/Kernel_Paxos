@@ -19,7 +19,7 @@ struct file_operations fops = {
   .release = kdev_release,
 };
 
-const char* MOD_NAME = "KLEARNER";
+const char* MOD_NAME = "KLearner";
 
 size_t   sendtrim;
 atomic_t auto_trim;

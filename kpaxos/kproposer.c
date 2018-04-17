@@ -7,7 +7,7 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-const char* MOD_NAME = "KPROPOSER";
+const char* MOD_NAME = "KProposer";
 
 static char* if_name = "enp4s0";
 module_param(if_name, charp, 0000);

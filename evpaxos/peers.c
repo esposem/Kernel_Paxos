@@ -193,30 +193,30 @@ add_acceptors_from_config(struct peers* p, struct evpaxos_config* conf)
 void
 printall(struct peers* p, char* name)
 {
-  paxos_log_info("\t%s", name);
-  paxos_log_info("\t\tME id=%d address %02x:%02x:%02x:%02x:%02x:%02x",
+  paxos_log_info("%s", name);
+  paxos_log_info("\tME id=%d address %02x:%02x:%02x:%02x:%02x:%02x",
                  p->me_send->id, p->me_send->addr[0], p->me_send->addr[1],
                  p->me_send->addr[2], p->me_send->addr[3], p->me_send->addr[4],
                  p->me_send->addr[5]);
-  paxos_log_info("\tPEERS we connect to");
+  paxos_log_info("PEERS we connect to");
   int i;
   for (i = 0; i < p->peers_count; i++) {
-    paxos_log_info("\t\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x",
+    paxos_log_info("\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x",
                    p->peers[i]->id, p->peers[i]->addr[0], p->peers[i]->addr[1],
                    p->peers[i]->addr[2], p->peers[i]->addr[3],
                    p->peers[i]->addr[4], p->peers[i]->addr[5]);
   }
 
-  printk(KERN_INFO
-         "\tCLIENTS we receive connections \n\t(will be updated as message are "
-         "received)");
+  paxos_log_info("CLIENTS we receive connections ");
+  paxos_log_info("(will be updated as message are received");
 
   for (i = 0; i < p->clients_count; i++) {
     paxos_log_info(
-      "\t\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x", p->clients[i]->id,
+      "\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x", p->clients[i]->id,
       p->clients[i]->addr[0], p->clients[i]->addr[1], p->clients[i]->addr[2],
       p->clients[i]->addr[3], p->clients[i]->addr[4], p->clients[i]->addr[5]);
   }
+  paxos_log_info("");
 }
 
 int
@@ -240,7 +240,6 @@ add_or_update_client(eth_address* addr, struct peers* p)
     prealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1));
   p->clients[p->clients_count] = make_peer(p, p->clients_count, addr);
   p->clients_count++;
-  printall(p, "TMP");
   return 1;
 }
 

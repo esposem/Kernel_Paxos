@@ -330,71 +330,68 @@ msgpack_pack_paxos_message(msgpack_packer* p, paxos_message* v)
   }
 }
 
-#define ADJ_POINTER(msg, name)                                                 \
-  ({                                                                           \
-    msg->u.name.value.paxos_value_val =                                        \
-      (char*)msg + offsetof(paxos_message, u.name.value.paxos_value_val) +     \
-      sizeof(char*);                                                           \
-  })
+#define ADJ_POINTER(msg, name, dest)                                           \
+  ({ msg->u.name.value.paxos_value_val = dest; })
 
 int
-msgpack_unpack_paxos_message(paxos_message* v, paxos_message_type p,
-                             msgpack_packer* o, int size)
+msgpack_unpack_paxos_message(paxos_message* msg, char* msg_data,
+                             paxos_message_type proto,
+                             msgpack_packer* recv_data, int size)
 {
-  v->type = p;
+  msg->type = proto;
 
-  switch (p) {
+  switch (proto) {
 
     case PAXOS_CLIENT_VALUE:
-      ADJ_POINTER(v, client_value);
-      msgpack_unpack_paxos_client_value(o, &v->u.client_value);
+      ADJ_POINTER(msg, client_value, msg_data);
+      msgpack_unpack_paxos_client_value(recv_data, &msg->u.client_value);
       break;
 
     case PAXOS_PROMISE:
-      ADJ_POINTER(v, promise);
-      msgpack_unpack_paxos_promise(o, &v->u.promise);
+      ADJ_POINTER(msg, promise, msg_data);
+      msgpack_unpack_paxos_promise(recv_data, &msg->u.promise);
       break;
 
     case PAXOS_ACCEPT:
-      ADJ_POINTER(v, accept);
-      msgpack_unpack_paxos_accept(o, &v->u.accept);
+      ADJ_POINTER(msg, accept, msg_data);
+      msgpack_unpack_paxos_accept(recv_data, &msg->u.accept);
       break;
 
     case PAXOS_ACCEPTED:
-      ADJ_POINTER(v, accepted);
-      msgpack_unpack_paxos_accepted(o, &v->u.accepted);
+      ADJ_POINTER(msg, accepted, msg_data);
+      msgpack_unpack_paxos_accepted(recv_data, &msg->u.accepted);
       break;
 
     case PAXOS_PREPARE:
-      msgpack_unpack_paxos_prepare(o, &v->u.prepare);
+      msgpack_unpack_paxos_prepare(recv_data, &msg->u.prepare);
       break;
 
     case PAXOS_PREEMPTED:
-      msgpack_unpack_paxos_preempted(o, &v->u.preempted);
+      msgpack_unpack_paxos_preempted(recv_data, &msg->u.preempted);
       break;
 
     case PAXOS_REPEAT:
-      msgpack_unpack_paxos_repeat(o, &v->u.repeat);
+      msgpack_unpack_paxos_repeat(recv_data, &msg->u.repeat);
       break;
 
     case PAXOS_TRIM:
-      msgpack_unpack_paxos_trim(o, &v->u.trim);
+      msgpack_unpack_paxos_trim(recv_data, &msg->u.trim);
       break;
 
     case PAXOS_ACCEPTOR_STATE:
-      msgpack_unpack_paxos_acceptor_state(o, &v->u.state);
+      msgpack_unpack_paxos_acceptor_state(recv_data, &msg->u.state);
       break;
 
     case PAXOS_LEARNER_HI:
-      msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_HI);
+      msgpack_unpack_paxos_learner(recv_data, PAXOS_LEARNER_HI);
       break;
 
     case PAXOS_LEARNER_DEL:
-      msgpack_unpack_paxos_learner(o, PAXOS_LEARNER_DEL);
+      msgpack_unpack_paxos_learner(recv_data, PAXOS_LEARNER_DEL);
       break;
 
     case PAXOS_ACCEPTOR_OK:
-      msgpack_unpack_paxos_learner(o, PAXOS_ACCEPTOR_OK);
+      msgpack_unpack_paxos_learner(recv_data, PAXOS_ACCEPTOR_OK);
       break;
 
     default:

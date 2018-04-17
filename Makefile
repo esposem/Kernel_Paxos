@@ -80,7 +80,7 @@ ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -Wframe-larger-than
 
 LFLAGS = -levent -I /home/ubuntu/local/include -L /home/ubuntu/local/lib
 
-all: $(BUILD_DIR) user_app kernel_app
+all: $(BUILD_DIR) kernel_app #user_app
 
 kernel_app: $(BUILD_DIR_MAKEFILE)
 	make -C $(KDIR) M=$(BUILD_DIR) src=$(PWD) modules

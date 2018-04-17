@@ -140,8 +140,8 @@ paxos_submit(struct net_device* dev, eth_address* addr, char* data, int size)
 }
 
 int
-recv_paxos_message(paxos_message* out, paxos_message_type p, char* data,
-                   size_t size)
+recv_paxos_message(paxos_message* msg, char* msg_data, paxos_message_type proto,
+                   char* data, size_t size)
 {
-  return msgpack_unpack_paxos_message(out, p, data, size);
+  return msgpack_unpack_paxos_message(msg, msg_data, proto, data, size);
 }
