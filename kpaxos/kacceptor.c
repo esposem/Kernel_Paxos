@@ -8,7 +8,7 @@
 
 #include "evpaxos.h"
 
-const char* MOD_NAME = "KACCEPTOR";
+const char* MOD_NAME = "KAcceptor";
 
 static char* if_name = "enp4s0";
 module_param(if_name, charp, 0000);

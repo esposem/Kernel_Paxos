@@ -26,6 +26,8 @@
  */
 
 #include "carray.h"
+#include "paxos.h"
+#include <linux/vmalloc.h>
 
 struct carray
 {
@@ -46,21 +48,21 @@ carray_new(int size)
   struct carray* a;
   a = pmalloc(sizeof(struct carray));
   if (a == NULL)
-    printk(KERN_ALERT "A IS NULL");
+    paxos_log_error("A IS NULL");
   a->head = 0;
   a->tail = 0;
   a->size = size;
   a->count = 0;
-  a->array = pmalloc(sizeof(void*) * a->size);
+  a->array = vmalloc(sizeof(void*) * a->size);
   if (a == NULL)
-    printk(KERN_ALERT "ARRAY IS NULL");
+    paxos_log_error("ARRAY IS NULL");
   return a;
 }
 
 void
 carray_free(struct carray* a)
 {
-  pfree(a->array);
+  vfree(a->array);
   pfree(a);
 }
 
@@ -120,7 +122,7 @@ carray_grow(struct carray* a)
   struct carray* tmp = carray_new(a->size * 2);
   for (i = 0; i < a->count; i++)
     carray_push_back(tmp, carray_at(a, i));
-  pfree(a->array);
+  vfree(a->array);
   a->head = 0;
   a->tail = tmp->tail;
   a->size = tmp->size;
