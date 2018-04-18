@@ -142,6 +142,7 @@ msgpack_pack_paxos_accept(msgpack_packer* p, paxos_accept* v)
   char* value = v->value.paxos_value_val;
 
   cp_int_packet(v->iid, &p);
+  cp_int_packet(v->promise_iid, &p);
   cp_int_packet(v->ballot, &p);
   cp_int_packet(len, &p);
 
@@ -155,6 +156,7 @@ msgpack_unpack_paxos_accept(msgpack_packer* o, paxos_accept* v)
   int size;
 
   dcp_int_packet(&v->iid, &o);
+  dcp_int_packet(&v->promise_iid, &o);
   dcp_int_packet(&v->ballot, &o);
   dcp_int_packet(&size, &o);
 
@@ -171,6 +173,7 @@ msgpack_pack_paxos_accepted(msgpack_packer* p, paxos_accepted* v)
 
   cp_int_packet(v->aid, &p);
   cp_int_packet(v->iid, &p);
+  cp_int_packet(v->promise_iid, &p);
   cp_int_packet(v->ballot, &p);
   cp_int_packet(v->value_ballot, &p);
   cp_int_packet(len, &p);
@@ -186,6 +189,7 @@ msgpack_unpack_paxos_accepted(msgpack_packer* o, paxos_accepted* v)
 
   dcp_int_packet(&v->aid, &o);
   dcp_int_packet(&v->iid, &o);
+  dcp_int_packet(&v->promise_iid, &o);
   dcp_int_packet(&v->ballot, &o);
   dcp_int_packet(&v->value_ballot, &o);
   dcp_int_packet(&size, &o);

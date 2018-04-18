@@ -93,7 +93,6 @@ acceptor_receive_prepare(struct acceptor* a, paxos_prepare* req,
   if (storage_tx_commit(&a->store) != 0)
     return 0;
   paxos_accepted_to_promise(&acc, out);
-  paxos_log_debug("Acceptor: Created promise for iid %u", req->iid);
   return 1;
 }
 
@@ -178,9 +177,13 @@ paxos_accept_to_accepted(int id, paxos_accept* acc, paxos_message* out)
     memcpy(value, acc->value.paxos_value_val, value_size);
   }
   out->type = PAXOS_ACCEPTED;
-  out->u.accepted = (paxos_accepted){
-    id, acc->iid, acc->ballot, acc->ballot, { value_size, value }
-  };
+  out->u.accepted =
+    (paxos_accepted){ .aid = id,
+                      .iid = acc->iid,
+                      .promise_iid = 0,
+                      .ballot = acc->ballot,
+                      .value_ballot = acc->ballot,
+                      .value = (paxos_value){ value_size, value } };
 }
 
 static void

@@ -76,7 +76,7 @@ USR_SRCS := $(wildcard kpaxos/user_*.c)
 USR_OBJS := $(patsubst kpaxos/%.c, $(BUILD_DIR)/%.o, $(USR_SRCS))
 
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include -I$(HOME)/local/include
-ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -Wframe-larger-than=2048 -O3
+ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -Wframe-larger-than=3056 -O3
 
 LFLAGS = -levent -I /home/ubuntu/local/include -L /home/ubuntu/local/lib
 

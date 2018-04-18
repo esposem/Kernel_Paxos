@@ -73,11 +73,14 @@ proposer_preexecute(struct evproposer* p)
 static void
 try_accept(struct evproposer* p)
 {
-  paxos_accept accept;
-  while (proposer_accept(p->state, &accept))
+  paxos_accept  accept;
+  paxos_prepare pr;
+  while (proposer_accept(p->state, &accept)) {
+    proposer_prepare(p->state, &pr);
+    accept.promise_iid = pr.iid;
     peers_foreach_acceptor(p->peers, peer_send_accept, &accept);
-
-  proposer_preexecute(p);
+  }
+  // proposer_preexecute(p);
 }
 
 static void
@@ -87,7 +90,6 @@ evproposer_handle_promise(paxos_message* msg, void* arg, eth_address* src)
   paxos_prepare      prepare;
   paxos_promise*     pro = &msg->u.promise;
   int preempted = proposer_receive_promise(proposer->state, pro, &prepare);
-
   if (preempted)
     peers_foreach_acceptor(proposer->peers, peer_send_prepare, &prepare);
   try_accept(proposer);
@@ -97,8 +99,26 @@ static void
 evproposer_handle_accepted(paxos_message* msg, void* arg, eth_address* src)
 {
   struct evproposer* proposer = arg;
+  paxos_message      prom;
+  paxos_prepare      prep;
   paxos_accepted*    acc = &msg->u.accepted;
+  int                preempted;
 
+  if (acc->promise_iid) {
+    prom.type = PAXOS_PROMISE;
+    prom.u.promise =
+      (paxos_promise){ .aid = acc->aid,
+                       .iid = acc->promise_iid,
+                       .ballot = acc->ballot,
+                       .value_ballot = 0,
+                       .value = (paxos_value){ .paxos_value_val = NULL,
+                                               .paxos_value_len = 0 } };
+    preempted =
+      proposer_receive_promise(proposer->state, &prom.u.promise, &prep);
+    if (preempted)
+      paxos_log_error("Proposer: piggybacked prepare has been preempted!");
+    // peers_foreach_acceptor(proposer->peers, peer_send_prepare, &prep);
+  }
   if (proposer_receive_accepted(proposer->state, acc))
     try_accept(proposer);
 }
@@ -110,7 +130,6 @@ evproposer_handle_preempted(paxos_message* msg, void* arg, eth_address* src)
   paxos_prepare      prepare;
   int                preempted =
     proposer_receive_preempted(proposer->state, &msg->u.preempted, &prepare);
-
   if (preempted) {
     peers_foreach_acceptor(proposer->peers, peer_send_prepare, &prepare);
     try_accept(proposer);
@@ -174,8 +193,7 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers)
 {
 
   struct evproposer* proposer;
-  int                acceptor_count;
-  acceptor_count = evpaxos_acceptor_count(c);
+  int                acceptor_count = evpaxos_acceptor_count(c);
 
   proposer = pmalloc(sizeof(struct evproposer));
   if (proposer == NULL)
