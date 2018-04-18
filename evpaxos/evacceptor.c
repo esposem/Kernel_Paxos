@@ -56,11 +56,10 @@ evacceptor_handle_prepare(paxos_message* msg, void* arg, eth_address* src)
   paxos_prepare*     prepare = &msg->u.prepare;
   struct evacceptor* a = (struct evacceptor*)arg;
   add_or_update_client(src, a->peers);
-  paxos_log_debug("Acceptor: Received PREPARE");
+  paxos_log_debug("Received PREPARE");
   if (acceptor_receive_prepare(a->state, prepare, &out) != 0) {
     send_paxos_message(get_dev(a->peers), src, &out);
     paxos_message_destroy(&out);
-    paxos_log_debug("Acceptor: sent promise for iid %d", prepare->iid);
   }
 }
 
@@ -70,18 +69,35 @@ evacceptor_handle_prepare(paxos_message* msg, void* arg, eth_address* src)
 static void
 evacceptor_handle_accept(paxos_message* msg, void* arg, eth_address* src)
 {
-  paxos_message      out;
+  paxos_message      out, out2;
   paxos_accept*      accept = &msg->u.accept;
   struct evacceptor* a = (struct evacceptor*)arg;
-  paxos_log_debug("Acceptor: Received ACCEPT REQUEST");
+  paxos_log_debug("Received ACCEPT REQUEST");
+  paxos_prepare prepare =
+    (paxos_prepare){ .iid = accept->promise_iid, .ballot = accept->ballot };
+  uint32_t promise_iid = 0;
   if (acceptor_receive_accept(a->state, accept, &out) != 0) {
-    if (out.type == PAXOS_ACCEPTED) {
-      paxos_log_debug("Acceptor: Sent ACCEPTED to all proposers and learners");
-      peers_foreach_client(a->peers, send_acceptor_paxos_message, &out);
-    } else if (out.type == PAXOS_PREEMPTED) {
-      paxos_log_debug("Acceptor: Sent PREEMPTED to the proposer ");
-      send_paxos_message(get_dev(a->peers), src, &out);
+
+    if (acceptor_receive_prepare(a->state, &prepare, &out2) != 0) {
+      promise_iid = out2.u.promise.iid;
+      if (out2.u.promise.ballot > accept->ballot ||
+          out2.u.promise.value_ballot > 0) {
+        out.u.accepted.promise_iid = 0;
+        send_paxos_message(get_dev(a->peers), src, &out2);
+        paxos_message_destroy(&out2);
+        promise_iid = 0;
+      }
     }
+
+    if (out.type == PAXOS_ACCEPTED) {
+      out.u.accepted.promise_iid = promise_iid;
+      peers_foreach_client(a->peers, send_acceptor_paxos_message, &out);
+      paxos_log_debug("Sent ACCEPTED to all proposers and learners");
+    } else if (out.type == PAXOS_PREEMPTED) {
+      send_paxos_message(get_dev(a->peers), src, &out);
+      paxos_log_debug("Sent PREEMPTED to the proposer ");
+    }
+
     paxos_message_destroy(&out);
   }
 }
@@ -93,12 +109,10 @@ evacceptor_handle_repeat(paxos_message* msg, void* arg, eth_address* src)
   paxos_accepted     accepted;
   paxos_repeat*      repeat = &msg->u.repeat;
   struct evacceptor* a = (struct evacceptor*)arg;
-  paxos_log_debug("Acceptor: Handle repeat for iids %d-%d", repeat->from,
-                  repeat->to);
+  paxos_log_debug("Handle repeat for iids %d-%d", repeat->from, repeat->to);
   for (iid = repeat->from; iid <= repeat->to; ++iid) {
     if (acceptor_receive_repeat(a->state, iid, &accepted)) {
-      paxos_log_debug("Acceptor: sent a repeated PAXOS_ACCEPTED %d to learner",
-                      iid);
+      paxos_log_debug("sent a repeated PAXOS_ACCEPTED %d to learner", iid);
       send_paxos_accepted(get_dev(a->peers), src, &accepted);
       paxos_accepted_destroy(&accepted);
     }
@@ -108,7 +122,6 @@ evacceptor_handle_repeat(paxos_message* msg, void* arg, eth_address* src)
 static void
 evacceptor_handle_trim(paxos_message* msg, void* arg, eth_address* src)
 {
-  paxos_log_debug("Acceptor: Received PAXOS_TRIM. Deleting the old instances");
   paxos_trim*        trim = &msg->u.trim;
   struct evacceptor* a = (struct evacceptor*)arg;
   acceptor_receive_trim(a->state, trim);
@@ -120,7 +133,7 @@ evacceptor_handle_hi(paxos_message* msg, void* arg, eth_address* src)
 
   struct evacceptor* a = (struct evacceptor*)arg;
   if (add_or_update_client(src, a->peers)) {
-    paxos_log_debug("Acceptor: Received PAXOS_LEARNER_HI. Sending OK");
+    paxos_log_debug("Received PAXOS_LEARNER_HI. Sending OK");
     send_paxos_acceptor_ok(get_dev(a->peers), src);
   }
 }
@@ -128,7 +141,7 @@ evacceptor_handle_hi(paxos_message* msg, void* arg, eth_address* src)
 static void
 evacceptor_handle_del(paxos_message* msg, void* arg, eth_address* src)
 {
-  paxos_log_debug("Acceptor: Received PAXOS_LEARNER_DEL.");
+  paxos_log_debug("Received PAXOS_LEARNER_DEL.");
   struct evacceptor* a = (struct evacceptor*)arg;
   peers_delete_learner(a->peers, src);
 }
@@ -136,7 +149,6 @@ evacceptor_handle_del(paxos_message* msg, void* arg, eth_address* src)
 static void
 send_acceptor_state(unsigned long arg)
 {
-  paxos_log_debug("Acceptor: send_acceptor_state");
   struct evacceptor* a = (struct evacceptor*)arg;
   paxos_message      msg = { .type = PAXOS_ACCEPTOR_STATE };
   acceptor_set_current_state(a->state, &msg.u.state);
@@ -182,9 +194,8 @@ evacceptor_init(int id, char* if_name, char* path)
 
   int acceptor_count = evpaxos_acceptor_count(config);
   if (id < 0 || id >= acceptor_count) {
-    paxos_log_error(
-      "Acceptor: Invalid acceptor id: %d, should be between 0 and %d", id,
-      (acceptor_count - 1));
+    paxos_log_error("Invalid acceptor id: %d, should be between 0 and %d", id,
+                    (acceptor_count - 1));
     evpaxos_config_free(config);
     return NULL;
   }

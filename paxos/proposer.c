@@ -63,6 +63,8 @@ struct proposer
   iid_t            next_prepare_iid;
   struct instance* prepare_instances; /* Waiting for prepare acks */
   struct instance* accept_instances;  /* Waiting for accept acks */
+  iid_t*           prepare_iids;
+  int              prepare_iids_len;
 };
 
 struct timeout_iterator
@@ -89,6 +91,11 @@ static void instance_to_accept(struct instance* inst, paxos_accept* acc);
 static void carray_paxos_value_free(void* v);
 static int  paxos_value_cmp(struct paxos_value* v1, struct paxos_value* v2);
 
+static inline int   ordered_add(iid_t* v, int len, iid_t value);
+static inline iid_t ordered_get_smallest(iid_t* v, int len);
+static inline int   ordered_del(iid_t* v, int len, iid_t value);
+static inline void  ordered_print(iid_t* v, int len);
+
 struct proposer*
 proposer_new(int id, int acceptors)
 {
@@ -101,6 +108,9 @@ proposer_new(int id, int acceptors)
   p->values = carray_new(paxos_config.proposer_preexec_window);
   p->prepare_instances = NULL;
   p->accept_instances = NULL;
+  p->prepare_iids =
+    pmalloc(sizeof(iid_t) * 4 * paxos_config.proposer_preexec_window);
+  p->prepare_iids_len = 0;
   return p;
 }
 
@@ -122,6 +132,7 @@ proposer_free(struct proposer* p)
 
   carray_foreach(p->values, carray_paxos_value_free);
   carray_free(p->values);
+  pfree(p->prepare_iids);
   pfree(p);
 }
 
@@ -145,7 +156,6 @@ proposer_set_instance_id(struct proposer* p, iid_t iid)
   if (iid > p->next_prepare_iid) {
     p->next_prepare_iid = iid;
     // remove instances older than iid
-    paxos_log_debug("Proposer: removing instances older than %d", iid);
     proposer_trim_instances(p, &p->prepare_instances, iid);
     proposer_trim_instances(p, &p->accept_instances, iid);
   }
@@ -160,6 +170,7 @@ proposer_prepare(struct proposer* p, paxos_prepare* out)
   inst = instance_new(id, bal, p->acceptors);
   HASH_ADD_IID(p->prepare_instances, iid, inst);
   *out = (paxos_prepare){ inst->iid, inst->ballot };
+  p->prepare_iids_len = ordered_add(p->prepare_iids, p->prepare_iids_len, id);
 }
 
 int
@@ -198,9 +209,9 @@ proposer_receive_promise(struct proposer* p, paxos_promise* ack,
 
   if (ack->value.paxos_value_len > 0) {
     if (ack->value_ballot > inst->value_ballot) {
-      if (instance_has_promised_value(inst)) {
+      if (instance_has_promised_value(inst))
         paxos_value_free(inst->promised_value);
-      }
+
       inst->value_ballot = ack->value_ballot;
       inst->promised_value =
         paxos_value_new(ack->value.paxos_value_val, ack->value.paxos_value_len);
@@ -214,13 +225,27 @@ int
 proposer_accept(struct proposer* p, paxos_accept* out)
 {
   struct instance* inst = NULL;
-  struct instance* i;
+  int              i;
+  iid_t            iid;
 
   // Find smallest inst->iid
-  for (i = p->prepare_instances; i != NULL; i = i->hh.next) {
-    if (inst == NULL || inst->iid > i->iid) {
-      inst = i;
+  // for (i = p->prepare_instances; i != NULL; i = i->hh.next) {
+  //   if (inst == NULL || inst->iid > i->iid) {
+  //     inst = i;
+  //   }
+  // }
+  for (i = 0; i < p->prepare_iids_len; ++i) {
+    iid = ordered_get_smallest(p->prepare_iids, p->prepare_iids_len);
+    HASH_FIND_IID(p->prepare_instances, &iid, inst);
+
+    if (inst == NULL) {
+      paxos_log_info("Instance %u not in prepare", iid);
+
+      p->prepare_iids_len =
+        ordered_del(p->prepare_iids, p->prepare_iids_len, iid);
+      continue;
     }
+    break;
   }
 
   if (inst == NULL || !quorum_reached(&inst->quorum))
@@ -238,6 +263,8 @@ proposer_accept(struct proposer* p, paxos_accept* out)
 
   // We have both a prepared instance and a value
   proposer_move_instance(&p->prepare_instances, &p->accept_instances, inst);
+  p->prepare_iids_len =
+    ordered_del(p->prepare_iids, p->prepare_iids_len, inst->iid);
   instance_to_accept(inst, out);
 
   return 1;
@@ -477,9 +504,11 @@ instance_to_accept(struct instance* inst, paxos_accept* accept)
   paxos_value* v = inst->value;
   if (instance_has_promised_value(inst))
     v = inst->promised_value;
-  *accept = (paxos_accept){ inst->iid,
-                            inst->ballot,
-                            { v->paxos_value_len, v->paxos_value_val } };
+  *accept = (paxos_accept){ .iid = inst->iid,
+                            .ballot = inst->ballot,
+                            .promise_iid = 0,
+                            .value = (paxos_value){ v->paxos_value_len,
+                                                    v->paxos_value_val } };
 }
 
 static int
@@ -494,4 +523,75 @@ static void
 carray_paxos_value_free(void* v)
 {
   paxos_value_free(v);
+}
+
+/** reversed-ordered array **/
+
+typedef unsigned int iid_t;
+
+static inline int
+ordered_search(iid_t* v, int len, iid_t value)
+{
+  int first = 0, last = len - 1;
+  int middle = (first + last) / 2;
+
+  while (first <= last) {
+    if (v[middle] == value) {
+      return middle;
+    } else if (v[middle] > value)
+      first = middle + 1;
+    else
+      last = middle - 1;
+
+    middle = (first + last) / 2;
+  }
+  return first;
+}
+
+static inline int
+ordered_add(iid_t* v, int len, iid_t value)
+{
+  if (!len) {
+    v[0] = value;
+    return 1;
+  }
+
+  int idx = ordered_search(v, len, value);
+  if (v[idx] == value)
+    return len;
+
+  memmove(&v[idx + 1], &v[idx], (len - idx) * sizeof(iid_t));
+  v[idx] = value;
+  return len + 1;
+}
+
+static inline iid_t
+ordered_get_smallest(iid_t* v, int len)
+{
+  if (len)
+    return v[len - 1];
+  return 0;
+}
+
+static inline int
+ordered_del(iid_t* v, int len, iid_t value)
+{
+  if (!len)
+    return 0;
+
+  int idx = ordered_search(v, len, value);
+  if (v[idx] != value)
+    return len;
+
+  memmove(&v[idx], &v[idx + 1], (len - idx - 1) * sizeof(iid_t));
+  return len - 1;
+}
+
+static inline void
+ordered_print(iid_t* v, int len)
+{
+  int i;
+
+  for (i = 0; i < len; i++)
+    paxos_log_debug("v[%d] = %u", i, v[i]);
 }
