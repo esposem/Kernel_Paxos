@@ -47,13 +47,13 @@ evlearner_get_device(struct evlearner* ev)
   return get_dev(ev->acceptors);
 }
 
-static void
+static inline void
 peer_send_repeat(struct net_device* dev, struct peer* p, void* arg)
 {
   send_paxos_repeat(dev, get_addr(p), arg);
 }
 
-static void
+static inline void
 peer_send_hi(struct net_device* dev, struct peer* p, void* arg)
 {
   send_paxos_learner_hi(dev, get_addr(p));

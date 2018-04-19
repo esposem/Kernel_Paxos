@@ -42,13 +42,13 @@ struct evproposer
   struct timeval    stats_interval;
 };
 
-static void
+static inline void
 peer_send_prepare(struct net_device* dev, struct peer* p, void* arg)
 {
   send_paxos_prepare(dev, get_addr(p), arg);
 }
 
-static void
+static inline void
 peer_send_accept(struct net_device* dev, struct peer* p, void* arg)
 {
   send_paxos_accept(dev, get_addr(p), arg);
