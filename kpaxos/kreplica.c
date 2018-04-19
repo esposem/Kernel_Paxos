@@ -85,6 +85,7 @@ static int __init
     return 0;
   }
   start_replica(id);
+  printk("Module loaded\n");
   return 0;
 }
 
@@ -95,7 +96,7 @@ static void __exit
   // kdevchar_exit();
   if (replica != NULL)
     evpaxos_replica_free(replica);
-  printk("Module unloaded\n\n");
+  printk("Module unloaded\n");
 }
 
 module_init(init_replica) module_exit(replica_exit) MODULE_LICENSE("GPL");

@@ -79,6 +79,7 @@ static int __init
     return 0;
   }
   start_learner();
+  printk("Module loaded\n");
   return 0;
 }
 
@@ -89,7 +90,7 @@ static void __exit
   kdevchar_exit();
   if (lea != NULL)
     evlearner_free(lea);
-  printk("Module unloaded\n\n");
+  printk("Module unloaded\n");
 }
 
 module_init(init_learner);

@@ -37,6 +37,7 @@ static int __init
            init_acceptor(void)
 {
   start_acceptor(id);
+  printk("Module loaded\n");
   return 0;
 }
 
@@ -45,7 +46,7 @@ static void __exit
 {
   if (acc != NULL)
     evacceptor_free(acc);
-  printk("Module unloaded\n\n");
+  printk("Module unloaded\n");
 }
 
 module_init(init_acceptor) module_exit(acceptor_exit) MODULE_LICENSE("GPL");
