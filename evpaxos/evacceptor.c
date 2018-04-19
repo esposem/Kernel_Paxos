@@ -40,7 +40,7 @@ struct evacceptor
   struct timeval    stats_interval;
 };
 
-static void
+static inline void
 send_acceptor_paxos_message(struct net_device* dev, struct peer* p, void* arg)
 {
   send_paxos_message(dev, get_addr(p), arg);
