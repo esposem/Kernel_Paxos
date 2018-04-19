@@ -36,6 +36,7 @@ static int __init
            init_prop(void)
 {
   start_proposer(id);
+  printk("Module loaded\n");
   return 0;
 }
 
@@ -44,7 +45,7 @@ static void __exit
 {
   if (prop != NULL)
     evproposer_free(prop);
-  printk("Module unloaded\n\n");
+  printk("Module unloaded\n");
 }
 
 module_init(init_prop);
