@@ -28,7 +28,6 @@
 #include "storage.h"
 #include "uthash.h"
 #include <linux/slab.h>
-// TODO use vmalloc
 
 #ifndef HASH_FIND_IID
 #define HASH_FIND_IID(head, findint, out)                                      \

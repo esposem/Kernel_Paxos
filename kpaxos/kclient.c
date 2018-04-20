@@ -1,6 +1,5 @@
 #include "evpaxos_internal.h"
 #include "kernel_client.h"
-#include "paxos.h"
 #include <asm/atomic.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -101,20 +100,17 @@ static void
 update_stats(struct stats* stats, struct client_value* delivered, size_t size,
              struct timeval* tv)
 {
-  // do_gettimeofday(tv);
-  // long lat = timeval_diff(&delivered->t, tv);
+  do_gettimeofday(tv);
+  long lat = timeval_diff(&delivered->t, tv);
   stats->delivered_count++;
 
-  /* // TODO LATER uncomment this
   stats->delivered_bytes += size;
   stats->avg_latency =
-    stats->avg_latency + ((lat - stats->avg_latency) /
-    stats->delivered_count);
+    stats->avg_latency + ((lat - stats->avg_latency) / stats->delivered_count);
   if (stats->min_latency == 0 || lat < stats->min_latency)
     stats->min_latency = lat;
   if (lat > stats->max_latency)
     stats->max_latency = lat;
-  */
 }
 
 static void
@@ -122,7 +118,7 @@ check_timeout(struct timeval* now)
 {
   for (int i = 0; i < nclients; i++) {
     if (timeval_diff(&c->clients_timeval[i], now) > TIMEOUT_US) {
-      LOG_ERROR("Client %d sent expired", i);
+      paxos_log_error("Client %d sent expired", i);
       client_submit_value(c, i + id);
     }
   }
@@ -154,11 +150,10 @@ on_stats(unsigned long arg)
   long           mbps =
     (c->stats.delivered_count * c->send_buffer_len * 8) / (1024 * 1024);
 
-  LOG_INFO("%d msgs/sec, %ld Mbps", c->stats.delivered_count, mbps);
-  //  LOG_INFO("Client: %d value/sec, %d Mbps, latency min %ld us max %ld "
-  //           "us avg %ld us\n",
-  //           c->stats.delivered_count, mbps, c->stats.min_latency,
-  //           c->stats.max_latency, c->stats.avg_latency);
+  // LOG_INFO("%d msgs/sec, %ld Mbps", c->stats.delivered_count, mbps);
+  LOG_INFO("%d val/sec, %ld Mbps, latency min %ld us max %ld us avg %ld us\n",
+           c->stats.delivered_count, mbps, c->stats.min_latency,
+           c->stats.max_latency, c->stats.avg_latency);
   memset(&c->stats, 0, sizeof(struct stats));
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 
