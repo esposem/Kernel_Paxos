@@ -43,19 +43,11 @@ struct peer
   struct peers* peers;
 };
 
-struct subscription
-{
-  paxos_message_type type;
-  peer_cb            callback;
-  void*              arg;
-};
-
 struct peers
 {
   int                peers_count, clients_count;
   struct peer**      peers;   /* peers we connected to */
   struct peer**      clients; /* peers we accepted connections from */
-  struct peer*       me_send;
   struct net_device* dev;
 };
 
@@ -119,7 +111,6 @@ peers_new(struct evpaxos_config* config, int id, char* if_name)
     pfree(p);
     return NULL;
   }
-  p->me_send = make_peer(p, id, p->dev->dev_addr);
   check_id(p, config, id);
   return p;
 }
@@ -130,7 +121,6 @@ peers_free(struct peers* p)
   eth_destroy(p->dev);
   free_all_peers(p->peers, p->peers_count);
   free_all_peers(p->clients, p->clients_count);
-  pfree(p->me_send);
   pfree(p);
 }
 
@@ -194,14 +184,14 @@ void
 printall(struct peers* p, char* name)
 {
   paxos_log_info("%s", name);
-  paxos_log_info("\tME id=%d address %02x:%02x:%02x:%02x:%02x:%02x",
-                 p->me_send->id, p->me_send->addr[0], p->me_send->addr[1],
-                 p->me_send->addr[2], p->me_send->addr[3], p->me_send->addr[4],
-                 p->me_send->addr[5]);
+  paxos_log_info("\tME address %02x:%02x:%02x:%02x:%02x:%02x",
+                 p->dev->dev_addr[0], p->dev->dev_addr[1], p->dev->dev_addr[2],
+                 p->dev->dev_addr[3], p->dev->dev_addr[4], p->dev->dev_addr[5]);
   paxos_log_info("PEERS we connect to");
   int i;
   for (i = 0; i < p->peers_count; i++) {
-    paxos_log_info("\tid=%d address %02x:%02x:%02x:%02x:%02x:%02x",
+    paxos_log_info("\tid=%d address "
+                   "%02x:%02x:%02x:%02x:%02x:%02x",
                    p->peers[i]->id, p->peers[i]->addr[0], p->peers[i]->addr[1],
                    p->peers[i]->addr[2], p->peers[i]->addr[3],
                    p->peers[i]->addr[4], p->peers[i]->addr[5]);
@@ -235,6 +225,7 @@ add_or_update_client(eth_address* addr, struct peers* p)
       return 0;
     }
   }
+
   paxos_log_info("Added a new client, now %d clients", p->clients_count + 1);
   p->clients =
     prealloc(p->clients, sizeof(struct peer) * (p->clients_count + 1));

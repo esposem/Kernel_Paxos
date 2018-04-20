@@ -7,12 +7,15 @@
 #include <linux/skbuff.h>
 #include <linux/socket.h>
 #include <linux/string.h>
+#include <net/dst.h>
+
+#define MAX_CALLBACK 3
 
 struct callback
 {
   struct packet_type pt;
-  peer_cb            cb; // TODO LATER add callback array
-  void*              arg;
+  peer_cb            cb[MAX_CALLBACK];
+  void*              arg[MAX_CALLBACK];
 };
 
 static struct callback cbs[N_PAXOS_TYPES];
@@ -31,14 +34,37 @@ int
 eth_listen(struct net_device* dev, uint16_t proto, peer_cb cb, void* arg)
 {
   int i = GET_PAXOS_POS(proto);
-  if (i >= 0 && i < N_PAXOS_TYPES && cbs[i].cb == NULL) {
+  if (i < 0 || i >= N_PAXOS_TYPES)
+    return 0;
+
+  int k = 0;
+
+  while (k < MAX_CALLBACK && cbs[i].cb[k] != NULL) {
+    // there is already such callback, ignore this
+    if (cbs[i].cb[k] == cb) {
+      return 0;
+    }
+    k++;
+  }
+
+  // no space for an additional callback!
+  if (k >= MAX_CALLBACK) {
+    paxos_log_error("Could not register the callback for %d: too many cb",
+                    proto);
+    return 0;
+  }
+
+  // there are callbacks already registered: remove them first
+  if (k != 0) {
+    dev_remove_pack(&cbs[i].pt);
+  } else { // first callback registered
     cbs[i].pt.type = htons(proto);
     cbs[i].pt.func = packet_recv;
     cbs[i].pt.dev = dev;
-    cbs[i].cb = cb;
-    cbs[i].arg = arg;
-    dev_add_pack(&cbs[i].pt);
   }
+  cbs[i].cb[k] = cb;
+  cbs[i].arg[k] = arg;
+  dev_add_pack(&cbs[i].pt);
   return 1;
 }
 
@@ -47,7 +73,7 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
             struct net_device* src_dev)
 {
   uint16_t       proto = ntohs(skb->protocol);
-  int            i = GET_PAXOS_POS(proto);
+  int            i = GET_PAXOS_POS(proto), k = 0;
   paxos_message  msg;
   char           msg_data[ETH_DATA_LEN];
   struct ethhdr* eth = eth_hdr(skb);
@@ -55,25 +81,35 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
   char           data[ETH_DATA_LEN];
 
   skb_copy_bits(skb, 0, data, len);
-  recv_paxos_message(&msg, msg_data, proto, data, len);
-  cbs[i].cb(&msg, cbs[i].arg, eth->h_source);
+  while (k < MAX_CALLBACK && cbs[i].cb[k] != NULL) {
+    recv_paxos_message(&msg, msg_data, proto, data, len);
+    cbs[i].cb[k](&msg, cbs[i].arg[k], eth->h_source);
+    k++;
+  }
 
   kfree_skb(skb);
   return 0;
+}
+
+// dumbest thing to do: reimplement dev_loopback_xmit without
+// the warning
+void
+dev_loopback_xmit2(struct sk_buff* skb)
+{
+  skb_reset_mac_header(skb);
+  __skb_pull(skb, skb_network_offset(skb));
+  skb->pkt_type = PACKET_LOOPBACK;
+  skb->ip_summed = CHECKSUM_UNNECESSARY;
+  skb_dst_force(skb);
+  netif_rx_ni(skb);
 }
 
 int
 eth_send(struct net_device* dev, uint8_t dest_addr[ETH_ALEN], uint16_t proto,
          const char* msg, size_t len)
 {
-  int            ret;
+  int            ret = 0;
   unsigned char* data;
-  // TODO LATER Replica Fix this
-  // if (memcmp(dev->dev_addr, dest_addr, ETH_ALEN) == 0) {
-  //   // localhost for replica
-  //   deliver_message(proto, dest_addr, (char*)msg, len);
-  //   return !len;
-  // }
 
   struct sk_buff* skb = alloc_skb(ETH_FRAME_LEN, GFP_ATOMIC);
 
@@ -92,9 +128,12 @@ eth_send(struct net_device* dev, uint8_t dest_addr[ETH_ALEN], uint16_t proto,
     len = ETH_DATA_LEN;
 
   data = skb_put(skb, len);
-
   memcpy(data, msg, len);
-  ret = dev_queue_xmit(skb);
+  if (memcmp(dest_addr, dev->dev_addr, ETH_ALEN) == 0) {
+    dev_loopback_xmit2(skb);
+  } else {
+    ret = dev_queue_xmit(skb);
+  }
   return !ret;
 }
 
@@ -102,9 +141,12 @@ int
 eth_destroy(struct net_device* dev)
 {
   int i;
-  for (i = 0; i < N_PAXOS_TYPES; ++i)
-    if (cbs[i].cb != NULL)
+
+  for (i = 0; i < N_PAXOS_TYPES; ++i) {
+    if (cbs[i].cb[0] != NULL)
       dev_remove_pack(&cbs[i].pt);
+  }
+
   return 1;
 }
 
