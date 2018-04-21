@@ -14,6 +14,7 @@ kpaxos/kfile.o
 
 CL_OBJ= \
 kpaxos/kclient.o \
+kpaxos/stats.o \
 evpaxos/evlearner.o \
 paxos/learner.o \
 $(PAX_OBJ)
