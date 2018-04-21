@@ -1,5 +1,6 @@
 #include "evpaxos_internal.h"
 #include "kernel_client.h"
+#include "stats.h"
 #include <asm/atomic.h>
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -97,27 +98,22 @@ client_submit_value(struct client* c, int cid)
 }
 
 static void
-update_stats(struct stats* stats, struct client_value* delivered, size_t size,
-             struct timeval* tv)
+update_stats(struct stats* stats, struct client_value* delivered, size_t size)
 {
-  do_gettimeofday(tv);
-  long lat = timeval_diff(&delivered->t, tv);
+  struct timeval tv = { 0, 0 };
+  do_gettimeofday(&tv);
+  long lat = timeval_diff(&delivered->t, &tv);
   stats->delivered_count++;
-
-  stats->delivered_bytes += size;
-  stats->avg_latency =
-    stats->avg_latency + ((lat - stats->avg_latency) / stats->delivered_count);
-  if (stats->min_latency == 0 || lat < stats->min_latency)
-    stats->min_latency = lat;
-  if (lat > stats->max_latency)
-    stats->max_latency = lat;
+  stats_add(lat);
 }
 
 static void
-check_timeout(struct timeval* now)
+check_timeout(void)
 {
+  struct timeval now;
+  do_gettimeofday(&now);
   for (int i = 0; i < nclients; i++) {
-    if (timeval_diff(&c->clients_timeval[i], now) > TIMEOUT_US) {
+    if (timeval_diff(&c->clients_timeval[i], &now) > TIMEOUT_US) {
       paxos_log_error("Client %d sent expired", i);
       client_submit_value(c, i + id);
     }
@@ -130,14 +126,12 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
   struct client*       c = arg;
   struct client_value* v = (struct client_value*)value;
   int                  clid = v->client_id;
-  struct timeval       now = { 0, 0 };
 
   if (clid >= id && clid < id + nclients) {
-    update_stats(&c->stats, v, size, &now);
+    update_stats(&c->stats, v, size);
     //    paxos_log_debug(
     //      "Client %d received value %.16s with %zu bytes, total size is %zu",
     //      v->client_id, v->value, v->size, size);
-
     client_submit_value(c, clid);
   }
 }
@@ -146,19 +140,14 @@ static void
 on_stats(unsigned long arg)
 {
   struct client* c = (struct client*)arg;
-  struct timeval now;
   long           mbps =
     (c->stats.delivered_count * c->send_buffer_len * 8) / (1024 * 1024);
 
   // LOG_INFO("%d msgs/sec, %ld Mbps", c->stats.delivered_count, mbps);
-  LOG_INFO("%d val/sec, %ld Mbps, latency min %ld us max %ld us avg %ld us\n",
-           c->stats.delivered_count, mbps, c->stats.min_latency,
-           c->stats.max_latency, c->stats.avg_latency);
+  LOG_INFO("%d val/sec, %ld Mbps", c->stats.delivered_count, mbps);
   memset(&c->stats, 0, sizeof(struct stats));
+  check_timeout();
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
-
-  do_gettimeofday(&now);
-  check_timeout(&now);
 }
 
 void
@@ -194,6 +183,7 @@ start_client(int proposer_id, int value_size)
   c->stats_interval = (struct timeval){ 1, 0 };
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 
+  stats_init();
   for (int i = 0; i < nclients; ++i) {
     client_submit_value(c, id + i);
   }
@@ -204,12 +194,17 @@ static int __init
 {
   LOG_INFO("Id: %d --- Nclients: %d", id, nclients);
   start_client(proposer_id, value_size);
+  stats_add(100);
   return 0;
 }
 
 static void __exit
             client_exit(void)
 {
+  char file_name[128];
+  int  id = 0;
+  stats_add(201);
+
   if (c != NULL) {
     if (c->learner) {
       del_timer(&c->stats_ev);
@@ -218,6 +213,13 @@ static void __exit
     pfree(c->clients_timeval);
     pfree(c);
   }
+
+  stats_print();
+  get_random_bytes(&id, sizeof(id));
+  id &= 0xffffff;
+  sprintf(file_name, "stats-%3.3dclients-%d.txt", nclients, id);
+  stats_persist(file_name);
+  stats_destroy();
   LOG_INFO("Module unloaded.");
 }
 
