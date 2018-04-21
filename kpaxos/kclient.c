@@ -194,7 +194,6 @@ static int __init
 {
   LOG_INFO("Id: %d --- Nclients: %d", id, nclients);
   start_client(proposer_id, value_size);
-  stats_add(100);
   return 0;
 }
 
@@ -203,7 +202,6 @@ static void __exit
 {
   char file_name[128];
   int  id = 0;
-  stats_add(201);
 
   if (c != NULL) {
     if (c->learner) {
