@@ -1,4 +1,4 @@
-ClientUser spaceClientReplicaProposer# Kernel_Paxos
+# Kernel_Paxos
 Kernel Modules that implements Paxos protocol
 
 Tested on Ubuntu 17.04 zesty, kernel 4.10.0-33-generic and CentOS Linux kernel 3.10.0.
