@@ -26,7 +26,6 @@ static char *de_name, *clas_name;
 static int majorNumber, working, current_buf = 0, first_buf = 0;
 
 static struct user_msg** msg_buf;
-static size_t            value_size = 0;
 static atomic_t          must_stop, used_buf;
 
 static void
@@ -54,7 +53,7 @@ kstop_device()
 }
 
 void
-kset_message(char* msg, size_t size, unsigned int iid)
+kset_message(char* msg, int size, unsigned int iid)
 {
   if (atomic_read(&used_buf) >= BUFFER_SIZE) {
     paxos_log_error("Buffer is full! Lost a value");
@@ -64,6 +63,7 @@ kset_message(char* msg, size_t size, unsigned int iid)
   mutex_lock(&buffer_mutex);
   atomic_inc(&used_buf); // TODO useful atomic?
   msg_buf[current_buf]->iid = iid;
+  msg_buf[current_buf]->size = size;
   memcpy(msg_buf[current_buf]->value, msg, size);
   current_buf = (current_buf + 1) % BUFFER_SIZE;
   mutex_unlock(&buffer_mutex);
@@ -88,8 +88,9 @@ kdev_read(struct file* filep, char* buffer, size_t len, loff_t* offset)
   }
 
   mutex_lock(&buffer_mutex);
-  error_count = copy_to_user(buffer, (char*)msg_buf[first_buf],
-                             sizeof(struct user_msg) + value_size);
+  error_count =
+    copy_to_user(buffer, (char*)msg_buf[first_buf],
+                 sizeof(struct user_msg) + msg_buf[first_buf]->size);
   if (error_count != 0) {
     working = 0;
     paxerr("send x characters to the user");
@@ -111,11 +112,6 @@ kdev_write(struct file* filep, const char* buffer, size_t len, loff_t* offset)
 {
   if (working == 0) {
     return -1;
-  }
-
-  if (value_size == 0) {
-    memcpy(&value_size, buffer, sizeof(size_t));
-    paxos_log_debug("Device: client value size is %zu", value_size);
   }
 
   return len;
@@ -145,7 +141,7 @@ allocate_name(char** dest, char* name, int id)
 static void
 allocate_name_folder(char** dest, char* name, int id)
 {
-  char*  folder = "chardevice";
+  char*  folder = "paxos";
   size_t f_len = strlen(folder);
   size_t len = strlen(name);
   *dest = pmalloc(f_len + len + 3);

@@ -19,6 +19,7 @@ struct callback
 };
 
 static struct callback cbs[N_PAXOS_TYPES];
+static int             if_lo = 0;
 
 static int packet_recv(struct sk_buff* sk, struct net_device* dev,
                        struct packet_type* pt, struct net_device* dev2);
@@ -27,6 +28,8 @@ struct net_device*
 eth_init(const char* if_name)
 {
   memset(cbs, 0, sizeof(cbs));
+  if (memcmp(if_name, "lo", 3) == 0)
+    if_lo = 1;
   return dev_get_by_name(&init_net, if_name);
 }
 
@@ -82,10 +85,12 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
   char*          data_p = data;
 
   skb_copy_bits(skb, 0, data, len);
-  if (memcmp(eth->h_source, dev->dev_addr, ETH_ALEN) == 0) {
+
+  if (!if_lo && memcmp(eth->h_source, dev->dev_addr, ETH_ALEN) == 0) {
     data_p += ETH_HLEN;
     len -= ETH_HLEN;
   }
+
   while (k < MAX_CALLBACK && cbs[i].cb[k] != NULL) {
     recv_paxos_message(&msg, msg_data, proto, data_p, len);
     cbs[i].cb[k](&msg, cbs[i].arg[k], eth->h_source);

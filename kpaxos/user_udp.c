@@ -1,19 +1,23 @@
+#include <arpa/inet.h>
+#include <linux/if_ether.h>
+#include <linux/if_packet.h>
+#include <net/if.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
-#include "user_udp.h"
 #include "paxos_types.h"
+#include "user_udp.h"
 
-#if 0
-	#define PORT 5003
-	#define PROP_IP "127.0.0.3"
-#else
-	#define PORT 3002
-	#define PROP_IP "127.0.0.2"
-#endif
+static uint8_t if_addr[ETH_ALEN];
+static int     if_index;
 
-struct sockaddr_in address_to_sockaddr(const char *ip, int port) {
+struct sockaddr_in
+address_to_sockaddr(const char* ip, int port)
+{
   struct sockaddr_in addr;
 
   memset(&addr, 0, sizeof(struct sockaddr_in));
@@ -23,79 +27,105 @@ struct sockaddr_in address_to_sockaddr(const char *ip, int port) {
   return addr;
 }
 
-static void serialize_int_to_big(unsigned int * n, unsigned char ** buffer){
-	(*buffer)[0] = *n >> 24;
-  (*buffer)[1] = *n >> 16;
-  (*buffer)[2] = *n >> 8;
-  (*buffer)[3] = *n;
-  *buffer += sizeof(unsigned int);
+static void
+serialize_int_to_big(uint32_t n, unsigned char** buffer)
+{
+  unsigned char* res = (unsigned char*)&n;
+  (*buffer)[0] = res[3];
+  (*buffer)[1] = res[2];
+  (*buffer)[2] = res[1];
+  (*buffer)[3] = res[0];
+  *buffer += sizeof(uint32_t);
 }
 
-static void cp_int_packet(unsigned int * n, unsigned char ** buffer){
-	memcpy(*buffer, n, sizeof(unsigned int));
-	*buffer+=sizeof(unsigned int);
+static void
+cp_int_packet(uint32_t n, unsigned char** buffer)
+{
+  memcpy(*buffer, &n, sizeof(uint32_t));
+  *buffer += sizeof(uint32_t);
 }
 
 // returns 1 if architecture is little endian, 0 in case of big endian.
-static int check_for_endianness(){
+static int
+check_for_endianness()
+{
   unsigned int x = 1;
-  char *c = (char*) &x;
+  char*        c = (char*)&x;
   return (int)*c;
 }
 
-void udp_send_msg(struct client_value * clv, size_t size)
+void
+udp_send_msg(struct client* cl, struct client_value* clv, size_t size)
 {
-  unsigned char * packer;
-  unsigned int len = size;
-  long size2 = (sizeof(unsigned int) * 2) + len;
-  packer = malloc(size2);
-  unsigned char * tmp = packer;
-  unsigned int type = PAXOS_CLIENT_VALUE;
-  char * value = (char *)clv;
-  if(check_for_endianness()){
+  uint32_t             len = size;
+  unsigned char*       tmp;
+  char*                value = (char*)clv;
+  unsigned char        buf[ETH_FRAME_LEN] = { 0 };
+  size_t               send_len;
+  struct ether_header* eh;
+  struct sockaddr_ll   sock_addr;
+
+  /* Construct ethernet header. */
+  eh = (struct ether_header*)buf;
+  memcpy(eh->ether_shost, if_addr, ETH_ALEN);
+  memcpy(eh->ether_dhost, cl->ethop.prop_addr, ETH_ALEN);
+  eh->ether_type = htons(PAXOS_CLIENT_VALUE);
+  send_len = sizeof(*eh);
+
+  /* Fill the packet data. */
+  if (len + send_len >= ETH_FRAME_LEN)
+    len = ETH_FRAME_LEN - send_len - sizeof(unsigned int);
+
+  tmp = &(buf[send_len]);
+  if (check_for_endianness()) {
     // Machine is little endian, transform the packet data from little
-		// to big endian
-    serialize_int_to_big(&type, &tmp);
-    serialize_int_to_big(&len, &tmp);
-  }else{
-    cp_int_packet(&type, &tmp);
-    cp_int_packet(&len, &tmp);
+    // to big endian
+    serialize_int_to_big(len, &tmp);
+  } else {
+    cp_int_packet(len, &tmp);
   }
   memcpy(tmp, value, len);
-  if(cl->socket != -1){
-    if (sendto(cl->socket, packer, size2, 0,(struct sockaddr *) &cl->prop_addr, sizeof(cl->prop_addr))==-1)
-      perror("sendto()");
+  send_len += len;
+  send_len += (sizeof(unsigned int));
+
+  /* Fill the destination address and send it. */
+  sock_addr.sll_ifindex = if_index;
+  sock_addr.sll_halen = ETH_ALEN;
+  memcpy(sock_addr.sll_addr, cl->ethop.prop_addr, ETH_ALEN);
+
+  if (sendto(cl->ethop.socket, buf, send_len, 0, (struct sockaddr*)&sock_addr,
+             sizeof(sock_addr)) < 0) {
+    perror("sendto()");
+    return;
   }
-  free(packer);
 }
 
+void
+init_socket(struct client* c)
+{
 
-void init_socket(struct client * c){
-	if ((c->socket=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1){
-		printf("Socket not working\n");
-		free(c);
-		free(c->send_buffer);
-		exit(1);
-	}
-	memset((char *) &c->prop_addr, 0, sizeof(cl->prop_addr));
-	c->prop_addr.sin_family = AF_INET;
-	c->prop_addr.sin_port = htons(PORT);
-	if (inet_aton(PROP_IP, &cl->prop_addr.sin_addr)==0) {
-		fprintf(stderr, "inet_aton() failed\n");
-		free(c);
-		exit(1);
-	}
-	struct sockaddr_in si_me;
-	memset((char *) &si_me, 0, sizeof(si_me));
-	si_me.sin_family = AF_INET;
-	si_me.sin_port = 0;
-	// inet_aton("127.0.0.8", &si_me.sin_addr);
-	si_me.sin_addr.s_addr = htonl(0);
+  struct ifreq ifr;
+  c->ethop.socket = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW);
 
-	if (bind(c->socket, (struct sockaddr *)&si_me, sizeof(si_me))==-1)
-		perror("bind");
-	struct sockaddr_in address;
-	socklen_t i = (socklen_t) sizeof(struct sockaddr_in);
-	getsockname(c->socket, (struct sockaddr *) &address, &i);
-	printf("Socket is bind to %s : %d \n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+  if (c->ethop.socket == -1) {
+    printf("Socket not working, maybe you are not using sudo?\n");
+    free(c->ethop.send_buffer);
+    free(c);
+    exit(1);
+  }
+
+  /* Get the index number and MAC address of ethernet interface. */
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, c->ethop.if_name, IFNAMSIZ - 1);
+  if (ioctl(c->ethop.socket, SIOCGIFINDEX, &ifr) < 0) {
+    perror("SIOCGIFINDEX");
+    return;
+  }
+  if_index = ifr.ifr_ifindex;
+  if (ioctl(c->ethop.socket, SIOCGIFHWADDR, &ifr) < 0) {
+    perror("SIOCGIFHWADDR");
+    return;
+  }
+  memcpy(if_addr, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
+  printf("Socket ready\n");
 }

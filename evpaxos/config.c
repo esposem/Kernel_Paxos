@@ -126,7 +126,6 @@ evpaxos_config_read(char* name)
     // if new line
     if (line[line_pos] == '\n') {
       line[line_pos] = '\0';
-      printk("READ: %s %zu\n", line, strlen(line));
       parse_line(c, line);
       memset(line, 0, SIZE_LINE);
       line_pos = 0;
@@ -152,7 +151,6 @@ evpaxos_config_read(char* name)
   // safety check in case the file does not end with \n
   if (line_pos > 0) {
     line[line_pos] = '\0';
-    printk("READ: %s\n", line);
     parse_line(c, line);
   }
 
