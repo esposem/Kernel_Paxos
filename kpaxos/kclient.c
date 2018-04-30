@@ -92,9 +92,10 @@ client_submit_value(struct client* c, int cid)
   c->val->t = c->clients_timeval[cid - id];
   paxos_submit(evlearner_get_device(c->learner), c->proposeradd, c->send_buffer,
                c->send_buffer_len);
-  paxos_log_debug(
-    "Client %d submitted value %.16s with %zu bytes, total size is %zu",
-    c->val->client_id, c->val->value, c->val->size, c->send_buffer_len);
+  // LOG_DEBUG("Client %d submitted value %.16s with %zu bytes, total size is
+  // %d",
+  //           c->val->client_id, c->val->value, c->val->size,
+  //           c->send_buffer_len);
 }
 
 static void
@@ -114,7 +115,7 @@ check_timeout(void)
   do_gettimeofday(&now);
   for (int i = 0; i < nclients; i++) {
     if (timeval_diff(&c->clients_timeval[i], &now) > TIMEOUT_US) {
-      paxos_log_error("Client %d sent expired", i);
+      LOG_ERROR("Client %d sent expired", i);
       client_submit_value(c, i + id);
     }
   }
@@ -129,7 +130,7 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 
   if (clid >= id && clid < id + nclients) {
     update_stats(&c->stats, v, size);
-    //    paxos_log_debug(
+    //    LOG_DEBUG(
     //      "Client %d received value %.16s with %zu bytes, total size is %zu",
     //      v->client_id, v->value, v->size, size);
     client_submit_value(c, clid);

@@ -28,7 +28,7 @@ start_proposer(int id)
 {
   prop = evproposer_init(id, if_name, path);
   if (prop == NULL) {
-    printk(KERN_ERR "Could not start the proposer\n");
+    LOG_ERROR("Could not start the proposer");
   }
 }
 
@@ -36,7 +36,7 @@ static int __init
            init_prop(void)
 {
   start_proposer(id);
-  printk("Module loaded\n");
+  LOG_INFO("Module loaded");
   return 0;
 }
 
@@ -45,7 +45,7 @@ static void __exit
 {
   if (prop != NULL)
     evproposer_free(prop);
-  printk("Module unloaded\n");
+  LOG_INFO("Module unloaded");
 }
 
 module_init(init_prop);

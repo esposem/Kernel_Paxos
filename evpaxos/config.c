@@ -317,6 +317,9 @@ parse_line(struct evpaxos_config* c, char* line)
   char*          sep = " ";
   struct option* opt;
 
+  if (line == NULL)
+    return 0;
+
   line = strtrim(line);
   tok = strsep(&line, sep);
 

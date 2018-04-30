@@ -79,10 +79,15 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
   struct ethhdr* eth = eth_hdr(skb);
   size_t         len = skb->len;
   char           data[ETH_DATA_LEN];
+  char*          data_p = data;
 
   skb_copy_bits(skb, 0, data, len);
+  if (memcmp(eth->h_source, dev->dev_addr, ETH_ALEN) == 0) {
+    data_p += ETH_HLEN;
+    len -= ETH_HLEN;
+  }
   while (k < MAX_CALLBACK && cbs[i].cb[k] != NULL) {
-    recv_paxos_message(&msg, msg_data, proto, data, len);
+    recv_paxos_message(&msg, msg_data, proto, data_p, len);
     cbs[i].cb[k](&msg, cbs[i].arg[k], eth->h_source);
     k++;
   }
@@ -91,8 +96,7 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
   return 0;
 }
 
-// dumbest thing to do: reimplement dev_loopback_xmit without
-// the warning
+// reimplemented dev_loopback_xmit without the warning
 void
 dev_loopback_xmit2(struct sk_buff* skb)
 {

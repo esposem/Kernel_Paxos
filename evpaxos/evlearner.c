@@ -62,7 +62,7 @@ peer_send_hi(struct net_device* dev, struct peer* p, void* arg)
 static void
 evlearner_check_holes(unsigned long arg)
 {
-  paxos_log_debug("Learner: Checking holes");
+  // paxos_log_debug("Learner: Checking holes");
 
   paxos_repeat      msg;
   int               chunks = 10;
