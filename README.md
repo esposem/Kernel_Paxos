@@ -58,7 +58,7 @@ In addition the aforementioned, there are little changes in the logic:
 
 - A KLearner also sends a "delete" message to the KAcceptor when it is being unloaded, so that it can delete its entry from the known addresses.
 
-- Since a Client value can be lost (connectionless communication), the Client waits at most one second for receiving it back. If no value is received in that period of time, it sends the value again to the KProposer. This feature is not implemented inside the KClient.
+- Since a Client value can be lost (connectionless communication), the Client waits at most one second for receiving it back. If no value is received in that period of time, it sends the value again to the KProposer. This feature is also implemented inside the KClient.
 
 
 - The maximum ethernet frame size is 1500, and bigger packets will be only sent partially. The application must care about limiting the data size.
@@ -72,7 +72,9 @@ To load a kernel module type `sudo insmod module_name.ko parameters`. <br>
 To unload it, `sudo rmmod module_name.ko`. <br>
 `module_name` is the name of the module.
 
-To run an User space application type `./application_name`.
+To run an User space application type `sudo ./application_name`.
+
+Note that both kernel modules and User space applications need `sudo` privileges in order to work.
 
 ### Parameters
 

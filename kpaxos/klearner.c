@@ -9,7 +9,7 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-#define SEND_TO_CHAR_DEVICE 0
+#define SEND_TO_CHAR_DEVICE 1
 
 struct file_operations fops = {
   .open = kdev_open,

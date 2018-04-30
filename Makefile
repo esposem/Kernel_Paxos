@@ -74,14 +74,17 @@ C_COMP:= -std=c99
 G_COMP:= -std=gnu99
 USR_FLAGS:= -Wall -D user_space
 USR_SRCS := $(wildcard kpaxos/user_*.c)
-USR_OBJS := $(patsubst kpaxos/%.c, $(BUILD_DIR)/%.o, $(USR_SRCS))
+USR_CL := $(filter-out kpaxos/user_learner.c, $(USR_SRCS))
+USR_LEARN := $(filter-out kpaxos/user_client.c, $(USR_SRCS))
+USRC_OBJS := $(patsubst kpaxos/%.c, $(BUILD_DIR)/%.o, $(USR_CL))
+USRL_OBJS := $(patsubst kpaxos/%.c, $(BUILD_DIR)/%.o, $(USR_LEARN))
 
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include -I$(HOME)/local/include
 ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -Wframe-larger-than=3100 -O3
 
 LFLAGS = -levent -I /home/ubuntu/local/include -L /home/ubuntu/local/lib
 
-all: $(BUILD_DIR) kernel_app #user_app
+all: $(BUILD_DIR) kernel_app user_client user_learner
 
 kernel_app: $(BUILD_DIR_MAKEFILE)
 	make -C $(KDIR) M=$(BUILD_DIR) src=$(PWD) modules
@@ -97,9 +100,11 @@ $(BUILD_DIR_MAKEFILE): $(BUILD_DIR)
 $(BUILD_DIR)/%.o: kpaxos/%.c
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
-user_app: $(USR_OBJS)
+user_client: $(USRC_OBJS)
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $(BUILD_DIR)/$@ $^ $(LFLAGS)
 
+user_learner: $(USRL_OBJS)
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $(BUILD_DIR)/$@ $^ $(LFLAGS)
 
 ###########################################################################
 clean:
