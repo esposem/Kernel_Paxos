@@ -228,12 +228,6 @@ proposer_accept(struct proposer* p, paxos_accept* out)
   int              i;
   iid_t            iid;
 
-  // Find smallest inst->iid
-  // for (i = p->prepare_instances; i != NULL; i = i->hh.next) {
-  //   if (inst == NULL || inst->iid > i->iid) {
-  //     inst = i;
-  //   }
-  // }
   for (i = 0; i < p->prepare_iids_len; ++i) {
     iid = ordered_get_smallest(p->prepare_iids, p->prepare_iids_len);
     HASH_FIND_IID(p->prepare_instances, &iid, inst);

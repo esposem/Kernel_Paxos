@@ -61,7 +61,7 @@ static void         free_all_peers(struct peer** p, int count);
 static void
 check_id(struct peers* p, struct evpaxos_config* config, int id)
 {
-  paxos_log_debug("Id %d\n", id);
+  paxos_log_debug("check Id %d\n", id);
   if (id < 0)
     return;
 

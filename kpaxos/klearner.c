@@ -20,9 +20,6 @@ struct file_operations fops = {
 
 const char* MOD_NAME = "KLearner";
 
-size_t   sendtrim;
-atomic_t auto_trim;
-
 static int cantrim = 0;
 module_param(cantrim, int, S_IRUGO);
 MODULE_PARM_DESC(cantrim, "If the module has send to trim, set it to 1");
@@ -44,15 +41,9 @@ static struct evlearner* lea = NULL;
 static void
 on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
-  if (atomic_read(&auto_trim) == 1) {
-    if (sendtrim > 0) {
-      if (cantrim > 0) {
-        printk(KERN_ERR "Learner: sent trim to all\n");
-        evlearner_send_trim(lea, sendtrim);
-      }
-      sendtrim = 0;
-    }
-  }
+  // struct client_value* val = (struct client_value*)value;
+  // printk(KERN_INFO "%s: %ld.%06ld [%.16s] %ld bytes", MOD_NAME,
+  // val->t.tv_sec, val->t.tv_usec, val->value, (long)val->size);
   if (SEND_TO_CHAR_DEVICE)
     kset_message(value, size, iid);
 }
@@ -64,7 +55,7 @@ start_learner(void)
   lea = evlearner_init(on_deliver, NULL, if_name, path, 0);
 
   if (lea == NULL) {
-    printk(KERN_ERR "Could not start the learner!\n");
+    LOG_ERROR("Could not start the learner!");
   }
 
   return 0;
@@ -74,11 +65,11 @@ static int __init
            init_learner(void)
 {
   if (id < 0 || id > 10) {
-    printk(KERN_ERR "you must give an id!\n");
+    LOG_ERROR("you must give an id!");
     return 0;
   }
   start_learner();
-  printk("Module loaded\n");
+  LOG_INFO("Module loaded");
   return 0;
 }
 
@@ -89,7 +80,7 @@ static void __exit
   kdevchar_exit();
   if (lea != NULL)
     evlearner_free(lea);
-  printk("Module unloaded\n");
+  LOG_INFO("Module unloaded");
 }
 
 module_init(init_learner);
