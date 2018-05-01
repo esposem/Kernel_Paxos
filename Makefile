@@ -98,7 +98,7 @@ $(BUILD_DIR_MAKEFILE): $(BUILD_DIR)
 	touch "$@"
 
 $(BUILD_DIR)/%.o: kpaxos/%.c
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
+	$(CC) $(G_COMP) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
 user_client: $(USRC_OBJS)
 	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $(BUILD_DIR)/$@ $^ $(LFLAGS)

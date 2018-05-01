@@ -91,6 +91,8 @@ client_submit_value(struct client* c)
 
   size_t size = sizeof(struct client_value) + v->size;
   udp_send_msg(c, v, size);
+  // printf("Client %d submitted value %.16s with %zu bytes\n", v->client_id,
+  //        v->value, v->size);
   // printf("Client: submitted PAXOS_CLIENT_VALUE %.16s\n", v->value);
 }
 
