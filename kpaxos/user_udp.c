@@ -1,7 +1,9 @@
 #include <arpa/inet.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
+#include <net/ethernet.h>
 #include <net/if.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

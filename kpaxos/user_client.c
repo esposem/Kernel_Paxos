@@ -16,6 +16,8 @@ unpack_message(char* msg)
   struct client_value* val = (struct client_value*)mess->value;
   if (val->client_id == client->id) {
     update_stats(&client->stats, val->t, client->value_size);
+    // printf("Client %d received value %.16s with %zu bytes\n", val->client_id,
+    //        val->value, val->size);
     client_submit_value(client);
     event_add(client->ethop.resend_ev, &client->ethop.resend_interval);
   }
@@ -36,6 +38,7 @@ on_read_file(evutil_socket_t fd, short event, void* arg)
     }
     return;
   }
+  // printf("Read something\n");
   unpack_message(receive);
 }
 
@@ -63,6 +66,7 @@ static void
 on_resend(evutil_socket_t fd, short event, void* arg)
 {
   struct client* cl = (struct client*)arg;
+  client_submit_value(cl);
   client_submit_value(cl);
   event_add(cl->ethop.resend_ev, &cl->ethop.resend_interval);
 }
@@ -195,7 +199,8 @@ int
 main(int argc, char* argv[])
 {
   struct timeval seed;
-  struct client* cl = valloc(sizeof(struct client));
+  struct client* cl = malloc(sizeof(struct client));
+  memset(cl, 0, sizeof(struct client));
   client = cl;
   cl->ethop.if_name = "enp0s3";
   cl->tcpop.dest_addr = "127.0.0.1";

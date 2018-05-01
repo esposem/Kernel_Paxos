@@ -3,12 +3,10 @@
 #include "kernel_device.h"
 #include <asm/atomic.h>
 #include <linux/init.h>
-#include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/time.h>
 #include <linux/udp.h>
 #include <net/sock.h>
-
 #define SEND_TO_CHAR_DEVICE 1
 
 struct file_operations fops = {
@@ -36,11 +34,16 @@ static char* path = "./paxos.conf";
 module_param(path, charp, S_IRUGO);
 MODULE_PARM_DESC(path, "The config file position, default ./paxos.conf");
 
+#include <linux/time.h>
 static struct evlearner* lea = NULL;
+static unsigned long     count = 0;
+static struct timer_list stats_ev;
+static struct timeval    stats_interval;
 
 static void
 on_deliver(unsigned iid, char* value, size_t size, void* arg)
 {
+  count++;
   // struct client_value* val = (struct client_value*)value;
   // printk(KERN_INFO "%s: %ld.%06ld [%.16s] %ld bytes", MOD_NAME,
   // val->t.tv_sec, val->t.tv_usec, val->value, (long)val->size);
@@ -61,6 +64,14 @@ start_learner(void)
   return 0;
 }
 
+static void
+send_acceptor_state(unsigned long arg)
+{
+  LOG_INFO("%lu val/sec", count);
+  count = 0;
+  mod_timer(&stats_ev, jiffies + timeval_to_jiffies(&stats_interval));
+}
+
 static int __init
            init_learner(void)
 {
@@ -70,6 +81,9 @@ static int __init
   }
   start_learner();
   LOG_INFO("Module loaded");
+  setup_timer(&stats_ev, send_acceptor_state, 0);
+  stats_interval = (struct timeval){ 1, 0 };
+  mod_timer(&stats_ev, jiffies + timeval_to_jiffies(&stats_interval));
   return 0;
 }
 
@@ -77,6 +91,7 @@ static void __exit
             learner_exit(void)
 {
   kstop_device();
+  del_timer(&stats_ev);
   kdevchar_exit();
   if (lea != NULL)
     evlearner_free(lea);
