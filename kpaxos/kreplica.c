@@ -46,7 +46,7 @@ deliver(unsigned iid, char* value, size_t size, void* arg)
   // printk(KERN_INFO "%s: %ld.%06ld [%.16s] %ld bytes", kreplica->name,
   // val->t.tv_sec, val->t.tv_usec, val->value, (long)val->size);
   if (SEND_TO_CHAR_DEVICE)
-    kset_message(value, size, iid);
+    kset_message(value, size);
 }
 
 static void
@@ -75,7 +75,6 @@ static int __init
 static void __exit
             replica_exit(void)
 {
-  // kstop_device();
   // kdevchar_exit();
   if (replica != NULL)
     evpaxos_replica_free(replica);

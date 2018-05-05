@@ -1,29 +1,27 @@
+#include "user_eth.h"
 #include "user_levent.h"
 #include "user_stats.h"
-#include "user_udp.h"
 #include <getopt.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static char    receive[ETH_DATA_LEN];
-static int     use_chardevice = 0, use_socket = 0;
-struct client* client = NULL;
+static int     use_chardevice = 0;
+struct server* server = NULL;
+
 static void
-unpack_message(char* msg)
+unpack_message(char* msg, size_t len)
 {
   struct user_msg*     mess = (struct user_msg*)msg;
   struct client_value* val = (struct client_value*)mess->value;
-  if (use_socket) {
-    size_t         i;
-    struct server* serv = client->tcpop.s;
-    for (i = 0; i < serv->clients_count; i++) {
-      if (serv->connections[i]->cl_id == val->client_id) {
-        size_t total_size = sizeof(struct user_msg) +
-                            sizeof(struct client_value) + client->value_size;
-        bufferevent_write(serv->connections[i]->bev, msg, total_size);
-        break;
-      }
+  struct server*       serv = server;
+  for (int i = 0; i < serv->clients_count; i++) {
+    if (val->client_id >= serv->connections[i]->start_id &&
+        val->client_id < serv->connections[i]->end_id) {
+      bufferevent_write(serv->connections[i]->bev, msg, len);
+      break;
     }
   }
 }
@@ -31,71 +29,54 @@ unpack_message(char* msg)
 static void
 on_read_file(evutil_socket_t fd, short event, void* arg)
 {
-  int           len;
-  struct event* ev = arg;
-  len = read(client->fileop.fd, receive, ETH_DATA_LEN);
+  struct event_base* base = arg;
 
-  if (len < 0) {
-    if (len == -2) {
-      printf("Stopped by kernel module\n");
-      event_del(ev);
-      event_base_loopbreak(event_get_base(ev));
-    }
+  int len = read(server->fileop.fd, receive, ETH_DATA_LEN);
+  if (len < 0)
+    return;
+
+  if (len == 0) {
+    printf("Stop\n");
+    event_base_loopbreak(base);
     return;
   }
-  unpack_message(receive);
+  unpack_message(receive, len);
 }
 
 void
 on_read_sock(struct bufferevent* bev, void* arg)
 {
   struct connection* conn = (struct connection*)arg;
-  char*              c = client->tcpop.rec_buffer;
-  char               ok = 'k';
+  char*              c = server->tcpop.rec_buffer;
   size_t             len = bufferevent_read(bev, c, ETH_DATA_LEN);
 
   if (!len) {
     return;
   }
-
-  memcpy(&conn->cl_id, c, sizeof(int));
-  bufferevent_write(conn->bev, &ok, 1);
+  int* buff = (int*)c;
+  conn->start_id = buff[0];
+  conn->end_id = buff[1];
+  bufferevent_write(conn->bev, buff, sizeof(int) * 2);
 }
 
 static void
-make_client(struct client* cl)
+make_learner(struct server* cl)
 {
-  struct event_config* cfg = event_config_new();
-  event_config_avoid_method(cfg, "epoll");
-  cl->base = event_base_new_with_config(cfg);
-  cl->id = rand();
-  printf("id is %d\n", cl->id);
+  cl->base = event_base_new();
 
-  // TCP socket to connect learner
-  if (use_socket) {
-    cl->tcpop.s = server_new(cl);
-    if (cl->tcpop.s == NULL) {
-      printf("Could not start TCP connection\n");
-      exit(1);
-    }
-    server_listen(&cl->tcpop);
-  }
+  // cl->sig = evsignal_new(cl->base, SIGINT, handle_sigint, cl->base);
+  // evsignal_add(cl->sig, NULL);
+
+  server_listen(cl);
 
   // chardevice
-  open_file(cl);
-  // size_t s = sizeof(struct client_value) + cl->value_size;
-  // write_file(cl->fileop.fd, &s, sizeof(size_t));
+  open_file(&cl->fileop);
   cl->fileop.evread = event_new(cl->base, cl->fileop.fd, EV_READ | EV_PERSIST,
-                                on_read_file, NULL);
+                                on_read_file, cl->base);
   event_add(cl->fileop.evread, NULL);
 
-  // stop with ctrl+c
-  cl->sig = evsignal_new(cl->base, SIGINT, handle_sigint, cl->base);
-  evsignal_add(cl->sig, NULL);
-
   event_base_dispatch(cl->base);
-  client_free(cl, use_chardevice, 0, use_socket);
-  event_config_free(cfg);
+  server_free(cl);
 }
 
 int
@@ -113,7 +94,7 @@ str_to_mac(const char* str, uint8_t daddr[ETH_ALEN])
 }
 
 static void
-check_args(int argc, char* argv[], struct client* cl)
+check_args(int argc, char* argv[], struct server* serv)
 {
   int opt = 0, idx = 0;
 
@@ -128,11 +109,10 @@ check_args(int argc, char* argv[], struct client* cl)
     switch (opt) {
       case 'c':
         use_chardevice = 1;
-        cl->fileop.char_device_id = atoi(optarg);
+        serv->fileop.char_device_id = atoi(optarg);
         break;
       case 'm':
-        use_socket = 1;
-        cl->tcpop.dest_port = atoi(optarg);
+        serv->tcpop.dest_port = atoi(optarg);
         break;
       default:
         usage(argv[0], 0);
@@ -152,15 +132,15 @@ int
 main(int argc, char* argv[])
 {
   struct timeval seed;
-  struct client* cl = valloc(sizeof(struct client));
-  client = cl;
-  cl->tcpop.dest_port = 4000;
+  struct server* serv = server_new();
+  server = serv;
+  serv->tcpop.dest_port = 4000;
 
-  check_args(argc, argv, cl);
+  check_args(argc, argv, serv);
 
   if (!use_chardevice) {
     printf("You must use chardevice\n");
-    free(cl);
+    free(serv);
     usage(argv[0], 0);
     exit(1);
   }
@@ -168,7 +148,7 @@ main(int argc, char* argv[])
   gettimeofday(&seed, NULL);
   srand(seed.tv_usec);
 
-  make_client(cl);
+  make_learner(serv);
   signal(SIGPIPE, SIG_IGN);
 
   return 0;

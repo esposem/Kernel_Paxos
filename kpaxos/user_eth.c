@@ -12,22 +12,10 @@
 #include <unistd.h>
 
 #include "paxos_types.h"
-#include "user_udp.h"
+#include "user_eth.h"
 
 static uint8_t if_addr[ETH_ALEN];
 static int     if_index;
-
-struct sockaddr_in
-address_to_sockaddr(const char* ip, int port)
-{
-  struct sockaddr_in addr;
-
-  memset(&addr, 0, sizeof(struct sockaddr_in));
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(port);
-  addr.sin_addr.s_addr = inet_addr(ip);
-  return addr;
-}
 
 static void
 serialize_int_to_big(uint32_t n, unsigned char** buffer)
@@ -57,7 +45,7 @@ check_for_endianness()
 }
 
 void
-udp_send_msg(struct client* cl, struct client_value* clv, size_t size)
+eth_sendmsg(struct client* cl, struct client_value* clv, size_t size)
 {
   uint32_t             len = size;
   unsigned char*       tmp;
@@ -98,18 +86,17 @@ udp_send_msg(struct client* cl, struct client_value* clv, size_t size)
   if (sendto(cl->ethop.socket, buf, send_len, 0, (struct sockaddr*)&sock_addr,
              sizeof(sock_addr)) < 0) {
     perror("sendto()");
-    return;
   }
 }
 
 void
-init_socket(struct client* c)
+eth_init(struct client* c)
 {
 
   struct ifreq ifr;
   c->ethop.socket = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW);
 
-  if (c->ethop.socket == -1) {
+  if (c->ethop.socket < 0) {
     printf("Socket not working, maybe you are not using sudo?\n");
     free(c->ethop.send_buffer);
     free(c);

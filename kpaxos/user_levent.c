@@ -4,50 +4,10 @@
 #include <string.h>
 #include <time.h>
 
+#include "user_eth.h"
 #include "user_levent.h"
-#include "user_udp.h"
 
-static void random_string(char* s, const int len);
-static void on_client_event(struct bufferevent* bev, short ev, void* arg);
-static void on_listener_error(struct evconnlistener* l, void* arg);
-static void on_accept(struct evconnlistener* l, evutil_socket_t fd,
-                      struct sockaddr* addr, int socklen, void* arg);
-static struct connection* make_connection(struct server* server, int id,
-                                          struct sockaddr_in* addr);
-static void               free_connection(struct connection* p);
-static void free_all_connections(struct connection** p, int count);
-static void server_free(struct server* p);
-static void socket_set_nodelay(int fd);
-static void on_connect(struct bufferevent* bev, short events, void* arg);
-
-struct server*
-server_new(struct client* base)
-{
-  struct server* p = malloc(sizeof(struct server));
-  p->clients_count = 0;
-  p->connections = NULL;
-  p->listener = NULL;
-  p->client = base;
-  return p;
-}
-
-void
-handle_sigint(int sig, short ev, void* arg)
-{
-  struct event_base* base = arg;
-  event_base_loopbreak(base);
-}
-
-static void
-random_string(char* s, const int len)
-{
-  int               i;
-  static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-  for (i = 0; i < len - 1; ++i)
-    s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-  s[len - 1] = 0;
-}
-
+/* ################## common methods ################ */
 void
 write_file(int fd, void* data, size_t size)
 {
@@ -61,39 +21,110 @@ write_file(int fd, void* data, size_t size)
 }
 
 void
-open_file(struct client* c)
+open_file(struct chardevice* c)
 {
   char*  name = "/dev/paxos/klearner0";
   size_t strl = strlen(name) + 1;
   char*  fname = malloc(strl);
   memcpy(fname, name, strl);
-  fname[strl - 2] = c->fileop.char_device_id + '0';
-  c->fileop.fd = open(fname, O_RDWR | O_NONBLOCK, 0);
-  if (c->fileop.fd < 0) {
+  fname[strl - 2] = c->char_device_id + '0';
+  c->fd = open(fname, O_RDWR | O_NONBLOCK, 0);
+  if (c->fd < 0) {
     perror("Failed to open the device");
-    free(c);
     exit(1);
   }
 }
 
-void
-client_submit_value(struct client* c)
+struct sockaddr_in
+address_to_sockaddr(const char* ip, int port)
 {
-  struct client_value* v = (struct client_value*)c->ethop.send_buffer;
-  v->client_id = c->id;
-  gettimeofday(&v->t, NULL);
-  v->size = c->value_size;
+  struct sockaddr_in addr;
 
-  /* ############################################
-     HERE YOU SET THE VALUE TO SEND, YOU HAVE V->SIZE BYTES*/
-  random_string(v->value, v->size);
-  /* ############################################ */
+  memset(&addr, 0, sizeof(struct sockaddr_in));
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(port);
+  addr.sin_addr.s_addr = inet_addr(ip);
+  return addr;
+}
 
-  size_t size = sizeof(struct client_value) + v->size;
-  udp_send_msg(c, v, size);
-  // printf("Client %d submitted value %.16s with %zu bytes\n", v->client_id,
-  //        v->value, v->size);
-  // printf("Client: submitted PAXOS_CLIENT_VALUE %.16s\n", v->value);
+void
+usage(const char* name, int client)
+{
+  printf("Client Usage: %s [path/to/paxos.conf] [options] \n", name);
+  printf("Options:\n");
+  printf("  %-30s%s\n", "-h, --help", "Output this message and exit");
+  printf("  %-30s%s\n", "-c, --char_device_id #", "Chardevice id");
+  printf("  %-30s%s\n", "-m, --learner_port #", "Learner port (TCP)");
+  if (client) {
+    printf("  %-30s%s\n", "-l, --learner_addr #", "Learner address (TCP)");
+    printf("  %-30s%s\n", "-i, --if_name #", "Interface name (ETH)");
+    printf("  %-30s%s\n", "-p, --proposer-addr #", "Proposer address (ETH)");
+    printf("  %-30s%s\n", "-o, --outstanding #",
+           "Number of outstanding client values");
+    printf("  %-30s%s\n", "-v, --value-size #",
+           "Size of client value (in bytes)");
+    printf("  %-30s%s\n", "-d, --id #", "Starting id");
+    printf("  %-30s%s\n", "-n, --nclients #",
+           "Number of virtual clients to simulate");
+  }
+
+  exit(1);
+}
+
+/* ################## Server ################ */
+
+struct server*
+server_new()
+{
+  struct server* p = malloc(sizeof(struct server));
+  memset(p, 0, sizeof(struct server));
+  p->clients_count = 0;
+  p->connections = NULL;
+  p->listener = NULL;
+  return p;
+}
+
+static struct connection*
+make_connection(struct server* server, int id, struct sockaddr_in* addr)
+{
+  struct connection* p = malloc(sizeof(struct connection));
+  p->id = id;
+  p->addr = *addr;
+  p->bev = bufferevent_socket_new(server->base, -1, BEV_OPT_CLOSE_ON_FREE);
+  p->server = server;
+  p->status = BEV_EVENT_EOF;
+  p->start_id = -1;
+  p->end_id = -1;
+  return p;
+}
+
+static void
+free_connection(struct connection* p)
+{
+  bufferevent_free(p->bev);
+  free(p);
+}
+
+static void
+free_all_connections(struct connection** p, int count)
+{
+  for (int i = 0; i < count; i++)
+    free_connection(p[i]);
+  if (count > 0)
+    free(p);
+}
+
+void
+server_free(struct server* p)
+{
+  free_all_connections(p->connections, p->clients_count);
+  if (p->listener != NULL)
+    evconnlistener_free(p->listener);
+  free(p);
+  event_free(p->fileop.evread);
+  // event_free(p->sig);
+  bufferevent_free(p->tcpop.bev);
+  event_base_free(p->base);
 }
 
 int
@@ -114,9 +145,8 @@ on_client_event(struct bufferevent* bev, short ev, void* arg)
 {
   struct connection* p = (struct connection*)arg;
   if (ev & BEV_EVENT_EOF || ev & BEV_EVENT_ERROR) {
-    int                 i;
     struct connection** connections = p->server->connections;
-    for (i = p->id; i < p->server->clients_count - 1; ++i) {
+    for (int i = p->id; i < p->server->clients_count - 1; ++i) {
       connections[i] = connections[i + 1];
       connections[i]->id = i;
     }
@@ -128,16 +158,6 @@ on_client_event(struct bufferevent* bev, short ev, void* arg)
   } else {
     printf("Event %d not handled\n", ev);
   }
-}
-
-static void
-on_listener_error(struct evconnlistener* l, void* arg)
-{
-  int                err = EVUTIL_SOCKET_ERROR();
-  struct event_base* base = evconnlistener_get_base(l);
-  printf("Listener error %d: %s. Shutting down event loop.\n", err,
-         evutil_socket_error_to_string(err));
-  event_base_loopexit(base, NULL);
 }
 
 static void
@@ -159,26 +179,24 @@ on_accept(struct evconnlistener* l, evutil_socket_t fd, struct sockaddr* addr,
   bufferevent_setcb(client->bev, on_read_sock, NULL, on_client_event, client);
   bufferevent_enable(client->bev, EV_READ | EV_WRITE);
   socket_set_nodelay(fd);
+
   printf("Accepted connection from %s:%d\n",
          inet_ntoa(((struct sockaddr_in*)addr)->sin_addr),
          ntohs(((struct sockaddr_in*)addr)->sin_port));
 }
 
-static struct connection*
-make_connection(struct server* server, int id, struct sockaddr_in* addr)
+static void
+on_listener_error(struct evconnlistener* l, void* arg)
 {
-  struct connection* p = malloc(sizeof(struct connection));
-  p->id = id;
-  p->addr = *addr;
-  p->bev =
-    bufferevent_socket_new(server->client->base, -1, BEV_OPT_CLOSE_ON_FREE);
-  p->server = server;
-  p->status = BEV_EVENT_EOF;
-  return p;
+  int                err = EVUTIL_SOCKET_ERROR();
+  struct event_base* base = evconnlistener_get_base(l);
+  printf("Listener error %d: %s. Shutting down event loop.\n", err,
+         evutil_socket_error_to_string(err));
+  event_base_loopexit(base, NULL);
 }
 
 int
-server_listen(struct tcp_connection* tcp)
+server_listen(struct server* serv)
 {
   struct sockaddr_in addr;
   unsigned           flags =
@@ -188,17 +206,75 @@ server_listen(struct tcp_connection* tcp)
   memset(&addr, 0, sizeof(struct sockaddr_in));
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(0);
-  addr.sin_port = htons(tcp->dest_port);
-  tcp->s->listener =
-    evconnlistener_new_bind(tcp->s->client->base, on_accept, tcp->s, flags, -1,
+  addr.sin_port = htons(serv->tcpop.dest_port);
+  serv->listener =
+    evconnlistener_new_bind(serv->base, on_accept, serv, flags, -1,
                             (struct sockaddr*)&addr, sizeof(addr));
-  if (tcp->s->listener == NULL) {
-    printf("Failed to bind on port %d\n", tcp->dest_port);
+  if (serv->listener == NULL) {
+    printf("Failed to bind on port %d\n", serv->tcpop.dest_port);
     exit(1);
   }
-  evconnlistener_set_error_cb(tcp->s->listener, on_listener_error);
-  printf("Listening on port %d\n", tcp->dest_port);
+  evconnlistener_set_error_cb(serv->listener, on_listener_error);
+  printf("Listening on port %d\n", serv->tcpop.dest_port);
   return 1;
+}
+
+/* ################## Client ################ */
+
+void
+handle_sigint(int sig, short ev, void* arg)
+{
+  struct event_base* base = arg;
+  printf("Stop!\n");
+  event_base_loopbreak(base);
+}
+
+void
+client_free(struct client* cl, int chardevice, int sock)
+{
+  event_free(cl->sig);
+  if (chardevice)
+    event_free(cl->fileop.evread);
+
+  free(cl->ethop.send_buffer);
+  event_free(cl->stats_ev);
+  close(cl->ethop.socket);
+  free(cl->nclients_time);
+
+  if (sock) {
+    bufferevent_free(cl->tcpop.bev);
+  }
+  event_base_free(cl->base);
+  free(cl);
+}
+
+static void
+random_string(char* s, const int len)
+{
+  int               i;
+  static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+  for (i = 0; i < len - 1; ++i)
+    s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+  s[len - 1] = 0;
+}
+
+void
+client_submit_value(struct client* c, int id)
+{
+  struct client_value* v = (struct client_value*)c->ethop.send_buffer;
+  v->client_id = id;
+
+  v->size = c->value_size;
+  /* ############################################ */
+  random_string(v->value, v->size);
+  /* ############################################ */
+  size_t size = sizeof(struct client_value) + v->size;
+
+  gettimeofday(&c->nclients_time[id - c->id], NULL);
+  v->t = c->nclients_time[id - c->id];
+  eth_sendmsg(c, v, size);
+  // printf("Client %d submitted value %.16s with %zu bytes\n", v->client_id,
+  //        v->value, v->size);
 }
 
 static void
@@ -208,10 +284,12 @@ on_connect(struct bufferevent* bev, short events, void* arg)
 
   if (events & BEV_EVENT_CONNECTED) {
     printf("Connected to server\n");
-    bufferevent_write(c->tcpop.bev, &c->id, sizeof(int));
+    int buff[2];
+    buff[0] = c->id;               // starting id
+    buff[1] = c->nclients + c->id; // ending id (not included)
+    bufferevent_write(c->tcpop.bev, buff, sizeof(buff));
   } else {
     printf("ERROR: %s\n", evutil_socket_error_to_string(EVUTIL_SOCKET_ERROR()));
-    // exit(1);
   }
 }
 
@@ -230,75 +308,4 @@ connect_to_server(struct client* c)
   setsockopt(bufferevent_getfd(bev), IPPROTO_TCP, TCP_NODELAY, &flag,
              sizeof(int));
   return bev;
-}
-
-void
-usage(const char* name, int client)
-{
-  printf("Client Usage: %s [path/to/paxos.conf] [options] \n", name);
-  printf("Options:\n");
-  printf("  %-30s%s\n", "-h, --help", "Output this message and exit");
-  printf("  %-30s%s\n", "-c, --char_device_id #", "Chardevice id");
-  printf("  %-30s%s\n", "-m, --learner_port #", "Learner port (TCP)");
-  if (client) {
-    printf("  %-30s%s\n", "-l, --learner_addr #", "Learner address (TCP)");
-    printf("  %-30s%s\n", "-i, --if_name #", "Interface name (ETH)");
-    printf("  %-30s%s\n", "-p, --proposer-addr #", "Proposer address (ETH)");
-    printf("  %-30s%s\n", "-o, --outstanding #",
-           "Number of outstanding client values");
-    printf("  %-30s%s\n", "-v, --value-size #",
-           "Size of client value (in bytes)");
-  }
-
-  exit(1);
-}
-
-static void
-free_connection(struct connection* p)
-{
-  bufferevent_free(p->bev);
-  free(p);
-}
-
-static void
-free_all_connections(struct connection** p, int count)
-{
-  int i;
-  for (i = 0; i < count; i++)
-    free_connection(p[i]);
-  if (count > 0)
-    free(p);
-}
-
-static void
-server_free(struct server* p)
-{
-  free_all_connections(p->connections, p->clients_count);
-  if (p->listener != NULL)
-    evconnlistener_free(p->listener);
-  free(p);
-}
-
-void
-client_free(struct client* cl, int chardevice, int send, int sock)
-{
-  event_free(cl->sig);
-  if (chardevice)
-    event_free(cl->fileop.evread);
-
-  if (send) {
-    free(cl->ethop.send_buffer);
-    event_free(cl->stats_ev);
-    event_free(cl->ethop.resend_ev);
-    close(cl->ethop.socket);
-  }
-
-  if (sock) {
-    if (send)
-      bufferevent_free(cl->tcpop.bev);
-    else
-      server_free(cl->tcpop.s);
-  }
-  event_base_free(cl->base);
-  free(cl);
 }

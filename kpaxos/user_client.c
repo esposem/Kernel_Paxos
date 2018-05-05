@@ -1,6 +1,6 @@
+#include "user_eth.h"
 #include "user_levent.h"
 #include "user_stats.h"
-#include "user_udp.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,37 +9,37 @@
 static char    receive[ETH_DATA_LEN];
 static int     use_chardevice = 0, use_socket = 0;
 struct client* client = NULL;
+
 static void
-unpack_message(char* msg)
+unpack_message(char* msg, size_t len)
 {
   struct user_msg*     mess = (struct user_msg*)msg;
   struct client_value* val = (struct client_value*)mess->value;
-  if (val->client_id == client->id) {
+  int                  id = val->client_id - client->id;
+  if (id >= 0 && id < client->nclients) {
     update_stats(&client->stats, val->t, client->value_size);
     // printf("Client %d received value %.16s with %zu bytes\n", val->client_id,
     //        val->value, val->size);
-    client_submit_value(client);
-    event_add(client->ethop.resend_ev, &client->ethop.resend_interval);
+    client_submit_value(client, val->client_id);
   }
 }
 
 static void
 on_read_file(evutil_socket_t fd, short event, void* arg)
 {
-  int           len;
-  struct event* ev = arg;
+  int                len;
+  struct event_base* base = arg;
   len = read(client->fileop.fd, receive, ETH_DATA_LEN);
 
-  if (len < 0) {
-    if (len == -2) {
-      printf("Stopped by kernel module\n");
-      event_del(ev);
-      event_base_loopbreak(event_get_base(ev));
-    }
+  if (len < 0)
+    return;
+
+  if (len == 0) {
+    printf("Stop\n");
+    event_base_loopbreak(base);
     return;
   }
-  // printf("Read something\n");
-  unpack_message(receive);
+  unpack_message(receive, len);
 }
 
 void
@@ -47,38 +47,32 @@ on_read_sock(struct bufferevent* bev, void* arg)
 {
   struct client* cl = (struct client*)arg;
   char*          c = cl->tcpop.rec_buffer;
-  size_t         len = bufferevent_read(bev, c, ETH_DATA_LEN);
-
-  if (!len) {
+  int            len = bufferevent_read(bev, c, ETH_DATA_LEN);
+  if (len < 0)
+    return;
+  static int first_mess = 1;
+  int*       buff = (int*)c;
+  if (first_mess && buff[0] == cl->id && buff[1] == ((cl->id + cl->nclients))) {
+    for (int i = 0; i < cl->nclients; i++) {
+      client_submit_value(cl, i + cl->id);
+    }
+    first_mess = 0;
     return;
   }
-
-  if (*c == 'k') { // ok
-    for (size_t i = 0; i < cl->outstanding; ++i) {
-      client_submit_value(cl);
+  struct user_msg* mess = (struct user_msg*)c;
+  int              expected_size = sizeof(struct user_msg) + mess->size;
+  if (len >= expected_size && len % expected_size == 0) {
+    for (int i = 0; i < len / expected_size; ++i) {
+      unpack_message(c + (expected_size * i), expected_size);
     }
-  } else {
-    unpack_message(c);
   }
-}
-
-static void
-on_resend(evutil_socket_t fd, short event, void* arg)
-{
-  struct client* cl = (struct client*)arg;
-  client_submit_value(cl);
-  client_submit_value(cl);
-  event_add(cl->ethop.resend_ev, &cl->ethop.resend_interval);
 }
 
 static void
 make_client(struct client* cl)
 {
-  struct event_config* cfg = event_config_new();
-  event_config_avoid_method(cfg, "epoll");
-  cl->base = event_base_new_with_config(cfg);
-  cl->id = rand();
-  printf("id is %d\n", cl->id);
+  cl->base = event_base_new();
+  // cl->id = rand();
 
   // TCP socket to connect learner
   if (use_socket) {
@@ -88,39 +82,27 @@ make_client(struct client* cl)
       exit(1);
     }
   } else { // chardevice
-    open_file(cl);
-    // size_t s = sizeof(struct client_value) + cl->value_size;
-    // write_file(cl->fileop.fd, &s, sizeof(size_t));
+    open_file(&cl->fileop);
     cl->fileop.evread = event_new(cl->base, cl->fileop.fd, EV_READ | EV_PERSIST,
-                                  on_read_file, NULL);
+                                  on_read_file, cl->base);
     event_add(cl->fileop.evread, NULL);
   }
 
-  // stop with ctrl+c
+  // stop with signint
   cl->sig = evsignal_new(cl->base, SIGINT, handle_sigint, cl->base);
   evsignal_add(cl->sig, NULL);
 
   // ethernet for proposer
   cl->ethop.send_buffer = malloc(sizeof(struct client_value) + cl->value_size);
-  init_socket(cl);
+  eth_init(cl);
 
   // print statistic every 1 sec
   cl->stats_interval = (struct timeval){ 1, 0 };
-  cl->ethop.resend_interval = (struct timeval){ 1, 0 };
   cl->stats_ev = evtimer_new(cl->base, on_stats, cl);
   event_add(cl->stats_ev, &cl->stats_interval);
 
-  // resend value after 1 sec I did not receive anything
-  cl->ethop.resend_ev = evtimer_new(cl->base, on_resend, cl);
-  event_add(cl->ethop.resend_ev, &cl->ethop.resend_interval);
-
-  for (size_t i = 0; i < cl->outstanding; i++) {
-    client_submit_value(cl);
-  }
-
   event_base_dispatch(cl->base);
-  client_free(cl, use_chardevice, 1, use_socket);
-  event_config_free(cfg);
+  client_free(cl, use_chardevice, use_socket);
 }
 
 int
@@ -150,12 +132,14 @@ check_args(int argc, char* argv[], struct client* cl)
     { "learner_port", required_argument, 0, 'm' },
     { "value-size", required_argument, 0, 'v' },
     { "outstanding", required_argument, 0, 'o' },
+    { "id", required_argument, 0, 'd' },
+    { "nclients", required_argument, 0, 'n' },
     { "help", no_argument, 0, 'h' },
     { 0, 0, 0, 0 }
   };
 
-  while ((opt = getopt_long(argc, argv, "i:p:c:l:m:v:o:h", options, &idx)) !=
-         -1) {
+  while ((opt = getopt_long(argc, argv, "i:p:c:l:m:v:o:d:n:h", options,
+                            &idx)) != -1) {
     switch (opt) {
       case 'i':
         cl->ethop.if_name = optarg;
@@ -180,6 +164,12 @@ check_args(int argc, char* argv[], struct client* cl)
         break;
       case 'o':
         cl->outstanding = atoi(optarg);
+        break;
+      case 'd':
+        cl->id = atoi(optarg);
+        break;
+      case 'n':
+        cl->nclients = atoi(optarg);
         break;
       default:
         usage(argv[0], 1);
@@ -209,12 +199,19 @@ main(int argc, char* argv[])
     cl->ethop.prop_addr[i] = 0x0;
   cl->value_size = 64;
   cl->outstanding = 1;
+  cl->nclients = 1;
 
   check_args(argc, argv, cl);
+  cl->nclients_time = malloc(sizeof(struct timeval) * cl->nclients);
+  memset(cl->nclients_time, 0, sizeof(struct timeval) * cl->nclients);
+
   printf("if_name %s\n", cl->ethop.if_name);
   char a[20];
   mac_to_str(cl->ethop.prop_addr, a);
-  printf("address %s\n", a);
+  printf("address %s", a);
+  printf("id: %d ------ nclients: %d\n", cl->id, cl->nclients);
+  printf("dest_addr: %s dest_port: %d\n", cl->tcpop.dest_addr,
+         cl->tcpop.dest_port);
 
   if ((use_chardevice ^ use_socket) == 0) {
     printf("Either use chardevice or connect remotely to a learner\n");
