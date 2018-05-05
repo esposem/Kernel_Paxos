@@ -203,7 +203,9 @@ main(int argc, char* argv[])
 
   check_args(argc, argv, cl);
   cl->nclients_time = malloc(sizeof(struct timeval) * cl->nclients);
-  memset(cl->nclients_time, 0, sizeof(struct timeval) * cl->nclients);
+  for (int i = 0; i < cl->nclients; i++) { // needed to skip initial expiring
+    gettimeofday(&cl->nclients_time[i], NULL);
+  }
 
   printf("if_name %s\n", cl->ethop.if_name);
   char a[20];

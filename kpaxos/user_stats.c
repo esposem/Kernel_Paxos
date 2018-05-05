@@ -25,9 +25,9 @@ check_timeout(struct client* client)
   struct timeval now;
   gettimeofday(&now, NULL);
   for (int i = 0; i < client->nclients; ++i) {
-    if (timeval_diff(&client->nclients_time[i], &now) > TIMEOUT_US) {
-      printf("Client %d sent expired %ld\n", i,
-             timeval_diff(&client->nclients_time[i], &now));
+    long diff = timeval_diff(&client->nclients_time[i], &now);
+    if (diff > TIMEOUT_US) {
+      printf("Client %d sent expired %ld\n", i + client->id, diff);
       client_submit_value(client, i + client->id);
     }
   }
