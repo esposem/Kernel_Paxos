@@ -47,14 +47,15 @@ void
 kset_message(char* msg, size_t size)
 {
   if (atomic_read(&used_buf) >= BUFFER_SIZE) {
-    paxos_log_error("Buffer is full! Lost a value");
+    if (printk_ratelimit())
+      paxos_log_error("Buffer is full! Lost a value");
     return;
   }
   msg_buf[current_buf]->size = size;
   memcpy(msg_buf[current_buf]->value, msg, size);
   current_buf = (current_buf + 1) % BUFFER_SIZE;
   atomic_inc(&used_buf);
-  wake_up_interruptible(&access_wait); // TODO this might stop user?
+  wake_up_interruptible(&access_wait);
 }
 
 // returns 0 if it has to stop, >0 when it reads something, and <0 on error
