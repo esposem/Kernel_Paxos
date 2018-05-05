@@ -36,7 +36,7 @@ on_read_file(evutil_socket_t fd, short event, void* arg)
     return;
 
   if (len == 0) {
-    printf("Stop\n");
+    printf("Stopped by kernel module\n");
     event_base_loopbreak(base);
     return;
   }
@@ -63,10 +63,6 @@ static void
 make_learner(struct server* cl)
 {
   cl->base = event_base_new();
-
-  // cl->sig = evsignal_new(cl->base, SIGINT, handle_sigint, cl->base);
-  // evsignal_add(cl->sig, NULL);
-
   server_listen(cl);
 
   // chardevice

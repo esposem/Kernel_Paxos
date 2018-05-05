@@ -120,11 +120,9 @@ server_free(struct server* p)
   free_all_connections(p->connections, p->clients_count);
   if (p->listener != NULL)
     evconnlistener_free(p->listener);
-  free(p);
   event_free(p->fileop.evread);
-  // event_free(p->sig);
-  bufferevent_free(p->tcpop.bev);
   event_base_free(p->base);
+  free(p);
 }
 
 int
