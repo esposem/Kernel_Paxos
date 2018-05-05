@@ -220,6 +220,8 @@ kdevchar_exit(void)
     return;
   }
   working = 0;
+  atomic_inc(&used_buf);
+  wake_up_interruptible(&access_wait);
   mutex_destroy(&char_mutex);
   device_destroy(charClass, MKDEV(majorNumber, 0)); // remove the device
   class_unregister(charClass); // unregister the device class

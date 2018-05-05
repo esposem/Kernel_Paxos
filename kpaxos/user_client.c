@@ -35,7 +35,7 @@ on_read_file(evutil_socket_t fd, short event, void* arg)
     return;
 
   if (len == 0) {
-    printf("Stop\n");
+    printf("Stopped by kernel module\n");
     event_base_loopbreak(base);
     return;
   }
