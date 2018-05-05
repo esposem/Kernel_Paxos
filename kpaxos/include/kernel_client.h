@@ -15,9 +15,8 @@ struct client_value
 
 struct user_msg
 {
-  int  iid;
-  int  size;
-  char value[0];
+  size_t size;
+  char   value[0];
 };
 
 struct stats
