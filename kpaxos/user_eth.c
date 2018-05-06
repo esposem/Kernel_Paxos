@@ -89,7 +89,7 @@ eth_sendmsg(struct client* cl, struct client_value* clv, size_t size)
   }
 }
 
-void
+int
 eth_init(struct client* c)
 {
 
@@ -98,23 +98,22 @@ eth_init(struct client* c)
 
   if (c->ethop.socket < 0) {
     printf("Socket not working, maybe you are not using sudo?\n");
-    free(c->ethop.send_buffer);
-    free(c);
-    exit(1);
+    return 1;
   }
 
   /* Get the index number and MAC address of ethernet interface. */
   memset(&ifr, 0, sizeof(ifr));
   strncpy(ifr.ifr_name, c->ethop.if_name, IFNAMSIZ - 1);
   if (ioctl(c->ethop.socket, SIOCGIFINDEX, &ifr) < 0) {
-    perror("SIOCGIFINDEX");
-    return;
+    perror("Error getting the interface index");
+    return 1;
   }
   if_index = ifr.ifr_ifindex;
   if (ioctl(c->ethop.socket, SIOCGIFHWADDR, &ifr) < 0) {
-    perror("SIOCGIFHWADDR");
-    return;
+    perror("Error getting the interface MAC address");
+    return 1;
   }
   memcpy(if_addr, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
   printf("Socket ready\n");
+  return 0;
 }

@@ -7,7 +7,7 @@
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
 
-#define BUFFER_SIZE 10000
+#define BUFFER_SIZE 100000
 static struct mutex char_mutex;
 // static struct mutex buffer_mutex;
 
@@ -46,10 +46,10 @@ kdev_open(struct inode* inodep, struct file* filep)
 void
 kset_message(char* msg, size_t size)
 {
-  if (atomic_read(&used_buf) >= BUFFER_SIZE) {
+  if (atomic_read(&used_buf) == BUFFER_SIZE) {
     if (printk_ratelimit())
       paxos_log_error("Buffer is full! Lost a value");
-    return;
+    atomic_dec(&used_buf);
   }
   msg_buf[current_buf]->size = size;
   memcpy(msg_buf[current_buf]->value, msg, size);
@@ -62,14 +62,11 @@ kset_message(char* msg, size_t size)
 ssize_t
 kdev_read(struct file* filep, char* buffer, size_t len, loff_t* offset)
 {
-  int error_count = -1;
+  int error_count;
 
   if (signal_pending(current) || !working) { // user called sigint
     return 0;
   }
-
-  if (atomic_read(&used_buf) <= 0)
-    return -1;
 
   atomic_dec(&used_buf);
   size_t llen = sizeof(struct user_msg) + msg_buf[first_buf]->size;

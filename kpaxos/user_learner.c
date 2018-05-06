@@ -63,15 +63,19 @@ static void
 make_learner(struct server* cl)
 {
   cl->base = event_base_new();
-  server_listen(cl);
+  if (server_listen(cl))
+    goto cleanup;
 
   // chardevice
-  open_file(&cl->fileop);
+  if (open_file(&cl->fileop))
+    goto cleanup;
+
   cl->fileop.evread = event_new(cl->base, cl->fileop.fd, EV_READ | EV_PERSIST,
                                 on_read_file, cl->base);
   event_add(cl->fileop.evread, NULL);
 
   event_base_dispatch(cl->base);
+cleanup:
   server_free(cl);
 }
 
