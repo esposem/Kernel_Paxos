@@ -72,21 +72,6 @@ static void
 make_client(struct client* cl)
 {
   cl->base = event_base_new();
-  // cl->id = rand();
-
-  // TCP socket to connect learner
-  if (use_socket) {
-    cl->tcpop.bev = connect_to_server(cl);
-    if (cl->tcpop.bev == NULL) {
-      printf("Could not start TCP connection\n");
-      exit(1);
-    }
-  } else { // chardevice
-    open_file(&cl->fileop);
-    cl->fileop.evread = event_new(cl->base, cl->fileop.fd, EV_READ | EV_PERSIST,
-                                  on_read_file, cl->base);
-    event_add(cl->fileop.evread, NULL);
-  }
 
   // stop with signint
   cl->sig = evsignal_new(cl->base, SIGINT, handle_sigint, cl->base);
@@ -94,7 +79,27 @@ make_client(struct client* cl)
 
   // ethernet for proposer
   cl->ethop.send_buffer = malloc(sizeof(struct client_value) + cl->value_size);
-  eth_init(cl);
+  if (eth_init(cl))
+    goto cleanup;
+
+  // TCP socket to connect learner
+  if (use_socket) {
+    cl->tcpop.bev = connect_to_server(cl);
+    if (cl->tcpop.bev == NULL) {
+      printf("Could not start TCP connection\n");
+      goto cleanup;
+    }
+  } else { // chardevice
+    if (open_file(&cl->fileop))
+      goto cleanup;
+    cl->fileop.evread = event_new(cl->base, cl->fileop.fd, EV_READ | EV_PERSIST,
+                                  on_read_file, cl->base);
+    event_add(cl->fileop.evread, NULL);
+
+    for (int i = 0; i < cl->nclients; i++) {
+      client_submit_value(cl, i + cl->id);
+    }
+  }
 
   // print statistic every 1 sec
   cl->stats_interval = (struct timeval){ 1, 0 };
@@ -102,6 +107,7 @@ make_client(struct client* cl)
   event_add(cl->stats_ev, &cl->stats_interval);
 
   event_base_dispatch(cl->base);
+cleanup:
   client_free(cl, use_chardevice, use_socket);
 }
 
@@ -203,9 +209,7 @@ main(int argc, char* argv[])
 
   check_args(argc, argv, cl);
   cl->nclients_time = malloc(sizeof(struct timeval) * cl->nclients);
-  for (int i = 0; i < cl->nclients; i++) { // needed to skip initial expiring
-    gettimeofday(&cl->nclients_time[i], NULL);
-  }
+  memset(cl->nclients_time, 1, sizeof(struct timeval) * cl->nclients);
 
   printf("if_name %s\n", cl->ethop.if_name);
   char a[20];
@@ -217,6 +221,7 @@ main(int argc, char* argv[])
 
   if ((use_chardevice ^ use_socket) == 0) {
     printf("Either use chardevice or connect remotely to a learner\n");
+    free(cl->nclients_time);
     free(cl);
     usage(argv[0], 1);
     exit(1);

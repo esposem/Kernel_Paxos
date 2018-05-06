@@ -10,6 +10,6 @@
 
 extern void eth_sendmsg(struct client* cl, struct client_value* clv,
                         size_t size);
-extern void eth_init(struct client* c);
+extern int  eth_init(struct client* c);
 
 #endif

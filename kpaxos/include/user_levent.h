@@ -80,7 +80,7 @@ struct client
   struct tcp_connection tcpop;  // TCP op
 };
 
-extern void open_file(struct chardevice* c);
+extern int  open_file(struct chardevice* c);
 extern void write_file(int fd, void* data, size_t size);
 extern void usage(const char* name, int client);
 extern void on_read_sock(struct bufferevent* bev, void* arg);

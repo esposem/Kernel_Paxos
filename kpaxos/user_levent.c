@@ -20,7 +20,7 @@ write_file(int fd, void* data, size_t size)
   }
 }
 
-void
+int
 open_file(struct chardevice* c)
 {
   char*  name = "/dev/paxos/klearner0";
@@ -31,8 +31,9 @@ open_file(struct chardevice* c)
   c->fd = open(fname, O_RDWR | O_NONBLOCK, 0);
   if (c->fd < 0) {
     perror("Failed to open the device");
-    exit(1);
+    return 1;
   }
+  return 0;
 }
 
 struct sockaddr_in
@@ -78,9 +79,6 @@ server_new()
 {
   struct server* p = malloc(sizeof(struct server));
   memset(p, 0, sizeof(struct server));
-  p->clients_count = 0;
-  p->connections = NULL;
-  p->listener = NULL;
   return p;
 }
 
@@ -118,9 +116,10 @@ void
 server_free(struct server* p)
 {
   free_all_connections(p->connections, p->clients_count);
-  if (p->listener != NULL)
+  if (p->listener)
     evconnlistener_free(p->listener);
-  event_free(p->fileop.evread);
+  if (p->fileop.evread)
+    event_free(p->fileop.evread);
   event_base_free(p->base);
   free(p);
 }
@@ -210,11 +209,11 @@ server_listen(struct server* serv)
                             (struct sockaddr*)&addr, sizeof(addr));
   if (serv->listener == NULL) {
     printf("Failed to bind on port %d\n", serv->tcpop.dest_port);
-    exit(1);
+    return 1;
   }
   evconnlistener_set_error_cb(serv->listener, on_listener_error);
   printf("Listening on port %d\n", serv->tcpop.dest_port);
-  return 1;
+  return 0;
 }
 
 /* ################## Client ################ */
@@ -230,16 +229,24 @@ handle_sigint(int sig, short ev, void* arg)
 void
 client_free(struct client* cl, int chardevice, int sock)
 {
-  event_free(cl->sig);
-  if (chardevice)
+  if (cl->sig)
+    event_free(cl->sig);
+
+  if (chardevice && cl->fileop.evread)
     event_free(cl->fileop.evread);
 
-  free(cl->ethop.send_buffer);
-  event_free(cl->stats_ev);
-  close(cl->ethop.socket);
+  if (cl->ethop.send_buffer)
+    free(cl->ethop.send_buffer);
+
+  if (cl->stats_ev)
+    event_free(cl->stats_ev);
+
+  if (cl->ethop.socket >= 0)
+    close(cl->ethop.socket);
+
   free(cl->nclients_time);
 
-  if (sock) {
+  if (sock && cl->tcpop.bev) {
     bufferevent_free(cl->tcpop.bev);
   }
   event_base_free(cl->base);
