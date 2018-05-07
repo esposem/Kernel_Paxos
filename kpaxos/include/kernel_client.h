@@ -28,10 +28,4 @@ struct stats
   size_t delivered_bytes;
 };
 
-enum file_commands
-{
-  VALUE,
-  TRIM
-};
-
 #endif

@@ -59,6 +59,12 @@ peer_send_hi(struct net_device* dev, struct peer* p, void* arg)
   send_paxos_learner_hi(dev, get_addr(p));
 }
 
+void
+evlearner_send_hi(struct peers* p)
+{
+  peers_foreach_acceptor(p, peer_send_hi, NULL);
+}
+
 static void
 evlearner_check_holes(unsigned long arg)
 {
@@ -129,11 +135,10 @@ evlearner_init_internal(struct evpaxos_config* config, struct peers* peers,
   learner->state = learner_new(acceptor_count);
   learner->acceptors = peers;
 
-  peers_subscribe(peers, PAXOS_ACCEPTED, evlearner_handle_accepted, learner);
-  peers_subscribe(peers, PAXOS_ACCEPTOR_OK, evlearner_handle_ok, learner);
-
-  paxos_log_debug("Learner: Sent HI to all acceptors");
-  peers_foreach_acceptor(peers, peer_send_hi, NULL);
+  peers_add_subscription(peers, PAXOS_ACCEPTED, evlearner_handle_accepted,
+                         learner);
+  peers_add_subscription(peers, PAXOS_ACCEPTOR_OK, evlearner_handle_ok,
+                         learner);
 
   setup_timer(&learner->stats_ev, evlearner_check_holes,
               (unsigned long)learner);
@@ -162,6 +167,9 @@ evlearner_init(deliver_function f, void* arg, char* if_name, char* path,
   printall(peers, "Learner");
 
   struct evlearner* l = evlearner_init_internal(c, peers, f, arg);
+  peers_subscribe(peers);
+  paxos_log_debug("Learner: Sent HI to all acceptors");
+  evlearner_send_hi(peers);
   evpaxos_config_free(c);
   return l;
 }

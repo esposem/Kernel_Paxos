@@ -25,44 +25,44 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _PEERS_H_
 #define _PEERS_H_
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-#include "paxos.h"
 #include "evpaxos.h"
+#include "paxos.h"
 #include "paxos_types.h"
 
+  struct peer;
+  struct peers;
 
-struct peer;
-struct peers;
+  typedef void (*peer_cb)(paxos_message* m, void* arg, eth_address* src);
+  typedef void (*peer_iter_cb)(struct net_device* dev, struct peer* p,
+                               void* arg);
 
-typedef void (*peer_cb)(paxos_message* m, void* arg, eth_address * src);
-typedef void (*peer_iter_cb)(struct net_device *dev, struct peer *p,
-                              void *arg);
-
-struct peers* peers_new(struct evpaxos_config *config, int id, char *if_name);
-void peers_free(struct peers* p);
-int peers_count(struct peers* p);
-eth_address *get_addr(struct peer *p);
-void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);
-void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
-struct peer* peers_get_acceptor(struct peers* p, int id);
-void add_acceptors_from_config(struct peers* p, struct evpaxos_config* conf);
-void printall(struct peers * p, char * name);
-int add_or_update_client(eth_address *addr, struct peers *p);
-int peer_get_id(struct peer* p);
-void peer_send_del(struct net_device* dev, struct peer* p, void* arg);
-struct net_device *get_dev(struct peers *p);
-int peers_missing_ok(struct peers * p);
-void peers_update_ok(struct peers * p, eth_address * addr);
-void peers_delete_learner(struct peers *p, eth_address *addr);
-void peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg);
-
+  struct peers* peers_new(struct evpaxos_config* config, int id, char* if_name);
+  void          peers_free(struct peers* p);
+  int           peers_count(struct peers* p);
+  eth_address*  get_addr(struct peer* p);
+  void peers_foreach_acceptor(struct peers* p, peer_iter_cb cb, void* arg);
+  void peers_foreach_client(struct peers* p, peer_iter_cb cb, void* arg);
+  struct peer* peers_get_acceptor(struct peers* p, int id);
+  void add_acceptors_from_config(struct peers* p, struct evpaxos_config* conf);
+  void printall(struct peers* p, char* name);
+  int  add_or_update_client(eth_address* addr, struct peers* p);
+  int  peer_get_id(struct peer* p);
+  void peer_send_del(struct net_device* dev, struct peer* p, void* arg);
+  struct net_device* get_dev(struct peers* p);
+  int                peers_missing_ok(struct peers* p);
+  void               peers_update_ok(struct peers* p, eth_address* addr);
+  void               peers_delete_learner(struct peers* p, eth_address* addr);
+  void               peers_subscribe(struct peers* p);
+  void peers_add_subscription(struct peers* p, paxos_message_type type,
+                              peer_cb cb, void* arg);
 #ifdef __cplusplus
 }
 #endif

@@ -355,10 +355,10 @@ parse_line(struct evpaxos_config* c, char* line)
     }
     c->acceptors[c->acceptors_count] = pmalloc(ETH_ALEN);
     eth_address* acc_addr = c->acceptors[c->acceptors_count++];
-    c->proposers[c->proposers_count] = pmalloc(ETH_ALEN);
-    eth_address* pro_addr = c->proposers[c->proposers_count++];
-    rv = parse_address(line, pro_addr);
-    memcpy(acc_addr, pro_addr, ETH_ALEN);
+    // c->proposers[c->proposers_count] = pmalloc(ETH_ALEN);
+    // eth_address* pro_addr = c->proposers[c->proposers_count++];
+    rv = parse_address(line, acc_addr);
+    // memcpy(acc_addr, pro_addr, ETH_ALEN);
     return rv;
   }
 

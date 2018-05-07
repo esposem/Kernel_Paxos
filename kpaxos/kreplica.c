@@ -1,5 +1,4 @@
 #include "evpaxos.h"
-#include "kernel_client.h"
 #include "kernel_device.h"
 #include <asm/atomic.h>
 #include <linux/init.h>
