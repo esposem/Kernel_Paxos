@@ -124,7 +124,7 @@ typedef struct paxos_acceptor_ok paxos_acceptor_ok;
 
 enum paxos_message_type
 {
-  PAXOS_PREPARE = 0xcafa,
+  PAXOS_PREPARE = 0xcafa, // this MUST be the first element of the enum
   PAXOS_PROMISE,
   PAXOS_ACCEPT,
   PAXOS_ACCEPTED,
@@ -140,7 +140,8 @@ enum paxos_message_type
 };
 
 #define N_PAXOS_TYPES N_ELEMENTS - PAXOS_PREPARE
-#define GET_PAXOS_POS(n) n - PAXOS_PREPARE
+#define GET_PAXOS_INDEX(n) n - PAXOS_PREPARE
+#define GET_PAXOS(n) n + PAXOS_PREPARE
 typedef enum paxos_message_type paxos_message_type;
 
 struct paxos_message
