@@ -23,12 +23,6 @@ static int id = 0;
 module_param(id, int, S_IRUGO);
 MODULE_PARM_DESC(id, "The replica id, default 0");
 
-size_t     sendtrim;
-atomic_t   auto_trim;
-static int cantrim = 0;
-module_param(cantrim, int, S_IRUGO);
-MODULE_PARM_DESC(cantrim, "If the module has to send trim, set it to 1");
-
 static char* if_name = "enp4s0";
 module_param(if_name, charp, 0000);
 MODULE_PARM_DESC(if_name, "The interface name, default enp4s0");
@@ -63,7 +57,7 @@ start_replica(int id)
 static int __init
            init_replica(void)
 {
-  if (id < 0 || id > 10) {
+  if (id < 0) {
     LOG_ERROR("you must give a valid id!");
     return 0;
   }

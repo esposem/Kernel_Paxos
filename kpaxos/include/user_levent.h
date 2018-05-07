@@ -23,7 +23,6 @@ struct chardevice
 
 struct tcp_connection
 {
-  // struct server*      s;
   char*               dest_addr;
   int                 dest_port;
   struct bufferevent* bev;
@@ -57,19 +56,21 @@ struct server
 // client side
 struct eth_connection
 {
-  int     socket;
-  char*   send_buffer;
-  char*   if_name;
-  uint8_t prop_addr[ETH_ALEN];
+  int                  socket;
+  struct client_value* val; // refers to the send_buffer
+  char                 send_buffer[ETH_DATA_LEN];
+  int                  send_buffer_len;
+  char*                if_name;
+  uint8_t              prop_addr[ETH_ALEN];
 };
 
 struct client
 {
   int                   id;
   int                   value_size;
+  int                   outstanding;
   struct event_base*    base;
   struct event*         sig;
-  int                   outstanding;
   int                   nclients;
   struct timeval*       nclients_time;
   struct stats          stats; /* Statistics */

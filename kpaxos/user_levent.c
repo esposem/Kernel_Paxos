@@ -120,6 +120,8 @@ server_free(struct server* p)
     evconnlistener_free(p->listener);
   if (p->fileop.evread)
     event_free(p->fileop.evread);
+  if (p->fileop.fd)
+    close(p->fileop.fd);
   event_base_free(p->base);
   free(p);
 }
@@ -235,49 +237,32 @@ client_free(struct client* cl, int chardevice, int sock)
   if (chardevice && cl->fileop.evread)
     event_free(cl->fileop.evread);
 
-  if (cl->ethop.send_buffer)
-    free(cl->ethop.send_buffer);
-
   if (cl->stats_ev)
     event_free(cl->stats_ev);
 
   if (cl->ethop.socket >= 0)
     close(cl->ethop.socket);
 
+  if (chardevice && cl->fileop.fd)
+    close(cl->fileop.fd);
+
   free(cl->nclients_time);
 
-  if (sock && cl->tcpop.bev) {
+  if (sock && cl->tcpop.bev)
     bufferevent_free(cl->tcpop.bev);
-  }
+
   event_base_free(cl->base);
   free(cl);
-}
-
-static void
-random_string(char* s, const int len)
-{
-  int               i;
-  static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-  for (i = 0; i < len - 1; ++i)
-    s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-  s[len - 1] = 0;
 }
 
 void
 client_submit_value(struct client* c, int id)
 {
-  struct client_value* v = (struct client_value*)c->ethop.send_buffer;
+  struct client_value* v = c->ethop.val;
   v->client_id = id;
-
-  v->size = c->value_size;
-  /* ############################################ */
-  random_string(v->value, v->size);
-  /* ############################################ */
-  size_t size = sizeof(struct client_value) + v->size;
-
   gettimeofday(&c->nclients_time[id - c->id], NULL);
   v->t = c->nclients_time[id - c->id];
-  eth_sendmsg(c, v, size);
+  eth_sendmsg(c, v, c->ethop.send_buffer_len);
   // printf("Client %d submitted value %.16s with %zu bytes\n", v->client_id,
   //        v->value, v->size);
 }

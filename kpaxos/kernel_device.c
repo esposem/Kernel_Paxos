@@ -47,8 +47,8 @@ void
 kset_message(char* msg, size_t size)
 {
   if (atomic_read(&used_buf) == BUFFER_SIZE) {
-    if (printk_ratelimit())
-      paxos_log_error("Buffer is full! Lost a value");
+    // if (printk_ratelimit())
+    paxos_log_error("Buffer is full! Lost a value");
     atomic_dec(&used_buf);
   }
   msg_buf[current_buf]->size = size;
@@ -106,7 +106,11 @@ kdev_release(struct inode* inodep, struct file* filep)
   if (working == 0)
     paxos_log_debug("Device Char: Device already closed");
   mutex_unlock(&char_mutex);
-  paxos_log_debug("Device Char: Device successfully closed");
+  LOG_INFO("Message left %d", atomic_read(&used_buf));
+  atomic_set(&used_buf, 0);
+  current_buf = 0;
+  first_buf = 0;
+  LOG_INFO("Device Char: Device successfully closed");
   return 0;
 }
 

@@ -9,6 +9,7 @@
 static char    receive[ETH_DATA_LEN];
 static int     use_chardevice = 0, use_socket = 0;
 struct client* client = NULL;
+static int     expected_size = -1;
 
 static void
 unpack_message(char* msg, size_t len)
@@ -48,23 +49,26 @@ on_read_sock(struct bufferevent* bev, void* arg)
   struct client* cl = (struct client*)arg;
   char*          c = cl->tcpop.rec_buffer;
   int            len = bufferevent_read(bev, c, ETH_DATA_LEN);
-  if (len < 0)
+  if (len <= 0)
     return;
+
   static int first_mess = 1;
   int*       buff = (int*)c;
-  if (first_mess && buff[0] == cl->id && buff[1] == ((cl->id + cl->nclients))) {
-    for (int i = 0; i < cl->nclients; i++) {
-      client_submit_value(cl, i + cl->id);
+
+  if (first_mess) {
+    if (buff[0] == cl->id && buff[1] == ((cl->id + cl->nclients))) {
+      for (int i = 0; i < cl->nclients; i++) {
+        client_submit_value(cl, i + cl->id);
+      }
+      first_mess = 0;
+      return;
     }
-    first_mess = 0;
-    return;
   }
-  struct user_msg* mess = (struct user_msg*)c;
-  int              expected_size = sizeof(struct user_msg) + mess->size;
-  if (len >= expected_size && len % expected_size == 0) {
-    for (int i = 0; i < len / expected_size; ++i) {
-      unpack_message(c + (expected_size * i), expected_size);
-    }
+
+  int i = 0;
+  while (i < len) {
+    unpack_message(c + i, expected_size);
+    i += expected_size;
   }
 }
 
@@ -78,7 +82,6 @@ make_client(struct client* cl)
   evsignal_add(cl->sig, NULL);
 
   // ethernet for proposer
-  cl->ethop.send_buffer = malloc(sizeof(struct client_value) + cl->value_size);
   if (eth_init(cl))
     goto cleanup;
 
@@ -191,6 +194,16 @@ mac_to_str(uint8_t daddr[ETH_ALEN], char* str)
   return 1;
 }
 
+static void
+random_string(char* s, const int len)
+{
+  int               i;
+  static const char alphanum[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+  for (i = 0; i < len - 1; ++i)
+    s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+  s[len - 1] = 0;
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -210,6 +223,11 @@ main(int argc, char* argv[])
   check_args(argc, argv, cl);
   cl->nclients_time = malloc(sizeof(struct timeval) * cl->nclients);
   memset(cl->nclients_time, 1, sizeof(struct timeval) * cl->nclients);
+  cl->ethop.send_buffer_len = sizeof(struct client_value) + cl->value_size;
+  cl->ethop.val = (struct client_value*)cl->ethop.send_buffer;
+  cl->ethop.val->size = cl->value_size;
+  expected_size = sizeof(struct user_msg) + cl->ethop.send_buffer_len;
+  random_string(cl->ethop.val->value, cl->value_size);
 
   printf("if_name %s\n", cl->ethop.if_name);
   char a[20];

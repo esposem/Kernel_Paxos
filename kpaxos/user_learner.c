@@ -7,9 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char    receive[ETH_DATA_LEN];
-static int     use_chardevice = 0;
-struct server* server = NULL;
+static char           receive[ETH_DATA_LEN];
+static int            use_chardevice = 0;
+static struct server* server = NULL;
+struct stats          stats; /* Statistics */
+struct timeval        stats_interval;
+struct event*         stats_ev;
+unsigned long         count;
 
 static void
 unpack_message(char* msg, size_t len)
@@ -20,6 +24,7 @@ unpack_message(char* msg, size_t len)
   for (int i = 0; i < serv->clients_count; i++) {
     if (val->client_id >= serv->connections[i]->start_id &&
         val->client_id < serv->connections[i]->end_id) {
+      count++;
       bufferevent_write(serv->connections[i]->bev, msg, len);
       break;
     }
@@ -59,6 +64,15 @@ on_read_sock(struct bufferevent* bev, void* arg)
   bufferevent_write(conn->bev, buff, sizeof(int) * 2);
 }
 
+void
+on_stats2(evutil_socket_t fd, short event, void* arg)
+{
+
+  printf("Learner: %lu value/sec\n", count);
+  count = 0;
+  event_add(stats_ev, &stats_interval);
+}
+
 static void
 make_learner(struct server* cl)
 {
@@ -73,6 +87,11 @@ make_learner(struct server* cl)
   cl->fileop.evread = event_new(cl->base, cl->fileop.fd, EV_READ | EV_PERSIST,
                                 on_read_file, cl->base);
   event_add(cl->fileop.evread, NULL);
+
+  count = 0;
+  stats_interval = (struct timeval){ 1, 0 };
+  stats_ev = evtimer_new(cl->base, on_stats2, cl);
+  event_add(stats_ev, &stats_interval);
 
   event_base_dispatch(cl->base);
 cleanup:
