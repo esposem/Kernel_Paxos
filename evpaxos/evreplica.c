@@ -74,12 +74,13 @@ evpaxos_replica_init(int id, deliver_function f, void* arg, char* if_name,
   replica->deliver = f;
   replica->arg = arg;
   replica->acceptor = evacceptor_init_internal(id, config, replica->peers);
+  // replica->learner = NULL;
   replica->learner = evlearner_init_internal(config, replica->peers,
                                              evpaxos_replica_deliver, replica);
-  // replica->proposer = evproposer_init_internal(id, config, replica->peers);
+  replica->proposer = evproposer_init_internal(id, config, replica->peers);
   peers_subscribe(replica->peers);
   evlearner_send_hi(replica->peers);
-  // evproposer_preexec_once(replica->proposer);
+  evproposer_preexec_once(replica->proposer);
   evpaxos_config_free(config);
   return replica;
 }
@@ -90,8 +91,8 @@ evpaxos_replica_free(struct evpaxos_replica* r)
   printall(r->peers, "REPLICA");
   if (r->learner)
     evlearner_free_internal(r->learner);
-  // if (r->proposer)
-  //   evproposer_free_internal(r->proposer);
+  if (r->proposer)
+    evproposer_free_internal(r->proposer);
   if (r->acceptor)
     evacceptor_free_internal(r->acceptor);
 
