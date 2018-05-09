@@ -76,7 +76,11 @@ try_accept(struct evproposer* p)
   paxos_accept  accept;
   paxos_prepare pr;
   while (proposer_accept(p->state, &accept)) {
-    proposer_prepare(p->state, &pr);
+    int count = p->preexec_window - proposer_prepared_count(p->state);
+    pr.iid = 0;
+    pr.ballot = accept.ballot;
+    if (count > 0)
+      proposer_prepare(p->state, &pr);
     accept.promise_iid = pr.iid;
     peers_foreach_acceptor(p->peers, peer_send_accept, &accept);
   }
