@@ -46,7 +46,8 @@ usage(const char* name, int client)
   printf("  %-30s%s\n", "-i, --if_name #", "Interface name (MAC)");
   if (client) {
     printf("  %-30s%s\n", "-l, --learner-addr #", "Learner address (MAC)");
-    printf("  %-30s%s\n", "-p, --proposer-addr #", "Proposer address (MAC)");
+    printf("  %-30s%s\n", "-p, --proposer-id #", "Proposer id");
+    printf("  %-30s%s\n", "-f, --file #", "config file");
     printf("  %-30s%s\n", "-o, --outstanding #",
            "Number of outstanding client values");
     printf("  %-30s%s\n", "-v, --value-size #",
@@ -262,4 +263,31 @@ client_submit_value(struct client* cl, int id)
   eth_sendmsg(&cl->ethop, cl->prop_addr, val, cl->send_buffer_len);
   // printf("Client %d submitted value %.16s with %zu bytes\n", v->client_id,
   //        v->value, v->size);
+}
+
+int
+find_proposer(struct client* cl, char* path)
+{
+  FILE* f;
+  int   id;
+  char  addr[20];
+  char  line[512];
+  char* l;
+
+  if ((f = fopen(path, "r")) == NULL) {
+    perror("fopen");
+  }
+  while (fgets(line, sizeof(line), f) != NULL) {
+    if (line[0] != '#' && line[0] != '\n') {
+      l = line;
+      while (*l == ' ') {
+        l++;
+      }
+      if (sscanf(l, "proposer %d %s", &id, addr) == 2 && id == cl->prop_id) {
+        str_to_mac(addr, cl->prop_addr);
+        return 0;
+      }
+    }
+  }
+  return 1;
 }

@@ -29,9 +29,9 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 
-struct paxos_config paxos_config = { .verbosity = PAXOS_LOG_INFO,
+struct paxos_config paxos_config = { .verbosity = PAXOS_LOG_ERROR,
                                      .tcp_nodelay = 1,
-                                     .learner_catch_up = 1,
+                                     .learner_catch_up = 0,
                                      .proposer_timeout = 1,
                                      .proposer_preexec_window = 128,
                                      .storage_backend = PAXOS_MEM_STORAGE,

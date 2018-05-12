@@ -7,8 +7,6 @@ The logic implementation of Paxos protocol used in these modules has been taken 
 
 You need to have libevent-2.18 or later versions.
 
-### <u> **Important:** Replica and User space Clients are still in development </u>
-
 ## Description
 ### Kernel space
 There are 5 kind of modules: KAcceptor, KProposer, KLearner, KClient and KReplica.

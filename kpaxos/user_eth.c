@@ -210,6 +210,5 @@ eth_init(struct eth_connection* ethop)
     return 1;
   }
   memcpy(if_addr, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
-  printf("Socket ready\n");
   return 0;
 }

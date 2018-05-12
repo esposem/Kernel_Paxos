@@ -14,6 +14,5 @@ extern int          kdevchar_init(int id, char* name);
 extern unsigned int kdev_poll(struct file*, poll_table* wait);
 extern void         kdevchar_exit(void);
 extern void         kset_message(char* msg, size_t size);
-extern struct file_operations fops;
 
 #endif

@@ -65,6 +65,7 @@ struct client
   struct chardevice     fileop; // File op
   struct eth_connection ethop;  // ETH op
   uint8_t               prop_addr[ETH_ALEN];
+  int                   prop_id;
   uint8_t               learner_addr[ETH_ALEN];
 };
 
@@ -87,5 +88,5 @@ extern void           prepare_clval(struct client* cl);
 extern void           print_settings(struct client* cl);
 extern void           client_free(struct client* cl);
 extern void           client_submit_value(struct client* cl, int id);
-
+extern int            find_proposer(struct client* cl, char* path);
 #endif
