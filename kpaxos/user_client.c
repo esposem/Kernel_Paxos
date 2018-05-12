@@ -127,31 +127,32 @@ cleanup:
 }
 
 static void
-check_args(int argc, char* argv[], struct client* cl)
+check_args(int argc, char* argv[], struct client* cl, char** path)
 {
   int opt = 0, idx = 0;
 
   static struct option options[] = {
     { "if_name", required_argument, 0, 'i' },
-    { "proposer-addr", required_argument, 0, 'p' },
+    { "proposer-id", required_argument, 0, 'p' },
     { "learner-addr", required_argument, 0, 'l' },
     { "chardev_id", required_argument, 0, 'c' },
     { "value-size", required_argument, 0, 'v' },
     { "outstanding", required_argument, 0, 'o' },
     { "id", required_argument, 0, 'd' },
     { "nclients", required_argument, 0, 'n' },
+    { "file", required_argument, 0, 'f' },
     { "help", no_argument, 0, 'h' },
     { 0, 0, 0, 0 }
   };
 
-  while ((opt = getopt_long(argc, argv, "i:p:c:l:v:o:d:n:h", options, &idx)) !=
-         -1) {
+  while ((opt = getopt_long(argc, argv, "i:p:c:l:v:o:d:n:f:h", options,
+                            &idx)) != -1) {
     switch (opt) {
       case 'i':
         cl->ethop.if_name = optarg;
         break;
       case 'p':
-        str_to_mac(optarg, cl->prop_addr);
+        cl->prop_id = atoi(optarg);
         break;
       case 'c':
         use_chardevice = 1;
@@ -173,6 +174,9 @@ check_args(int argc, char* argv[], struct client* cl)
       case 'n':
         cl->nclients = atoi(optarg);
         break;
+      case 'f':
+        *path = optarg;
+        break;
       default:
         usage(argv[0], 1);
     }
@@ -183,22 +187,26 @@ int
 main(int argc, char* argv[])
 {
   struct client* cl = client_new();
+  char*          path = "./paxos.conf";
+
   client = cl;
 
-  check_args(argc, argv, cl);
+  check_args(argc, argv, cl, &path);
   cl->nclients_time = malloc(sizeof(struct timeval) * cl->nclients);
   memset(cl->nclients_time, 0, sizeof(struct timeval) * cl->nclients);
   cl->send_buffer_len = sizeof(struct client_value) + cl->value_size;
 
   prepare_clval(cl);
+
+  if (find_proposer(cl, path)) {
+    printf("Wrong proposer id %d\n", cl->prop_id);
+    goto exit_err;
+  }
   print_settings(cl);
 
   if ((use_chardevice ^ use_socket) == 0) {
     printf("Either use chardevice or connect remotely to a learner\n");
-    free(cl->nclients_time);
-    free(cl);
-    usage(argv[0], 1);
-    exit(1);
+    goto exit_err;
   }
 
   signal(SIGINT, stop_execution);
@@ -207,4 +215,10 @@ main(int argc, char* argv[])
   make_client(cl);
 
   return 0;
+
+exit_err:
+  free(cl->nclients_time);
+  free(cl);
+  usage(argv[0], 1);
+  exit(1);
 }

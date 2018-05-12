@@ -8,15 +8,9 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-#define SEND_TO_CHAR_DEVICE 0
-const char* MOD_NAME = "KReplica";
+#define SEND_TO_CHAR_DEVICE 1
 
-struct file_operations fops = {
-  .open = kdev_open,
-  .read = kdev_read,
-  .write = kdev_write,
-  .release = kdev_release,
-};
+const char* MOD_NAME = "KReplica";
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
@@ -45,7 +39,7 @@ deliver(unsigned iid, char* value, size_t size, void* arg)
 static void
 start_replica(int id)
 {
-  // kdevchar_init(id, "klearner");
+  kdevchar_init(id, "klearner");
   replica = evpaxos_replica_init(id, deliver, NULL, if_name, path);
 
   if (replica == NULL) {
@@ -68,7 +62,7 @@ static int __init
 static void __exit
             replica_exit(void)
 {
-  // kdevchar_exit();
+  kdevchar_exit();
   if (replica != NULL)
     evpaxos_replica_free(replica);
   LOG_INFO("Module unloaded");

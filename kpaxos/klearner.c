@@ -7,14 +7,6 @@
 #include <linux/udp.h>
 #include <net/sock.h>
 
-struct file_operations fops = {
-  .open = kdev_open,
-  .read = kdev_read,
-  .write = kdev_write,
-  .release = kdev_release,
-  .poll = kdev_poll,
-};
-
 const char* MOD_NAME = "KLearner";
 
 static int id = 0;

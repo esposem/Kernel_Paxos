@@ -16,29 +16,32 @@ static struct class* charClass = NULL;
 // The device-driver device struct pointer
 static struct device*    charDevice = NULL;
 static wait_queue_head_t access_wait;
-
-// names
-static char *de_name, *clas_name;
-
-static int majorNumber, working, current_buf = 0, first_buf = 0;
-
+static char *            de_name, *clas_name;
+static int               majorNumber, working, current_buf = 0, first_buf = 0;
 static struct user_msg** msg_buf;
 static atomic_t          used_buf;
+
+struct file_operations fops = {
+  .open = kdev_open,
+  .read = kdev_read,
+  .write = kdev_write,
+  .release = kdev_release,
+  .poll = kdev_poll,
+};
 
 static void
 paxerr(char* err)
 {
   paxos_log_error("Device Char: failed to %s", err);
-  working = 0;
+  // working = 0;
 }
 
 int
 kdev_open(struct inode* inodep, struct file* filep)
 {
-  if (!mutex_trylock(&char_mutex) || working == 0) {
+  if (!mutex_trylock(&char_mutex)) {
     paxos_log_error("Device char: Device used by another process");
     return -EBUSY;
-    working = 0;
   }
   return 0;
 }
@@ -46,11 +49,11 @@ kdev_open(struct inode* inodep, struct file* filep)
 void
 kset_message(char* msg, size_t size)
 {
-  if (atomic_read(&used_buf) == BUFFER_SIZE) {
-    // if (printk_ratelimit())
-    paxos_log_error("Buffer is full! Lost a value");
-    atomic_dec(&used_buf);
+  if (atomic_read(&used_buf) >= BUFFER_SIZE) {
+    if (printk_ratelimit())
+      paxos_log_error("Buffer is full! Lost a value");
   }
+
   msg_buf[current_buf]->size = size;
   memcpy(msg_buf[current_buf]->value, msg, size);
   current_buf = (current_buf + 1) % BUFFER_SIZE;
@@ -64,7 +67,7 @@ kdev_read(struct file* filep, char* buffer, size_t len, loff_t* offset)
 {
   int error_count;
 
-  if (!working) { // user called sigint
+  if (!working) {
     return 0;
   }
 
@@ -73,9 +76,8 @@ kdev_read(struct file* filep, char* buffer, size_t len, loff_t* offset)
   error_count = copy_to_user(buffer, (char*)msg_buf[first_buf], llen);
 
   if (error_count != 0) {
-    atomic_inc(&used_buf);
     paxerr("send fewer characters to the user");
-    return error_count;
+    return -1;
   } else
     first_buf = (first_buf + 1) % BUFFER_SIZE;
 
@@ -104,8 +106,6 @@ kdev_poll(struct file* file, poll_table* wait)
 int
 kdev_release(struct inode* inodep, struct file* filep)
 {
-  if (working == 0)
-    paxos_log_debug("Device Char: Device already closed");
   mutex_unlock(&char_mutex);
   // LOG_INFO("Messages left %d", atomic_read(&used_buf));
   atomic_set(&used_buf, 0);
@@ -219,9 +219,6 @@ kdevchar_init(int id, char* name)
 void
 kdevchar_exit(void)
 {
-  if (working == 0) {
-    return;
-  }
   working = 0;
   atomic_inc(&used_buf);
   wake_up_interruptible(&access_wait);
