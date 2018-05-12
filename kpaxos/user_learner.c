@@ -7,109 +7,99 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char           receive[ETH_DATA_LEN];
-static int            use_chardevice = 0;
-static struct server* server = NULL;
-struct stats          stats; /* Statistics */
-struct timeval        stats_interval;
-struct event*         stats_ev;
-unsigned long         count;
+static int stop = 1;
 
-static void
-unpack_message(char* msg, size_t len)
+void
+stop_execution(int signo)
 {
-  struct user_msg*     mess = (struct user_msg*)msg;
-  struct client_value* val = (struct client_value*)mess->value;
-  struct server*       serv = server;
-  for (int i = 0; i < serv->clients_count; i++) {
-    if (val->client_id >= serv->connections[i]->start_id &&
-        val->client_id < serv->connections[i]->end_id) {
-      count++;
-      bufferevent_write(serv->connections[i]->bev, msg, len);
-      break;
-    }
-  }
+  stop = 0;
 }
 
 static void
-on_read_file(evutil_socket_t fd, short event, void* arg)
+unpack_message(struct server* serv, size_t len)
 {
-  struct event_base* base = arg;
+  struct user_msg*     mess = (struct user_msg*)serv->ethop.rec_buffer;
+  struct client_value* val = (struct client_value*)mess->value;
+  struct connection*   conn = find_connection(serv, val->client_id);
+  if (conn)
+    eth_sendmsg(&serv->ethop, conn->address, mess, len);
+}
 
-  int len = read(server->fileop.fd, receive, ETH_DATA_LEN);
+static void
+read_file(struct server* serv)
+{
+  int len = read(serv->fileop.fd, serv->ethop.rec_buffer, ETH_DATA_LEN);
+
   if (len < 0)
     return;
 
   if (len == 0) {
     printf("Stopped by kernel module\n");
-    event_base_loopbreak(base);
-    return;
+    stop = 0;
   }
-  unpack_message(receive, len);
-}
-
-void
-on_read_sock(struct bufferevent* bev, void* arg)
-{
-  struct connection* conn = (struct connection*)arg;
-  char*              c = server->tcpop.rec_buffer;
-  size_t             len = bufferevent_read(bev, c, ETH_DATA_LEN);
-
-  if (!len) {
-    return;
-  }
-  int* buff = (int*)c;
-  conn->start_id = buff[0];
-  conn->end_id = buff[1];
-  bufferevent_write(conn->bev, buff, sizeof(int) * 2);
-}
-
-void
-on_stats2(evutil_socket_t fd, short event, void* arg)
-{
-
-  printf("Learner: %lu value/sec\n", count);
-  count = 0;
-  event_add(stats_ev, &stats_interval);
+  unpack_message(serv, len);
 }
 
 static void
-make_learner(struct server* cl)
+change_conn_status(struct server* serv, char* mess, uint8_t dest_addr[ETH_ALEN])
 {
-  cl->base = event_base_new();
-  if (server_listen(cl))
-    goto cleanup;
-
-  // chardevice
-  if (open_file(&cl->fileop))
-    goto cleanup;
-
-  cl->fileop.evread = event_new(cl->base, cl->fileop.fd, EV_READ | EV_PERSIST,
-                                on_read_file, cl->base);
-  event_add(cl->fileop.evread, NULL);
-
-  count = 0;
-  stats_interval = (struct timeval){ 1, 0 };
-  stats_ev = evtimer_new(cl->base, on_stats2, cl);
-  event_add(stats_ev, &stats_interval);
-
-  event_base_dispatch(cl->base);
-cleanup:
-  server_free(cl);
+  int* buff = (int*)mess;
+  if (buff[0] == OPEN_CONN) {
+    int id = add_connection(serv, buff[1], buff[2], dest_addr);
+    int buffs[2];
+    buffs[0] = OK;
+    buffs[1] = id;
+    eth_sendmsg(&serv->ethop, dest_addr, buffs, sizeof(buffs));
+  }
+  if (buff[0] == CLOSE_CONN) {
+    rem_connection(serv, buff[1]);
+  }
 }
 
-int
-str_to_mac(const char* str, uint8_t daddr[ETH_ALEN])
+void
+read_socket(struct server* serv)
 {
-  int values[6], i;
-  if (6 == sscanf(str, "%x:%x:%x:%x:%x:%x", &values[0], &values[1], &values[2],
-                  &values[3], &values[4], &values[5])) {
-    /* convert to uint8_t */
-    for (i = 0; i < 6; ++i)
-      daddr[i] = (uint8_t)values[i];
-    return 1;
+  ssize_t len;
+  uint8_t src_addr[ETH_ALEN];
+  len =
+    eth_recmsg(&serv->ethop, src_addr, serv->ethop.rec_buffer, ETH_DATA_LEN);
+  if (len > 0)
+    change_conn_status(serv, serv->ethop.rec_buffer, src_addr);
+}
+
+static void
+make_learner(struct server* serv)
+{
+  struct pollfd pol[2]; // 2 events: socket and file
+
+  // chardevice
+  if (open_file(&serv->fileop))
+    goto cleanup;
+
+  // socket
+  if (eth_init(&serv->ethop))
+    goto cleanup;
+
+  if (eth_listen(&serv->ethop))
+    goto cleanup;
+
+  pol[0].fd = serv->ethop.socket;
+  pol[0].events = POLLIN;
+  pol[1].fd = serv->fileop.fd;
+  pol[1].events = POLLIN;
+
+  while (stop) {
+    poll(pol, 2, -1);
+    // send delivered values via socket
+    if (pol[0].revents & POLLIN) {
+      read_socket(serv);
+    } else if (pol[1].revents & POLLIN) { // communicate to chardevice via file
+      read_file(serv);
+    }
   }
-  return 0;
+
+cleanup:
+  server_free(serv);
 }
 
 static void
@@ -117,21 +107,19 @@ check_args(int argc, char* argv[], struct server* serv)
 {
   int opt = 0, idx = 0;
 
-  static struct option options[] = {
-    { "char_device_id", required_argument, 0, 'c' },
-    { "learner_port", required_argument, 0, 'm' },
-    { "help", no_argument, 0, 'h' },
-    { 0, 0, 0, 0 }
-  };
+  static struct option options[] = { { "chardev_id", required_argument, 0,
+                                       'c' },
+                                     { "if_name", required_argument, 0, 'i' },
+                                     { "help", no_argument, 0, 'h' },
+                                     { 0, 0, 0, 0 } };
 
-  while ((opt = getopt_long(argc, argv, "c:m:h", options, &idx)) != -1) {
+  while ((opt = getopt_long(argc, argv, "c:i:h", options, &idx)) != -1) {
     switch (opt) {
       case 'c':
-        use_chardevice = 1;
         serv->fileop.char_device_id = atoi(optarg);
         break;
-      case 'm':
-        serv->tcpop.dest_port = atoi(optarg);
+      case 'i':
+        serv->ethop.if_name = optarg;
         break;
       default:
         usage(argv[0], 0);
@@ -140,35 +128,20 @@ check_args(int argc, char* argv[], struct server* serv)
 }
 
 int
-mac_to_str(uint8_t daddr[ETH_ALEN], char* str)
-{
-  sprintf(str, "%02x:%02x:%02x:%02x:%02x:%02x\n", daddr[0], daddr[1], daddr[2],
-          daddr[3], daddr[4], daddr[5]);
-  return 1;
-}
-
-int
 main(int argc, char* argv[])
 {
-  struct timeval seed;
   struct server* serv = server_new();
-  server = serv;
-  serv->tcpop.dest_port = 4000;
+  serv->ethop.if_name = "enp0s3";
+  serv->fileop.char_device_id = 0;
+  new_connection_list(serv);
 
   check_args(argc, argv, serv);
 
-  if (!use_chardevice) {
-    printf("You must use chardevice\n");
-    free(serv);
-    usage(argv[0], 0);
-    exit(1);
-  }
-
-  gettimeofday(&seed, NULL);
-  srand(seed.tv_usec);
-
+  printf("if_name %s\n", serv->ethop.if_name);
+  printf("chardevice /dev/paxos/klearner%c\n",
+         serv->fileop.char_device_id + '0');
+  signal(SIGINT, stop_execution);
   make_learner(serv);
-  signal(SIGPIPE, SIG_IGN);
 
   return 0;
 }

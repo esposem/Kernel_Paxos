@@ -82,8 +82,6 @@ USRL_OBJS := $(patsubst kpaxos/%.c, $(BUILD_DIR)/%.o, $(USR_LEARN))
 EXTRA_CFLAGS:= -I$(PWD)/kpaxos/include -I$(PWD)/paxos/include -I$(PWD)/evpaxos/include -I$(HOME)/local/include
 ccflags-y:= $(G_COMP) -Wall -Wno-declaration-after-statement -Wframe-larger-than=3100 -O3
 
-LFLAGS = -levent -I /home/ubuntu/local/include -L /home/ubuntu/local/lib
-
 all: $(BUILD_DIR) kernel_app user_client user_learner
 
 kernel_app: $(BUILD_DIR_MAKEFILE)
@@ -101,10 +99,10 @@ $(BUILD_DIR)/%.o: kpaxos/%.c
 	$(CC) $(G_COMP) $(USR_FLAGS) $(EXTRA_CFLAGS) -c $< -o $@
 
 user_client: $(USRC_OBJS)
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $(BUILD_DIR)/$@ $^ $(LFLAGS)
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $(BUILD_DIR)/$@ $^
 
 user_learner: $(USRL_OBJS)
-	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $(BUILD_DIR)/$@ $^ $(LFLAGS)
+	$(CC) $(USR_FLAGS) $(EXTRA_CFLAGS) -o $(BUILD_DIR)/$@ $^
 
 ###########################################################################
 clean:
