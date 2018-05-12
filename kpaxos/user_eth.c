@@ -44,8 +44,59 @@ check_for_endianness()
   return (int)*c;
 }
 
+int
+str_to_mac(const char* str, uint8_t daddr[ETH_ALEN])
+{
+  int values[6], i;
+  if (6 == sscanf(str, "%x:%x:%x:%x:%x:%x", &values[0], &values[1], &values[2],
+                  &values[3], &values[4], &values[5])) {
+    /* convert to uint8_t */
+    for (i = 0; i < 6; ++i)
+      daddr[i] = (uint8_t)values[i];
+    return 1;
+  }
+  return 0;
+}
+
+int
+mac_to_str(uint8_t daddr[ETH_ALEN], char* str)
+{
+  sprintf(str, "%02x:%02x:%02x:%02x:%02x:%02x\n", daddr[0], daddr[1], daddr[2],
+          daddr[3], daddr[4], daddr[5]);
+  return 1;
+}
+
+size_t
+eth_recmsg(struct eth_connection* ethop, uint8_t sndr_addr[ETH_ALEN],
+           char* rmsg, size_t len)
+{
+  char                 buf[ETH_FRAME_LEN] = { 0 };
+  struct ether_header* eh = (struct ether_header*)buf;
+  ssize_t              received;
+
+  received = recvfrom(ethop->socket, buf, ETH_FRAME_LEN, 0, NULL, NULL);
+  if (received <= 0) {
+    perror("recvfrom()");
+    return 0;
+  }
+
+  if (sndr_addr)
+    memcpy(sndr_addr, eh->ether_shost, ETH_ALEN);
+
+  received -= sizeof(*eh);
+  received -= sizeof(PAXOS_CLIENT_VALUE);
+
+  // if message too big than given buffer, cut it
+  if (received > len)
+    received = len;
+
+  memcpy(rmsg, buf + sizeof(*eh) + sizeof(PAXOS_CLIENT_VALUE), received);
+  return received;
+}
+
 void
-eth_sendmsg(struct client* cl, struct client_value* clv, size_t size)
+eth_sendmsg(struct eth_connection* ethop, uint8_t dest_addr[ETH_ALEN],
+            void* clv, size_t size)
 {
   uint32_t             len = size;
   unsigned char*       tmp;
@@ -58,7 +109,7 @@ eth_sendmsg(struct client* cl, struct client_value* clv, size_t size)
   /* Construct ethernet header. */
   eh = (struct ether_header*)buf;
   memcpy(eh->ether_shost, if_addr, ETH_ALEN);
-  memcpy(eh->ether_dhost, cl->ethop.prop_addr, ETH_ALEN);
+  memcpy(eh->ether_dhost, dest_addr, ETH_ALEN);
   eh->ether_type = htons(PAXOS_CLIENT_VALUE);
   send_len = sizeof(*eh);
 
@@ -81,35 +132,80 @@ eth_sendmsg(struct client* cl, struct client_value* clv, size_t size)
   /* Fill the destination address and send it. */
   sock_addr.sll_ifindex = if_index;
   sock_addr.sll_halen = ETH_ALEN;
-  memcpy(sock_addr.sll_addr, cl->ethop.prop_addr, ETH_ALEN);
+  memcpy(sock_addr.sll_addr, dest_addr, ETH_ALEN);
 
-  if (sendto(cl->ethop.socket, buf, send_len, 0, (struct sockaddr*)&sock_addr,
+  if (sendto(ethop->socket, buf, send_len, 0, (struct sockaddr*)&sock_addr,
              sizeof(sock_addr)) < 0) {
     perror("sendto()");
+  } else {
+    char arr[20];
+    mac_to_str(dest_addr, arr);
+    // printf("Sent to %s", arr);
   }
 }
 
 int
-eth_init(struct client* c)
+eth_listen(struct eth_connection* ethop)
+{
+  struct ifreq ifr;
+  int          s;
+
+  memset(&ifr, 0, sizeof(ifr));
+  strncpy(ifr.ifr_name, ethop->if_name, IFNAMSIZ - 1);
+
+  /* Set interface to promiscuous mode. */
+  if (ioctl(ethop->socket, SIOCGIFFLAGS, &ifr) < 0) {
+    perror("Error setting the SIOCGIFFLAGS");
+    close(ethop->socket);
+    return 1;
+  }
+  ifr.ifr_flags |= IFF_PROMISC;
+  if (ioctl(ethop->socket, SIOCSIFFLAGS, &ifr) < 0) {
+    perror("Error setting the SIOCSIFFLAGS");
+    close(ethop->socket);
+    return 1;
+  }
+
+  /* Allow the socket to be reused. */
+  s = 1;
+  if (setsockopt(ethop->socket, SOL_SOCKET, SO_REUSEADDR, &s, sizeof(s)) < 0) {
+    perror("Error setting the socket as reused");
+    close(ethop->socket);
+    return 1;
+  }
+
+  /* Bind to device. */
+  if (setsockopt(ethop->socket, SOL_SOCKET, SO_BINDTODEVICE, ethop->if_name,
+                 IFNAMSIZ - 1) < 0) {
+    perror("Error binding the device");
+    close(ethop->socket);
+    return 1;
+  }
+
+  return 0;
+}
+
+int
+eth_init(struct eth_connection* ethop)
 {
 
   struct ifreq ifr;
-  c->ethop.socket = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW);
+  ethop->socket = socket(AF_PACKET, SOCK_RAW, htons(PAXOS_CLIENT_VALUE));
 
-  if (c->ethop.socket < 0) {
+  if (ethop->socket < 0) {
     printf("Socket not working, maybe you are not using sudo?\n");
     return 1;
   }
 
   /* Get the index number and MAC address of ethernet interface. */
   memset(&ifr, 0, sizeof(ifr));
-  strncpy(ifr.ifr_name, c->ethop.if_name, IFNAMSIZ - 1);
-  if (ioctl(c->ethop.socket, SIOCGIFINDEX, &ifr) < 0) {
+  strncpy(ifr.ifr_name, ethop->if_name, IFNAMSIZ - 1);
+  if (ioctl(ethop->socket, SIOCGIFINDEX, &ifr) < 0) {
     perror("Error getting the interface index");
     return 1;
   }
   if_index = ifr.ifr_ifindex;
-  if (ioctl(c->ethop.socket, SIOCGIFHWADDR, &ifr) < 0) {
+  if (ioctl(ethop->socket, SIOCGIFHWADDR, &ifr) < 0) {
     perror("Error getting the interface MAC address");
     return 1;
   }

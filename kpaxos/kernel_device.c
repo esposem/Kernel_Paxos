@@ -64,7 +64,7 @@ kdev_read(struct file* filep, char* buffer, size_t len, loff_t* offset)
 {
   int error_count;
 
-  if (signal_pending(current) || !working) { // user called sigint
+  if (!working) { // user called sigint
     return 0;
   }
 
@@ -96,7 +96,8 @@ kdev_poll(struct file* file, poll_table* wait)
 {
   poll_wait(file, &access_wait, wait);
   if (atomic_read(&used_buf) > 0)
-    return POLLIN | POLLRDNORM;
+    return POLLIN;
+
   return 0;
 }
 
@@ -106,7 +107,7 @@ kdev_release(struct inode* inodep, struct file* filep)
   if (working == 0)
     paxos_log_debug("Device Char: Device already closed");
   mutex_unlock(&char_mutex);
-  LOG_INFO("Message left %d", atomic_read(&used_buf));
+  // LOG_INFO("Messages left %d", atomic_read(&used_buf));
   atomic_set(&used_buf, 0);
   current_buf = 0;
   first_buf = 0;
