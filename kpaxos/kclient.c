@@ -9,6 +9,7 @@
 #include <linux/random.h>
 #include <linux/time.h>
 #include <linux/udp.h>
+#include <linux/vmalloc.h>
 #include <net/sock.h>
 
 #define TIMEOUT_US 1000000
@@ -166,10 +167,11 @@ start_client(int proposer_id, int value_size)
   if (c->learner == NULL) {
     LOG_ERROR("Could not start the learner.");
     kfree(c);
+    c = NULL;
     return;
   }
 
-  c->clients_timeval = pmalloc(sizeof(struct timeval) * nclients);
+  c->clients_timeval = vmalloc(sizeof(struct timeval) * nclients);
   memset(c->clients_timeval, 0, sizeof(struct timeval) * nclients);
   memset(&c->stats, 0, sizeof(struct stats));
   memcpy(c->proposeradd, evpaxos_proposer_address(conf, proposer_id), ETH_ALEN);
@@ -190,6 +192,12 @@ start_client(int proposer_id, int value_size)
   }
 }
 
+struct as
+{
+  int x;
+  int y;
+};
+
 static int __init
            init_client(void)
 {
@@ -209,7 +217,7 @@ static void __exit
       del_timer(&c->stats_ev);
       evlearner_free(c->learner);
     }
-    pfree(c->clients_timeval);
+    vfree(c->clients_timeval);
     pfree(c);
   }
 

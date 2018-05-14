@@ -5,49 +5,47 @@ Tested on Ubuntu 17.04 zesty, kernel 4.10.0-33-generic and CentOS Linux kernel 3
 
 The logic implementation of Paxos protocol used in these modules has been taken from [Libpaxos](http://libpaxos.sourceforge.net/)
 
-You need to have libevent-2.18 or later versions.
-
 ## Description
 ### Kernel space
 There are 5 kind of modules: KAcceptor, KProposer, KLearner, KClient and KReplica.
 
 <b>KAcceptor</b>: Simulates the role of an Acceptor. <br>
-It receives 1A (prepare) and 2A (accept request) from a Proposer, and sends it back 1B (promise) and 2B (accepted). It also sends 2B messages to all the Learners.
+An acceptor receives 1A (prepare) and 2A (accept request) from a Proposer, and sends it back 1B (promise) and 2B (accepted). It also sends 2B messages to all the Learners.
 
 <b>KProposer</b>: Simulates the role of a Proposer. <br>
-It sends 1A (prepare) and 2A (accept request) to the Acceptors, receiving back 1B (promise) and 2B (accepted). It also receives CVs (Client Values) from Client.
+A proposer sends 1A (prepare) and 2A (accept request) to the Acceptors, receiving back 1B (promise) and 2B (accepted). It also receives CVs (Client Values) from Client.
 
 <b>KLearner</b>: Simulates the role of a Learner. <br>
-A Learner receives 2B (accepted) messages from Acceptor and delivers them to the User space application(s).
+A Learner receives 2B (accepted) messages from Acceptor and delivers them to the user space application(s).
 
 <b>KClient</b>: Simulates the role of a Client and Learner. <br>
- The KClient sends a message to a KProposer, waiting that its internal Learner receives the value back. It keeps track of the delay between sending and receiving to calculate statistics (troughput, latency). The KClient can be substituted by the Client application in User space
+ The KClient sends a message to a KProposer, waiting that its internal Learner receives the value back. It keeps track of the delay between sending and receiving to calculate statistics (troughput, latency). The KClient can be substituted by the Client application in user space
 
 <b>KReplica</b>: Simulates the role of an Replica.<br>
  A Replica contains the logic of Proposer, Acceptor and Learner.
 
 ### User space
 
-There are 2 kind of User space applications: Client and Learner.
+There are 2 kind of user space applications: Client and Learner.
 
-<b> Client</b>: Sends message to the Proposer that is in kernel space. The Client can connect to a KLearner either via chardavice or via TCP connection with an User space Learner application.
+<b> Client</b>: Sends message to the KProposer that is in kernel space. A Client can either connect to a KLearner via chardavice or to an user space Learner application via Ethernet messages.
 
-<b> Learner</b>: Connects to a KLearner via chardevice. It sends received value to the Client through User space TCP connection.
+<b> Learner</b>: Connects to a KLearner via chardevice. It sends received value to the Client through user space ethernet messages.
 
 These are some of the possible connections that can be created.<br>
-Other examples include using Replica instead of Proposer + 3 Acceptors and kernel instead of User space Clients.<br><br>
+Other examples include using Replica instead of Proposer + 3 Acceptors and kernel instead of user space Clients.<br><br>
 ![Paxos_images.png](./.images/Paxos_images.png)
 
 ## Difference from Libpaxos
 
 There are some differences between Kernel_Paxos and Libpaxos, since it uses libevent, msgpacker and khash.
-These are User space libraries, that cannot be used in kernel modules. However, libevent is still being used in User space applications.
+These are user space libraries, that cannot be used in kernel modules.
 
 <b> libevent</b>: used to handle asynchronous timeouts and TCP connections between all Libpaxos roles. Kernel_Paxos uses raw ethernet frames.
 
 <b> msgpacker</b>: used to serialize messages, so that they can be read by big and little endian platforms. Kernel_Paxos uses a custom-made variant of it.
 
-<b> khash</b>: khash uses floating point internally, which cannot be used inside the Linux kernel, for portability reasons. Therefore uthash was preferred, since it does not use floating point operations.
+<b> khash</b>: khash uses floating point internally, which cannot be used inside the Linux kernel, for portability reasons. Therefore uthash was preferred, since it does not use floating point operations. Acceptors use a circular buffer to save instances.
 
 <b>lmdb</b>: Libpaxos offers the use of a database where values can be saved permanently. This is not implemented here, everything is kept in memory.
 
@@ -70,9 +68,9 @@ To load a kernel module type `sudo insmod module_name.ko parameters`. <br>
 To unload it, `sudo rmmod module_name.ko`. <br>
 `module_name` is the name of the module.
 
-To run an User space application type `sudo ./application_name`.
+To run an user space application type `sudo ./application_name`.
 
-Note that both kernel modules and User space applications need `sudo` privileges in order to work.
+Note that both kernel modules and user space applications need `sudo` privileges in order to work.
 
 ### Parameters
 
@@ -81,7 +79,7 @@ Each module and user application has its parameters. Parameters info of kernel m
 ### Order of execution
 
 It is recommended to firstly load all KAcceptors, then KProposers, and then KLearners.<br>
-Once they all are loaded, Learner in User space can be executed, and then finally client in user space can start. <br>
+Once they all are loaded, Learner in user space can be executed, and then finally client in user space can start. <br>
 
 
 ## Disclaimer

@@ -105,7 +105,9 @@ proposer_new(int id, int acceptors)
   p->acceptors = acceptors;
   p->max_trim_iid = 0;
   p->next_prepare_iid = 0;
-  p->values = carray_new(paxos_config.proposer_preexec_window);
+  // cannot allocate carray during execution, vmalloc does not work in atomic
+  // context. Using 10000, proposer is able to handle ~2k for one sec
+  p->values = carray_new(paxos_config.proposer_preexec_window * 10000);
   p->prepare_instances = NULL;
   p->accept_instances = NULL;
   p->prepare_iids =
