@@ -2,6 +2,7 @@
 #define USER_STATS
 
 #include "kernel_client.h"
+#include "stats.h"
 
 #define TIMEOUT_US 1000000
 
