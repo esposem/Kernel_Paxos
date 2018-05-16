@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "user_levent.h"
 #include "user_stats.h"
@@ -56,4 +57,96 @@ update_stats(struct stats* stats, struct timeval delivered, size_t size)
   //   stats->min_latency = lat;
   // if (lat > stats->max_latency)
   //   stats->max_latency = lat;
+}
+
+static long*           a = 0; // absolute time
+static long*           e = 0; // elapsed time between calls to stats_add
+static unsigned long   count;
+static struct timespec then;
+
+void
+stats_init()
+{
+  e = malloc(STATS_MAX_COUNT * sizeof(long));
+  memset(e, 0, STATS_MAX_COUNT * sizeof(long));
+  a = malloc(STATS_MAX_COUNT * sizeof(long));
+  memset(a, 0, STATS_MAX_COUNT * sizeof(long));
+  count = 0;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &then);
+}
+
+void
+stats_destroy()
+{
+  count = 0;
+  if (a)
+    free(a);
+  if (e)
+    free(e);
+}
+
+void
+stats_add(long latency)
+{
+  struct timespec now;
+
+  if (count == STATS_MAX_COUNT) {
+    printf("Stats error: array is full\n");
+    return;
+  }
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+  a[count] = (now.tv_sec - then.tv_sec) * 1000000 +
+             (now.tv_nsec - then.tv_nsec) / 1000000;
+  e[count++] = latency;
+  then = now;
+}
+
+long
+stats_get_avg()
+{
+  int  i;
+  long avg = 0;
+
+  for (i = 0; i < count; ++i)
+    avg += (e[i] - avg) / (i + 1);
+
+  return avg;
+}
+
+long
+stats_get_count()
+{
+  return count;
+}
+
+void
+stats_print()
+{
+  printf("Statistics with %lu entries average of %ldus\n", count,
+         stats_get_avg());
+}
+
+void
+stats_persist(const char* file)
+{
+  int  i;
+  long abs = 0;
+
+  FILE* f = fopen(file, "w+");
+  char  line[128];
+
+  if (f) {
+    sprintf(line, "#ORDER\tLATENCY\tABS\n");
+    fwrite(line, 1, strlen(line), f);
+    for (i = 0; i < count; i++) {
+      abs += a[i];
+      sprintf(line, "%d\t%ld\t%ld\n", (i + 1), e[i], abs);
+      fwrite(line, 1, strlen(line), f);
+    }
+    sync();
+    fclose(f);
+  } else {
+    printf("Stats: could not save statistics to file '%s'\n", file);
+  }
 }

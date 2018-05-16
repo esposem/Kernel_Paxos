@@ -1,7 +1,7 @@
-#include "stats.h"
 #include "common.h"
 #include "kfile.h"
 #include "paxos.h"
+#include "stats.h"
 #include <linux/time.h>
 #include <linux/vmalloc.h>
 #include <paxos.h>

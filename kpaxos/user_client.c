@@ -84,7 +84,10 @@ static void
 make_client(struct client* cl)
 {
 
-  struct pollfd pol;
+  struct pollfd  pol;
+  struct timeval seed;
+  int            fileid;
+  char           file_name[128];
   void (*callback)(struct client * cl);
 
   // ethernet for proposer
@@ -121,6 +124,15 @@ make_client(struct client* cl)
       callback(cl);
     }
   }
+
+  stats_print();
+  gettimeofday(&seed, NULL);
+  srand(seed.tv_usec);
+  fileid = rand();
+  fileid &= 0xffffff;
+  sprintf(file_name, "stats-%3.3dclients-%d.txt", cl->nclients, fileid);
+  stats_persist(file_name);
+  stats_destroy();
 
 cleanup:
   client_free(cl);
