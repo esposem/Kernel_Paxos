@@ -102,7 +102,7 @@ client_submit_value(struct client* c, int cid)
 static void
 update_stats(struct stats* stats, struct client_value* delivered, size_t size)
 {
-  struct timeval tv = { 0, 0 };
+  struct timeval tv;
   do_gettimeofday(&tv);
   long lat = timeval_diff(&delivered->t, &tv);
   stats->delivered_count++;
@@ -145,7 +145,6 @@ on_stats(unsigned long arg)
   long           mbps =
     (c->stats.delivered_count * c->send_buffer_len * 8) / (1024 * 1024);
 
-  // LOG_INFO("%d msgs/sec, %ld Mbps", c->stats.delivered_count, mbps);
   LOG_INFO("%d val/sec, %ld Mbps", c->stats.delivered_count, mbps);
   memset(&c->stats, 0, sizeof(struct stats));
   check_timeout();
@@ -191,12 +190,6 @@ start_client(int proposer_id, int value_size)
     client_submit_value(c, id + i);
   }
 }
-
-struct as
-{
-  int x;
-  int y;
-};
 
 static int __init
            init_client(void)

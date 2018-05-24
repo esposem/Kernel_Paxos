@@ -81,9 +81,9 @@ learner_new(int acceptors)
     l->current_iid = 1;
     l->highest_iid_closed = 1;
     if (paxos_config.learner_catch_up) {
-      paxos_log_info("Catch up on\n");
+      LOG_INFO("Catch up on");
     } else {
-      paxos_log_info("Catch up off\n");
+      LOG_INFO("Catch up off");
     }
     l->late_start = !paxos_config.learner_catch_up;
     l->instances = NULL;

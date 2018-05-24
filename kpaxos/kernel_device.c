@@ -22,6 +22,7 @@ static struct user_msg** msg_buf;
 static atomic_t          used_buf;
 
 struct file_operations fops = {
+  .owner = THIS_MODULE,
   .open = kdev_open,
   .read = kdev_read,
   .write = kdev_write,
