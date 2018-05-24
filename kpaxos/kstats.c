@@ -70,8 +70,8 @@ stats_get_count()
 void
 stats_print()
 {
-  paxos_log_info("Statistics with %d entries average of %.2fus", count,
-                 stats_get_avg());
+  LOG_INFO("Statistics with %d entries average of %ld us", count,
+           stats_get_avg());
 }
 
 void

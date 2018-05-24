@@ -27,7 +27,8 @@ void
 timercallback(int sig)
 {
   on_stats(client);
-  alarm(1);
+  if (stop)
+    alarm(1);
 }
 
 static void
@@ -36,6 +37,7 @@ unpack_message(struct client* cl, ssize_t len)
   struct user_msg*     mess = (struct user_msg*)cl->ethop.rec_buffer;
   struct client_value* val = (struct client_value*)mess->value;
   int                  id = val->client_id - cl->id;
+
   if (id >= 0 && id < cl->nclients) {
     update_stats(&cl->stats, val->t, cl->value_size);
     // printf("Client %d received value %.16s with %zu bytes\n", val->client_id,
@@ -49,7 +51,6 @@ read_file(struct client* cl)
 {
 
   ssize_t len = read(cl->fileop.fd, cl->ethop.rec_buffer, ETH_DATA_LEN);
-
   if (len == 0) {
     printf("Stopped by kernel module\n");
     stop = 0;
@@ -117,6 +118,7 @@ make_client(struct client* cl)
     pol.fd = cl->fileop.fd;
     callback = read_file;
   }
+  stats_init();
 
   while (stop) {
     poll(&pol, 1, -1);

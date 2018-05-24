@@ -39,7 +39,7 @@ open_file(struct chardevice* c)
 void
 usage(const char* name, int client)
 {
-  printf("Client Usage: %s [path/to/paxos.conf] [options] \n", name);
+  printf("Client Usage: %s [options] \n", name);
   printf("Options:\n");
   printf("  %-30s%s\n", "-h, --help", "Output this message and exit");
   printf("  %-30s%s\n", "-c, --chardev_id #", "Chardevice id");
@@ -202,7 +202,7 @@ client_new()
 {
   struct client* cl = malloc(sizeof(struct client));
   memset(cl, 0, sizeof(struct client));
-  cl->ethop.if_name = "enp0s3";
+  cl->ethop.if_name = "enp4s0";
   cl->ethop.socket = -1;
   cl->fileop.fd = -1;
   cl->value_size = 64;

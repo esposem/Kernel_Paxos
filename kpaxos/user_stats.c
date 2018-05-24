@@ -47,16 +47,9 @@ update_stats(struct stats* stats, struct timeval delivered, size_t size)
 {
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  // long lat = timeval_diff(&delivered, &tv);
+  long lat = timeval_diff(&delivered, &tv);
   stats->delivered_count++;
-  // stats->delivered_bytes += size;
-  // stats->avg_latency =
-  //   stats->avg_latency + ((lat - stats->avg_latency) /
-  //   stats->delivered_count);
-  // if (stats->min_latency == 0 || lat < stats->min_latency)
-  //   stats->min_latency = lat;
-  // if (lat > stats->max_latency)
-  //   stats->max_latency = lat;
+  stats_add(lat);
 }
 
 static long*           a = 0; // absolute time
