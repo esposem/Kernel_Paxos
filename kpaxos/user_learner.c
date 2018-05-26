@@ -44,14 +44,12 @@ static void
 change_conn_status(struct server* serv, char* mess, uint8_t dest_addr[ETH_ALEN])
 {
   int* buff = (int*)mess;
-  printf("Added connection\n");
   if (buff[0] == OPEN_CONN) {
     int id = add_connection(serv, buff[1], buff[2], dest_addr);
     int buffs[2];
     buffs[0] = OK;
     buffs[1] = id;
     eth_sendmsg(&serv->ethop, dest_addr, buffs, sizeof(buffs));
-    printf("Added connection\n");
   }
   if (buff[0] == CLOSE_CONN) {
     rem_connection(serv, buff[1]);
