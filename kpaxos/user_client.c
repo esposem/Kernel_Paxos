@@ -16,10 +16,12 @@ static struct client* client;
 void
 stop_execution(int sig)
 {
-  int buff[2];
-  buff[0] = CLOSE_CONN;
-  buff[1] = client->learner_id;
-  eth_sendmsg(&client->ethop, client->learner_addr, buff, sizeof(buff));
+  if (stop) {
+    int buff[2];
+    buff[0] = CLOSE_CONN;
+    buff[1] = client->learner_id;
+    eth_sendmsg(&client->ethop, client->learner_addr, buff, sizeof(buff));
+  }
   stop = 0;
 }
 
