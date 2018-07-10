@@ -1,31 +1,13 @@
 #include "evpaxos.h"
-#include "kernel_client.h"
 #include "kernel_device.h"
 #include <asm/atomic.h>
 #include <linux/init.h>
-#include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/time.h>
 #include <linux/udp.h>
 #include <net/sock.h>
 
-#define SEND_TO_CHAR_DEVICE 0
-
-struct file_operations fops = {
-  .open = kdev_open,
-  .read = kdev_read,
-  .write = kdev_write,
-  .release = kdev_release,
-};
-
 const char* MOD_NAME = "KLearner";
-
-size_t   sendtrim;
-atomic_t auto_trim;
-
-static int cantrim = 0;
-module_param(cantrim, int, S_IRUGO);
-MODULE_PARM_DESC(cantrim, "If the module has send to trim, set it to 1");
 
 static int id = 0;
 module_param(id, int, S_IRUGO);
@@ -42,19 +24,9 @@ MODULE_PARM_DESC(path, "The config file position, default ./paxos.conf");
 static struct evlearner* lea = NULL;
 
 static void
-on_deliver(unsigned iid, char* value, size_t size, void* arg)
+on_deliver(unsigned int iid, char* value, size_t size, void* arg)
 {
-  if (atomic_read(&auto_trim) == 1) {
-    if (sendtrim > 0) {
-      if (cantrim > 0) {
-        printk(KERN_ERR "Learner: sent trim to all\n");
-        evlearner_send_trim(lea, sendtrim);
-      }
-      sendtrim = 0;
-    }
-  }
-  if (SEND_TO_CHAR_DEVICE)
-    kset_message(value, size, iid);
+  kset_message(value, size);
 }
 
 static int
@@ -64,7 +36,7 @@ start_learner(void)
   lea = evlearner_init(on_deliver, NULL, if_name, path, 0);
 
   if (lea == NULL) {
-    printk(KERN_ERR "Could not start the learner!\n");
+    LOG_ERROR("Could not start the learner!");
   }
 
   return 0;
@@ -74,22 +46,21 @@ static int __init
            init_learner(void)
 {
   if (id < 0 || id > 10) {
-    printk(KERN_ERR "you must give an id!\n");
+    LOG_ERROR("you must give an id!");
     return 0;
   }
   start_learner();
-  printk("Module loaded\n");
+  LOG_INFO("Module loaded");
   return 0;
 }
 
 static void __exit
             learner_exit(void)
 {
-  kstop_device();
   kdevchar_exit();
   if (lea != NULL)
     evlearner_free(lea);
-  printk("Module unloaded\n");
+  LOG_INFO("Module unloaded");
 }
 
 module_init(init_learner);

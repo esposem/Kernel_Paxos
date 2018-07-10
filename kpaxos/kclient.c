@@ -9,6 +9,7 @@
 #include <linux/random.h>
 #include <linux/time.h>
 #include <linux/udp.h>
+#include <linux/vmalloc.h>
 #include <net/sock.h>
 
 #define TIMEOUT_US 1000000
@@ -92,15 +93,16 @@ client_submit_value(struct client* c, int cid)
   c->val->t = c->clients_timeval[cid - id];
   paxos_submit(evlearner_get_device(c->learner), c->proposeradd, c->send_buffer,
                c->send_buffer_len);
-  paxos_log_debug(
-    "Client %d submitted value %.16s with %zu bytes, total size is %zu",
-    c->val->client_id, c->val->value, c->val->size, c->send_buffer_len);
+  // LOG_DEBUG("Client %d submitted value %.16s with %zu bytes, total size is
+  // %d",
+  //           c->val->client_id, c->val->value, c->val->size,
+  //           c->send_buffer_len);
 }
 
 static void
 update_stats(struct stats* stats, struct client_value* delivered, size_t size)
 {
-  struct timeval tv = { 0, 0 };
+  struct timeval tv;
   do_gettimeofday(&tv);
   long lat = timeval_diff(&delivered->t, &tv);
   stats->delivered_count++;
@@ -114,7 +116,7 @@ check_timeout(void)
   do_gettimeofday(&now);
   for (int i = 0; i < nclients; i++) {
     if (timeval_diff(&c->clients_timeval[i], &now) > TIMEOUT_US) {
-      paxos_log_error("Client %d sent expired", i);
+      LOG_ERROR("Client %d sent expired", i);
       client_submit_value(c, i + id);
     }
   }
@@ -129,7 +131,7 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 
   if (clid >= id && clid < id + nclients) {
     update_stats(&c->stats, v, size);
-    //    paxos_log_debug(
+    //    LOG_DEBUG(
     //      "Client %d received value %.16s with %zu bytes, total size is %zu",
     //      v->client_id, v->value, v->size, size);
     client_submit_value(c, clid);
@@ -143,7 +145,6 @@ on_stats(unsigned long arg)
   long           mbps =
     (c->stats.delivered_count * c->send_buffer_len * 8) / (1024 * 1024);
 
-  // LOG_INFO("%d msgs/sec, %ld Mbps", c->stats.delivered_count, mbps);
   LOG_INFO("%d val/sec, %ld Mbps", c->stats.delivered_count, mbps);
   memset(&c->stats, 0, sizeof(struct stats));
   check_timeout();
@@ -165,10 +166,11 @@ start_client(int proposer_id, int value_size)
   if (c->learner == NULL) {
     LOG_ERROR("Could not start the learner.");
     kfree(c);
+    c = NULL;
     return;
   }
 
-  c->clients_timeval = pmalloc(sizeof(struct timeval) * nclients);
+  c->clients_timeval = vmalloc(sizeof(struct timeval) * nclients);
   memset(c->clients_timeval, 0, sizeof(struct timeval) * nclients);
   memset(&c->stats, 0, sizeof(struct stats));
   memcpy(c->proposeradd, evpaxos_proposer_address(conf, proposer_id), ETH_ALEN);
@@ -208,7 +210,7 @@ static void __exit
       del_timer(&c->stats_ev);
       evlearner_free(c->learner);
     }
-    pfree(c->clients_timeval);
+    vfree(c->clients_timeval);
     pfree(c);
   }
 

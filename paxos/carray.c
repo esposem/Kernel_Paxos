@@ -118,16 +118,18 @@ carray_full(struct carray* a)
 static void
 carray_grow(struct carray* a)
 {
-  int            i;
-  struct carray* tmp = carray_new(a->size * 2);
-  for (i = 0; i < a->count; i++)
-    carray_push_back(tmp, carray_at(a, i));
-  vfree(a->array);
-  a->head = 0;
-  a->tail = tmp->tail;
-  a->size = tmp->size;
-  a->array = tmp->array;
-  pfree(tmp);
+  if (printk_ratelimit())
+    paxos_log_error("Cannot allocate during execution! Carray value lost!");
+  // int i;
+  // void** tmp = vmalloc(sizeof(void*) * a->size * 2);
+  // for (i = 0; i < a->count; i++) {
+  //   tmp[i] = carray_at(a, i);
+  // }
+  // a->head = 0;
+  // a->tail = a->count;
+  // a->size *= 2;
+  // vfree(a->array);
+  // a->array = tmp;
 }
 
 static void*

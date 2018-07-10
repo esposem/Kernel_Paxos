@@ -72,11 +72,14 @@ evpaxos_replica_init(int id, deliver_function f, void* arg, char* if_name,
   add_acceptors_from_config(replica->peers, config);
   printall(replica->peers, "Replica");
   replica->deliver = f;
+  replica->arg = arg;
   replica->acceptor = evacceptor_init_internal(id, config, replica->peers);
   replica->learner = evlearner_init_internal(config, replica->peers,
                                              evpaxos_replica_deliver, replica);
   replica->proposer = evproposer_init_internal(id, config, replica->peers);
-  replica->arg = arg;
+  peers_subscribe(replica->peers);
+  evlearner_send_hi(replica->peers);
+  evproposer_preexec_once(replica->proposer);
   evpaxos_config_free(config);
   return replica;
 }

@@ -2,74 +2,91 @@
 #define USER_CLIENT
 
 #include "kernel_client.h"
-#include <event2/event.h>
-#include <event2/bufferevent.h>
-#include <event2/buffer.h>
-#include <event2/listener.h>
-#include <unistd.h>
-#include <signal.h>
 #include <arpa/inet.h>
-#include <netinet/tcp.h>
 #include <errno.h>
+#include <net/ethernet.h>
+#include <netinet/tcp.h>
+#include <signal.h>
+#include <unistd.h>
 
-#define BUFFER_LENGTH 8192
+enum user_communication
+{
+  OPEN_CONN = 100,
+  OK,
+  CLOSE_CONN
+};
 
-extern int learner_id;
-extern struct client * cl;
+// Common structs
+struct chardevice
+{
+  int fd;
+  int char_device_id;
+};
 
+struct eth_connection
+{
+  int   socket;
+  char  rec_buffer[ETH_DATA_LEN];
+  char* if_name;
+};
+
+// Server side
+
+struct connection
+{
+  int                id;
+  int                start_id;
+  int                end_id;
+  uint8_t            address[ETH_ALEN];
+  struct connection* next;
+};
+
+struct server
+{
+  struct connection_list* connections; // client we accepted connections from
+  struct chardevice       fileop;      // File op
+  struct eth_connection   ethop;       // ETH op
+};
+
+// client side
 struct client
 {
-	int id;
-	int value_size;
-	struct event_base* base;
-	struct event* sig;
-
-	// Statistics
-	struct stats stats;
-	struct timeval stats_interval;
-	struct event* stats_ev;
-
-	// File op
-	int fd;
-	struct event *evread;
-
-	// UDP op
-  int socket;
-	char* send_buffer;
-	struct sockaddr_in prop_addr;
-	struct timeval resend_interval;
-	struct event* resend_ev;
-
-	// TCP op
-	struct server * s;
-	struct bufferevent *bev;
+  int                   id;
+  int                   value_size;
+  int                   outstanding;
+  int                   nclients;
+  struct timeval*       nclients_time;
+  struct stats          stats; /* Statistics */
+  struct timeval        stats_interval;
+  struct client_value*  val; // refers to the send_buffer
+  char                  send_buffer[ETH_DATA_LEN];
+  int                   send_buffer_len;
+  int                   learner_id;
+  struct chardevice     fileop; // File op
+  struct eth_connection ethop;  // ETH op
+  uint8_t               prop_addr[ETH_ALEN];
+  int                   prop_id;
+  uint8_t               learner_addr[ETH_ALEN];
 };
 
-struct connection {
-  int id;
-	int cl_id;
-  int status;
-  struct bufferevent *bev;
-  struct sockaddr_in addr;
-  struct server *server;
-};
+extern int  open_file(struct chardevice* c);
+extern void write_file(int fd, void* data, size_t size);
+extern void usage(const char* name, int client);
 
-struct server {
-  int clients_count;
-  struct connection **connections; /* server we accepted connections from */
-  struct evconnlistener *listener;
-  struct client * client;
-};
+extern struct server* server_new();
+extern int            add_connection(struct server* serv, int start, int end,
+                                     uint8_t address[ETH_ALEN]);
+extern struct connection* find_connection(struct server* serv, int val);
+extern void               rem_connection(struct server* serv, int id);
+extern void               new_connection_list(struct server* serv);
+extern void               print_all_conn(struct server* serv);
+extern void               server_free(struct server* c);
+extern struct server*     server_new();
 
-extern void open_file(struct client * c);
-extern void usage(const char* name);
-extern void handle_sigint(int sig, short ev, void* arg);
-extern void client_submit_value(struct client* c);
-extern void client_free(struct client* c, int chardevice, int send, int sock);
-extern void write_file(int fd, void * data, int flag, size_t size, int opt);
-extern int server_listen(struct server *p, char * ip, int port);
-extern struct server *server_new(struct client *base);
-extern void on_read_sock(struct bufferevent *bev, void *arg);
-struct bufferevent *connect_to_server(struct client *c, const char *ip, int port);
-
+extern struct client* client_new();
+extern void           prepare_clval(struct client* cl);
+extern void           print_settings(struct client* cl);
+extern void           client_free(struct client* cl);
+extern void           client_submit_value(struct client* cl, int id);
+extern int            find_proposer(struct client* cl, char* path);
 #endif

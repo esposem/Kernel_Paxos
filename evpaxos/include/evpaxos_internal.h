@@ -25,28 +25,33 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #ifndef _EVPAXOS_INTERNAL_H_
 #define _EVPAXOS_INTERNAL_H_
 
-#include "peers.h"
 #include "evpaxos.h"
+#include "peers.h"
 
 struct evlearner* evlearner_init_internal(struct evpaxos_config* config,
-	struct peers* peers, deliver_function f, void* arg);
+                                          struct peers*          peers,
+                                          deliver_function f, void* arg);
 
 void evlearner_free_internal(struct evlearner* l);
 
-struct evacceptor* evacceptor_init_internal(int id,
-	struct evpaxos_config* config, struct peers* peers);
+struct evacceptor* evacceptor_init_internal(int                    id,
+                                            struct evpaxos_config* config,
+                                            struct peers*          peers);
 
 void evacceptor_free_internal(struct evacceptor* a);
 
-struct evproposer* evproposer_init_internal(int id,
-	struct evpaxos_config* config, struct peers* peers);
+struct evproposer* evproposer_init_internal(int                    id,
+                                            struct evpaxos_config* config,
+                                            struct peers*          peers);
 
 void evproposer_free_internal(struct evproposer* p);
 
 struct net_device* evlearner_get_device(struct evlearner* ev);
+
+void evlearner_send_hi(struct peers* p);
+void evproposer_preexec_once(struct evproposer* arg);
 
 #endif

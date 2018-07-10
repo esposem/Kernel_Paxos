@@ -105,7 +105,9 @@ proposer_new(int id, int acceptors)
   p->acceptors = acceptors;
   p->max_trim_iid = 0;
   p->next_prepare_iid = 0;
-  p->values = carray_new(paxos_config.proposer_preexec_window);
+  // cannot allocate carray during execution, vmalloc does not work in atomic
+  // context. Using 10000, proposer is able to handle ~2k for one sec
+  p->values = carray_new(paxos_config.proposer_preexec_window * 10000);
   p->prepare_instances = NULL;
   p->accept_instances = NULL;
   p->prepare_iids =
@@ -165,9 +167,8 @@ void
 proposer_prepare(struct proposer* p, paxos_prepare* out)
 {
   iid_t            id = ++(p->next_prepare_iid);
-  ballot_t         bal = proposer_next_ballot(p, 0);
-  struct instance* inst = NULL;
-  inst = instance_new(id, bal, p->acceptors);
+  ballot_t         bal = out->ballot ? out->ballot : proposer_next_ballot(p, 0);
+  struct instance* inst = instance_new(id, bal, p->acceptors);
   HASH_ADD_IID(p->prepare_instances, iid, inst);
   *out = (paxos_prepare){ inst->iid, inst->ballot };
   p->prepare_iids_len = ordered_add(p->prepare_iids, p->prepare_iids_len, id);
@@ -208,6 +209,7 @@ proposer_receive_promise(struct proposer* p, paxos_promise* ack,
                   ack->aid, inst->iid);
 
   if (ack->value.paxos_value_len > 0) {
+    paxos_log_debug("Promise has value");
     if (ack->value_ballot > inst->value_ballot) {
       if (instance_has_promised_value(inst))
         paxos_value_free(inst->promised_value);
@@ -228,12 +230,6 @@ proposer_accept(struct proposer* p, paxos_accept* out)
   int              i;
   iid_t            iid;
 
-  // Find smallest inst->iid
-  // for (i = p->prepare_instances; i != NULL; i = i->hh.next) {
-  //   if (inst == NULL || inst->iid > i->iid) {
-  //     inst = i;
-  //   }
-  // }
   for (i = 0; i < p->prepare_iids_len; ++i) {
     iid = ordered_get_smallest(p->prepare_iids, p->prepare_iids_len);
     HASH_FIND_IID(p->prepare_instances, &iid, inst);
@@ -330,6 +326,8 @@ proposer_receive_preempted(struct proposer* p, paxos_preempted* ack,
     if (instance_has_promised_value(inst))
       paxos_value_free(inst->promised_value);
     proposer_move_instance(&p->accept_instances, &p->prepare_instances, inst);
+    p->prepare_iids_len =
+      ordered_add(p->prepare_iids, p->prepare_iids_len, inst->iid);
     proposer_preempt(p, inst, out);
     return 1;
   } else {

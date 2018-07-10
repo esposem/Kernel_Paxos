@@ -137,11 +137,11 @@ evpaxos_config_read(char* name)
     // if comment or line too long
     if (line_pos == SIZE_LINE || line[line_pos - 1] == '#') {
       line_pos = 0;
-      char c;
+      char ch;
       // skip rest of the line
-      while ((read = file_read(f, offset, &c, 1)) != 0) {
+      while ((read = file_read(f, offset, &ch, 1)) != 0) {
         offset += read;
-        if (c == '\n') {
+        if (ch == '\n') {
           break;
         }
       }
@@ -317,6 +317,9 @@ parse_line(struct evpaxos_config* c, char* line)
   char*          sep = " ";
   struct option* opt;
 
+  if (line == NULL || strlen(line) == 0)
+    return 0;
+
   line = strtrim(line);
   tok = strsep(&line, sep);
 
@@ -354,8 +357,8 @@ parse_line(struct evpaxos_config* c, char* line)
     eth_address* acc_addr = c->acceptors[c->acceptors_count++];
     c->proposers[c->proposers_count] = pmalloc(ETH_ALEN);
     eth_address* pro_addr = c->proposers[c->proposers_count++];
-    rv = parse_address(line, pro_addr);
-    memcpy(acc_addr, pro_addr, ETH_ALEN);
+    rv = parse_address(line, acc_addr);
+    memcpy(pro_addr, acc_addr, ETH_ALEN);
     return rv;
   }
 

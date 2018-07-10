@@ -29,7 +29,7 @@ start_acceptor(int id)
 {
   acc = evacceptor_init(id, if_name, path);
   if (acc == NULL) {
-    printk(KERN_ERR "Could not start the acceptor\n");
+    LOG_ERROR("Could not start the acceptor\n");
   }
 }
 
@@ -37,7 +37,7 @@ static int __init
            init_acceptor(void)
 {
   start_acceptor(id);
-  printk("Module loaded\n");
+  LOG_INFO("Module loaded");
   return 0;
 }
 
@@ -46,7 +46,7 @@ static void __exit
 {
   if (acc != NULL)
     evacceptor_free(acc);
-  printk("Module unloaded\n");
+  LOG_INFO("Module unloaded");
 }
 
 module_init(init_acceptor) module_exit(acceptor_exit) MODULE_LICENSE("GPL");

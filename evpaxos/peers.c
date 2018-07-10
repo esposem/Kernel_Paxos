@@ -61,7 +61,7 @@ static void         free_all_peers(struct peer** p, int count);
 static void
 check_id(struct peers* p, struct evpaxos_config* config, int id)
 {
-  paxos_log_debug("Id %d\n", id);
+  paxos_log_debug("check Id %d\n", id);
   if (id < 0)
     return;
 
@@ -287,9 +287,16 @@ peers_delete_learner(struct peers* p, eth_address* addr)
 }
 
 void
-peers_subscribe(struct peers* p, paxos_message_type type, peer_cb cb, void* arg)
+peers_subscribe(struct peers* p)
 {
-  eth_listen(p->dev, (uint16_t)type, cb, arg);
+  eth_listen(p->dev);
+}
+
+void
+peers_add_subscription(struct peers* p, paxos_message_type type, peer_cb cb,
+                       void* arg)
+{
+  eth_subscribe(p->dev, (uint16_t)type, cb, arg);
 }
 
 static struct peer*

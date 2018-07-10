@@ -1,7 +1,7 @@
-#include "stats.h"
 #include "common.h"
 #include "kfile.h"
 #include "paxos.h"
+#include "stats.h"
 #include <linux/time.h>
 #include <linux/vmalloc.h>
 #include <paxos.h>
@@ -75,8 +75,8 @@ stats_get_count()
 void
 stats_print()
 {
-  paxos_log_info("Statistics with %d entries average of %.2fus", count,
-                 stats_get_avg());
+  LOG_INFO("Statistics with %d entries average of %ld us", count,
+           stats_get_avg());
 }
 
 void

@@ -169,12 +169,12 @@ evacceptor_init_internal(int id, struct evpaxos_config* c, struct peers* p)
   acceptor->state = acceptor_new(id);
   acceptor->peers = p;
 
-  peers_subscribe(p, PAXOS_PREPARE, evacceptor_handle_prepare, acceptor);
-  peers_subscribe(p, PAXOS_ACCEPT, evacceptor_handle_accept, acceptor);
-  peers_subscribe(p, PAXOS_REPEAT, evacceptor_handle_repeat, acceptor);
-  peers_subscribe(p, PAXOS_TRIM, evacceptor_handle_trim, acceptor);
-  peers_subscribe(p, PAXOS_LEARNER_HI, evacceptor_handle_hi, acceptor);
-  peers_subscribe(p, PAXOS_LEARNER_DEL, evacceptor_handle_del, acceptor);
+  peers_add_subscription(p, PAXOS_PREPARE, evacceptor_handle_prepare, acceptor);
+  peers_add_subscription(p, PAXOS_ACCEPT, evacceptor_handle_accept, acceptor);
+  peers_add_subscription(p, PAXOS_REPEAT, evacceptor_handle_repeat, acceptor);
+  peers_add_subscription(p, PAXOS_TRIM, evacceptor_handle_trim, acceptor);
+  peers_add_subscription(p, PAXOS_LEARNER_HI, evacceptor_handle_hi, acceptor);
+  peers_add_subscription(p, PAXOS_LEARNER_DEL, evacceptor_handle_del, acceptor);
 
   setup_timer(&acceptor->stats_ev, send_acceptor_state,
               (unsigned long)acceptor);
@@ -205,6 +205,7 @@ evacceptor_init(int id, char* if_name, char* path)
     return NULL;
   printall(peers, "Acceptor");
   struct evacceptor* acceptor = evacceptor_init_internal(id, config, peers);
+  peers_subscribe(peers);
   evpaxos_config_free(config);
   return acceptor;
 }

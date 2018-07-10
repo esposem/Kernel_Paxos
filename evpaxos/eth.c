@@ -14,11 +14,13 @@
 struct callback
 {
   struct packet_type pt;
+  int                cb_index;
   peer_cb            cb[MAX_CALLBACK];
   void*              arg[MAX_CALLBACK];
 };
 
 static struct callback cbs[N_PAXOS_TYPES];
+static int             if_lo = 0;
 
 static int packet_recv(struct sk_buff* sk, struct net_device* dev,
                        struct packet_type* pt, struct net_device* dev2);
@@ -27,44 +29,50 @@ struct net_device*
 eth_init(const char* if_name)
 {
   memset(cbs, 0, sizeof(cbs));
+  if (memcmp(if_name, "lo", 3) == 0)
+    if_lo = 1;
   return dev_get_by_name(&init_net, if_name);
 }
 
 int
-eth_listen(struct net_device* dev, uint16_t proto, peer_cb cb, void* arg)
+eth_subscribe(struct net_device* dev, uint16_t proto, peer_cb cb, void* arg)
 {
-  int i = GET_PAXOS_POS(proto);
-  if (i < 0 || i >= N_PAXOS_TYPES)
+  int i = GET_PAXOS_INDEX(proto); // cbs[i]
+
+  if (i < 0 || i >= N_PAXOS_TYPES) {
+    paxos_log_error("Wrong protocol!");
     return 0;
+  }
 
-  int k = 0;
+  if (cbs[i].cb_index >= MAX_CALLBACK) {
+    paxos_log_error("Callback full!");
+    return 0;
+  }
 
-  while (k < MAX_CALLBACK && cbs[i].cb[k] != NULL) {
-    // there is already such callback, ignore this
+  for (int k = 0; k < cbs[i].cb_index; k++) {
     if (cbs[i].cb[k] == cb) {
+      paxos_log_error("Callback already present!");
       return 0;
     }
-    k++;
   }
 
-  // no space for an additional callback!
-  if (k >= MAX_CALLBACK) {
-    paxos_log_error("Could not register the callback for %d: too many cb",
-                    proto);
-    return 0;
-  }
+  cbs[i].cb[cbs[i].cb_index] = cb;
+  cbs[i].arg[cbs[i].cb_index++] = arg;
+  return 1;
+}
 
-  // there are callbacks already registered: remove them first
-  if (k != 0) {
-    dev_remove_pack(&cbs[i].pt);
-  } else { // first callback registered
-    cbs[i].pt.type = htons(proto);
-    cbs[i].pt.func = packet_recv;
-    cbs[i].pt.dev = dev;
+int
+eth_listen(struct net_device* dev)
+{
+  for (int i = 0; i < N_PAXOS_TYPES; i++) {
+    if (cbs[i].cb_index > 0) {
+      cbs[i].pt.type = htons(GET_PAXOS(i));
+      cbs[i].pt.func = packet_recv;
+      cbs[i].pt.dev = dev;
+      paxos_log_debug("Added callback for proto %d", i);
+      dev_add_pack(&cbs[i].pt);
+    }
   }
-  cbs[i].cb[k] = cb;
-  cbs[i].arg[k] = arg;
-  dev_add_pack(&cbs[i].pt);
   return 1;
 }
 
@@ -73,26 +81,31 @@ packet_recv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt,
             struct net_device* src_dev)
 {
   uint16_t       proto = ntohs(skb->protocol);
-  int            i = GET_PAXOS_POS(proto), k = 0;
+  int            i = GET_PAXOS_INDEX(proto);
   paxos_message  msg;
   char           msg_data[ETH_DATA_LEN];
   struct ethhdr* eth = eth_hdr(skb);
   size_t         len = skb->len;
   char           data[ETH_DATA_LEN];
+  char*          data_p = data;
 
   skb_copy_bits(skb, 0, data, len);
-  while (k < MAX_CALLBACK && cbs[i].cb[k] != NULL) {
-    recv_paxos_message(&msg, msg_data, proto, data, len);
+
+  if (!if_lo && memcmp(eth->h_source, dev->dev_addr, ETH_ALEN) == 0) {
+    data_p += ETH_HLEN;
+    len -= ETH_HLEN;
+  }
+
+  recv_paxos_message(&msg, msg_data, proto, data_p, len);
+  for (int k = 0; k < cbs[i].cb_index; k++) {
     cbs[i].cb[k](&msg, cbs[i].arg[k], eth->h_source);
-    k++;
   }
 
   kfree_skb(skb);
   return 0;
 }
 
-// dumbest thing to do: reimplement dev_loopback_xmit without
-// the warning
+// reimplemented dev_loopback_xmit without the warning
 void
 dev_loopback_xmit2(struct sk_buff* skb)
 {
@@ -143,7 +156,7 @@ eth_destroy(struct net_device* dev)
   int i;
 
   for (i = 0; i < N_PAXOS_TYPES; ++i) {
-    if (cbs[i].cb[0] != NULL)
+    if (cbs[i].cb_index > 0)
       dev_remove_pack(&cbs[i].pt);
   }
 

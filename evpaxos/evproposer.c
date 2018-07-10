@@ -76,7 +76,11 @@ try_accept(struct evproposer* p)
   paxos_accept  accept;
   paxos_prepare pr;
   while (proposer_accept(p->state, &accept)) {
-    proposer_prepare(p->state, &pr);
+    int count = p->preexec_window - proposer_prepared_count(p->state);
+    pr.iid = 0;
+    pr.ballot = accept.ballot;
+    if (count > 0)
+      proposer_prepare(p->state, &pr);
     accept.promise_iid = pr.iid;
     peers_foreach_acceptor(p->peers, peer_send_accept, &accept);
   }
@@ -158,7 +162,7 @@ evproposer_handle_acceptor_state(paxos_message* msg, void* arg,
   proposer_receive_acceptor_state(proposer->state, acc_state);
 }
 
-static void
+void
 evproposer_preexec_once(struct evproposer* arg)
 {
   if (arg)
@@ -205,16 +209,17 @@ evproposer_init_internal(int id, struct evpaxos_config* c, struct peers* peers)
   proposer->state = proposer_new(proposer->id, acceptor_count);
   proposer->peers = peers;
 
-  peers_subscribe(peers, PAXOS_PROMISE, evproposer_handle_promise, proposer);
-  peers_subscribe(peers, PAXOS_ACCEPTED, evproposer_handle_accepted, proposer);
-  peers_subscribe(peers, PAXOS_PREEMPTED, evproposer_handle_preempted,
-                  proposer);
-  peers_subscribe(peers, PAXOS_CLIENT_VALUE, evproposer_handle_client_value,
-                  proposer);
-  peers_subscribe(peers, PAXOS_ACCEPTOR_STATE, evproposer_handle_acceptor_state,
-                  proposer);
+  peers_add_subscription(peers, PAXOS_PROMISE, evproposer_handle_promise,
+                         proposer);
+  peers_add_subscription(peers, PAXOS_ACCEPTED, evproposer_handle_accepted,
+                         proposer);
+  peers_add_subscription(peers, PAXOS_PREEMPTED, evproposer_handle_preempted,
+                         proposer);
+  peers_add_subscription(peers, PAXOS_CLIENT_VALUE,
+                         evproposer_handle_client_value, proposer);
+  peers_add_subscription(peers, PAXOS_ACCEPTOR_STATE,
+                         evproposer_handle_acceptor_state, proposer);
 
-  evproposer_preexec_once(proposer);
   setup_timer(&proposer->stats_ev, evproposer_check_timeouts,
               (unsigned long)proposer);
   proposer->stats_interval =
@@ -233,7 +238,7 @@ evproposer_init(int id, char* if_name, char* path)
     return NULL;
 
   if (id < 0 || id >= evpaxos_proposer_count(config)) {
-    printk(KERN_ERR "Invalid proposer id: %d", id);
+    paxos_log_error("Invalid proposer id: %d", id);
     return NULL;
   }
 
@@ -244,6 +249,8 @@ evproposer_init(int id, char* if_name, char* path)
   add_acceptors_from_config(peers, config);
   printall(peers, "Proposer");
   struct evproposer* p = evproposer_init_internal(id, config, peers);
+  peers_subscribe(peers);
+  evproposer_preexec_once(p);
   evpaxos_config_free(config);
   return p;
 }
