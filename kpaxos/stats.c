@@ -6,10 +6,10 @@
 #include <linux/vmalloc.h>
 #include <paxos.h>
 
-static long*           a = 0; // absolute time
-static long*           e = 0; // elapsed time between calls to stats_add
-static unsigned long   count;
-static struct timespec then;
+static long*          a = 0; // absolute time
+static long*          e = 0; // elapsed time between calls to stats_add
+static unsigned long  count;
+static struct timeval then;
 
 void
 stats_init()
@@ -19,7 +19,7 @@ stats_init()
   a = vmalloc(STATS_MAX_COUNT * sizeof(long));
   memset(a, 0, STATS_MAX_COUNT * sizeof(long));
   count = 0;
-  getrawmonotonic(&then);
+  do_gettimeofday(&then);
 }
 
 void
@@ -35,16 +35,21 @@ stats_destroy()
 void
 stats_add(long latency)
 {
-  struct timespec now;
+  struct timeval now;
+  long           us;
 
   if (count == STATS_MAX_COUNT) {
     paxos_log_error("Stats error: array is full");
     return;
   }
 
-  getrawmonotonic(&now);
-  a[count] = (now.tv_sec - then.tv_sec) * 1000000 +
-             (now.tv_nsec - then.tv_nsec) / 1000000;
+  do_gettimeofday(&now);
+  us = (now.tv_sec - then.tv_sec) * 1000000;
+  if (us < 0)
+    us = 0;
+
+  us += (now.tv_usec - then.tv_usec);
+  a[count] = us;
   e[count++] = latency;
   then = now;
 }
