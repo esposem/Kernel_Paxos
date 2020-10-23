@@ -139,9 +139,9 @@ on_deliver(unsigned iid, char* value, size_t size, void* arg)
 }
 
 static void
-on_stats(unsigned long arg)
+on_stats(struct timer_list *t)
 {
-  struct client* c = (struct client*)arg;
+  struct client* c = from_timer(c, t, stats_ev);
   long           mbps =
     (c->stats.delivered_count * c->send_buffer_len * 8) / (1024 * 1024);
 
@@ -181,7 +181,7 @@ start_client(int proposer_id, int value_size)
   c->send_buffer_len = sizeof(struct client_value) + value_size;
   random_string(c->val->value, value_size);
 
-  setup_timer(&c->stats_ev, on_stats, (unsigned long)c);
+  timer_setup(&c->stats_ev, on_stats, 0);
   c->stats_interval = (struct timeval){ 1, 0 };
   mod_timer(&c->stats_ev, jiffies + timeval_to_jiffies(&c->stats_interval));
 

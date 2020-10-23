@@ -147,9 +147,9 @@ evacceptor_handle_del(paxos_message* msg, void* arg, eth_address* src)
 }
 
 static void
-send_acceptor_state(unsigned long arg)
+send_acceptor_state(struct timer_list *t)
 {
-  struct evacceptor* a = (struct evacceptor*)arg;
+  struct evacceptor* a = from_timer(a, t, stats_ev);
   paxos_message      msg = { .type = PAXOS_ACCEPTOR_STATE };
   acceptor_set_current_state(a->state, &msg.u.state);
   peers_foreach_client(a->peers, send_acceptor_paxos_message, &msg);
@@ -176,8 +176,8 @@ evacceptor_init_internal(int id, struct evpaxos_config* c, struct peers* p)
   peers_add_subscription(p, PAXOS_LEARNER_HI, evacceptor_handle_hi, acceptor);
   peers_add_subscription(p, PAXOS_LEARNER_DEL, evacceptor_handle_del, acceptor);
 
-  setup_timer(&acceptor->stats_ev, send_acceptor_state,
-              (unsigned long)acceptor);
+  timer_setup(&acceptor->stats_ev, send_acceptor_state, 0);
+
   acceptor->stats_interval = (struct timeval){ 1, 0 };
   mod_timer(&acceptor->stats_ev,
             jiffies + timeval_to_jiffies(&acceptor->stats_interval));

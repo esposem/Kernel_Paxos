@@ -6,3 +6,4 @@
 *.symvers
 *.order
 build/**
+.vscode/

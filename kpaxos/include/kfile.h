@@ -2,7 +2,7 @@
 #define K_FILE
 
 #include <asm/segment.h>
-#include <asm/uaccess.h>
+//#include <asm/uaccess.h>
 #include <linux/buffer_head.h>
 #include <linux/fs.h>
 
